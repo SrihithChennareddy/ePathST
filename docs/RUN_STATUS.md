@@ -1,5 +1,11 @@
 # Run status & recovery log
 
+See also `experimental_runs/` (sibling to `docs/`) for captured result
+snapshots used for cross-run comparison/analysis -- this file is the
+operational log (what ran, what broke, what to do next); that folder is
+the scientific record (actual numbers). Both SLURM scripts call
+`scripts/snapshot_experiment.py` automatically at the end of their run.
+
 Living document tracking the real (non-simulated) execution of the CPTAC
 distillation pipeline: what's been submitted, what happened, what's
 resumable, and how to recover after a failure/interruption. Update this
@@ -94,8 +100,29 @@ job's Step 1-2).
 
 ### Job 83723 -- b40x4-09, RUNNING (started 2026-08-28T03:03:35)
 - Same script as 83721, with the `--mem=220G` fix.
-- Confirmed past the point where 83721 died; Step 1 QC progressing
-  (95 -> 100+ WSIs QC'd and climbing at last check).
+- **Step 1 completed successfully**: 598 initial WSIs / 598 patients ->
+  363 passed hard-filter QC -> 363 selected (below the ~500 target, so no
+  QC-score capping applied -- worth investigating exclusion_reasons in
+  `qc/cptac_wsi_selection_report.json` later, but not blocking).
+- **Step 2 (patch extraction) found a real bug**: `WsiDicomOutOfBoundsError`
+  when a sampled patch center is close enough to a WSI's edge that the
+  read region extends past the slide boundary (e.g. `position=Point(x=-3,
+  y=218)`). Because the per-WSI extraction function wraps its ENTIRE
+  patch loop in one try/except, a single edge-adjacent coordinate anywhere
+  in a WSI's sample list aborted that WSI's ENTIRE patch set, not just the
+  one bad patch. ~7/363 WSIs (~2%) lost to this before the fix landed.
+  **Fixed** in `sts/wsi_patches.py` (new `_clamp_region` helper, applied
+  in both `WsiDicomReader.read_region_at_mpp` and
+  `OpenSlideReader.read_region_at_mpp`): shifts the read region to stay
+  within the level's bounds instead of raising, trading a small
+  (sub-patch-width) shift in the exact patch center for keeping real
+  tissue content instead of losing the whole WSI.
+- The fix was applied to the source while job 83723 kept running (its
+  already-started Python process doesn't pick up the change); the ~7
+  WSIs it lost never got a shard file written, so Step 2's resumability
+  means a **later resubmission will automatically retry them** -- no
+  manual intervention needed, just don't forget this when checking final
+  WSI/patch counts against the 363-selected number.
 - **This is the currently active real run as of 2026-08-28.** Check
   `squeue -j 83723` for live status, or `tail -f
   STS_src/logs/slurm_b40_83723.out` for progress.

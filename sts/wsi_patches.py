@@ -14,6 +14,25 @@ import numpy as np
 from sts.cptac_select import tissue_mask_from_thumbnail
 
 
+def _clamp_region(x0: int, y0: int, size: int, level_width: int, level_height: int) -> tuple[int, int]:
+    """Shifts (x0, y0) so the `size`x`size` box stays fully within
+    [0, level_width) x [0, level_height) -- patches sampled near a tissue
+    edge routinely land within half a patch-width of the slide boundary
+    (Section 5's spatial-coverage sampling has no reason to avoid edges),
+    and reading past the boundary either crashes (wsidicom raises
+    WsiDicomOutOfBoundsError) or silently returns black padding
+    (openslide) instead of the real tissue that's actually there. Clamping
+    trades a small, harmless shift in the patch's exact center (at most
+    half the out-of-bounds amount) for real tissue content -- and, more
+    importantly, for not losing every OTHER patch in the same WSI when a
+    single edge coordinate would otherwise raise and abort the whole
+    WSI's extraction (see sts.wsi_patches module docstring / the
+    2026-08-28 real-run bug this fixes)."""
+    x0 = max(0, min(x0, max(0, level_width - size)))
+    y0 = max(0, min(y0, max(0, level_height - size)))
+    return x0, y0
+
+
 def open_slide(path: str):
     """Factory: a directory (or a path containing multiple sibling .dcm
     files) is a DICOM whole-slide-image series (the actual CPTAC/IDC
@@ -100,6 +119,8 @@ class WsiDicomReader:
         x0, y0 = int(round(center_x_px - half)), int(round(center_y_px - half))
         size = max(1, int(round(native_span)))
         lvl = self.level_for_mpp(mpp)
+        lvl_w, lvl_h = self._levels[lvl].size.width, self._levels[lvl].size.height
+        x0, y0 = _clamp_region(x0, y0, size, lvl_w, lvl_h)
         region = self.slide.read_region((x0, y0), lvl, (size, size)).convert("RGB")
         if size != out_px:
             region = region.resize((out_px, out_px), Image.BILINEAR)
@@ -198,6 +219,7 @@ class OpenSlideReader:
         half = native_span / 2.0
         x0, y0 = int(round(center_x_px - half)), int(round(center_y_px - half))
         size = max(1, int(round(native_span)))
+        x0, y0 = _clamp_region(x0, y0, size, self.dimensions[0], self.dimensions[1])
         region = self.slide.read_region((x0, y0), 0, (size, size)).convert("RGB")
         if size != out_px:
             region = region.resize((out_px, out_px), Image.BILINEAR)

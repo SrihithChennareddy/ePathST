@@ -89,4 +89,8 @@ log "=== Step 9: lock student, strip teacher-projection head, save to persist_di
 # Step 5 may not have reached every seed) rather than failing the whole job
 python3 scripts/07_lock_student.py --config "$CONFIG" --device cuda --mode A
 
+log "=== snapshotting results to experimental_runs/ for later comparison ==="
+python3 scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition h200x4 \
+  --gpu "4x H200" --label cptac_distill_h200x4 --stage "end of 8h job"
+
 log "=== DONE (total elapsed: $((SECONDS - JOB_START))s) ==="
