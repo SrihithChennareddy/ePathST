@@ -1,0 +1,261 @@
+"""WSI I/O (openslide for .svs/.ndpi/... and wsidicom for the DICOM
+whole-slide-image series CPTAC actually ships via the Imaging Data Commons
+-- see sts.wsi_patches.open_slide) + tissue-masked patch extraction
+(Final_Project.txt Step 2, and reused for HEST ST-centered patches in Step
+12). Never resizes whole WSIs -- always reads the pyramid level nearest the
+target mpp and extracts fixed-physical-size regions.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+
+from sts.cptac_select import tissue_mask_from_thumbnail
+
+
+def open_slide(path: str):
+    """Factory: a directory (or a path containing multiple sibling .dcm
+    files) is a DICOM whole-slide-image series (the actual CPTAC/IDC
+    layout: one series = 7+ separate SOP instances -- VOLUME pyramid
+    levels, LABEL, OVERVIEW, THUMBNAIL -- addressed by directory, never a
+    single filename); anything else is opened via openslide. Confirmed
+    against a real downloaded CPTAC-BRCA series (01BR001,
+    s3://idc-open-data/e20e17fe-.../): SOPClassUID
+    1.2.840.10008.5.1.4.1.1.77.1.6 (VL Whole Slide Microscopy Image), base
+    level 0.4942 um/px -- already almost exactly the Section 5 target of
+    ~0.5 um/px, so no resampling is needed for CPTAC's native resolution."""
+    p = Path(path)
+    if p.is_dir() or (p.exists() and any(p.parent.glob("*.dcm"))):
+        return WsiDicomReader(str(p if p.is_dir() else p.parent))
+    return OpenSlideReader(str(p))
+
+
+class WsiDicomReader:
+    """Duck-typed wrapper around wsidicom.WsiDicom, matching the interface
+    expected by sts.cptac_select.compute_wsi_qc and the patch extractors
+    below. `path` is a DIRECTORY containing every .dcm instance of one
+    series (wsidicom auto-discovers and assembles the pyramid).
+    wsidicom.read_region's `location` is level-0 pixel coordinates (same
+    convention as openslide.OpenSlide.read_region), so the rest of this
+    module's arithmetic (written against OpenSlideReader) is unchanged."""
+
+    def __init__(self, path: str):
+        from wsidicom import WsiDicom
+        self.path = path
+        self.slide = WsiDicom.open(path)
+        self.dimensions = (self.slide.size.width, self.slide.size.height)
+        self.mpp = float(self.slide.mpp.width) if self.slide.mpp else None
+        self._levels = sorted(self.slide.levels, key=lambda l: l.size.width, reverse=True)
+
+    def _infer_mpp(self) -> float | None:
+        return self.mpp
+
+    def get_thumbnail(self, max_dim: int) -> np.ndarray:
+        w, h = self.dimensions
+        scale = max_dim / max(w, h)
+        thumb = self.slide.read_thumbnail((max(1, int(w * scale)), max(1, int(h * scale))))
+        return np.asarray(thumb.convert("RGB"))
+
+    def level_for_mpp(self, target_mpp: float) -> int:
+        """Returns the pyramid INDEX (0 = highest resolution) into
+        self._levels closest to target_mpp -- this is the `level` argument
+        wsidicom.read_region expects, not the DICOM-native level number."""
+        if self.mpp is None:
+            return 0
+        best_idx, best_diff = 0, float("inf")
+        for idx, lvl in enumerate(self._levels):
+            diff = abs(float(lvl.mpp.width) - target_mpp)
+            if diff < best_diff:
+                best_diff, best_idx = diff, idx
+        return best_idx
+
+    def read_region_20x(self, x_thumb: int, y_thumb: int, size_px: int) -> np.ndarray:
+        lvl = self.level_for_mpp(0.5)
+        region = self.slide.read_region((int(x_thumb), int(y_thumb)), lvl, (size_px, size_px))
+        return np.asarray(region.convert("RGB"))
+
+    def sample_tissue_tile_coords(self, tissue_mask: np.ndarray, n_tiles: int, tile_px: int) -> list[tuple[int, int]]:
+        ys, xs = np.where(tissue_mask)
+        if len(xs) == 0:
+            return []
+        rng = np.random.RandomState(0)
+        idx = rng.choice(len(xs), size=min(n_tiles, len(xs)), replace=False)
+        w0, h0 = self.dimensions
+        th, tw = tissue_mask.shape
+        scale_x, scale_y = w0 / tw, h0 / th
+        coords = []
+        for i in idx:
+            x0 = int(xs[i] * scale_x - tile_px / 2)
+            y0 = int(ys[i] * scale_y - tile_px / 2)
+            coords.append((max(0, x0), max(0, y0)))
+        return coords
+
+    def read_region_at_mpp(self, center_x_px: float, center_y_px: float, physical_size_um: float,
+                            out_px: int, source_mpp: float | None = None) -> np.ndarray:
+        from PIL import Image
+        mpp = source_mpp or self.mpp or 0.5
+        native_span = physical_size_um / mpp
+        half = native_span / 2.0
+        x0, y0 = int(round(center_x_px - half)), int(round(center_y_px - half))
+        size = max(1, int(round(native_span)))
+        lvl = self.level_for_mpp(mpp)
+        region = self.slide.read_region((x0, y0), lvl, (size, size)).convert("RGB")
+        if size != out_px:
+            region = region.resize((out_px, out_px), Image.BILINEAR)
+        return np.asarray(region, dtype=np.uint8)
+
+    def close(self):
+        self.slide.close()
+
+
+class OpenSlideReader:
+    """Thin duck-typed wrapper around openslide.OpenSlide matching the
+    interface expected by sts.cptac_select.compute_wsi_qc and the patch
+    extractors below. cuCIM is a drop-in alternative when GPU-accelerated
+    slide reading is available; swap the backend here if so."""
+
+    def __init__(self, path: str):
+        import openslide
+        self.path = path
+        self.slide = openslide.OpenSlide(path)
+        self.dimensions = self.slide.dimensions
+        self.mpp = self._infer_mpp()
+
+    def _infer_mpp(self) -> float | None:
+        props = self.slide.properties
+        for key in ("openslide.mpp-x", "aperio.MPP"):
+            if key in props:
+                try:
+                    return float(props[key])
+                except ValueError:
+                    continue
+        # fallback: infer from objective power if present (20x ~ 0.5um/px, 40x ~ 0.25um/px)
+        power = props.get("aperio.AppMag") or props.get("openslide.objective-power")
+        if power is not None:
+            try:
+                p = float(power)
+                return 10.0 / p if p > 0 else None
+            except ValueError:
+                return None
+        return None
+
+    def get_thumbnail(self, max_dim: int) -> np.ndarray:
+        w, h = self.dimensions
+        scale = max_dim / max(w, h)
+        thumb = self.slide.get_thumbnail((int(w * scale), int(h * scale)))
+        return np.asarray(thumb.convert("RGB"))
+
+    def level_for_mpp(self, target_mpp: float) -> int:
+        if self.mpp is None:
+            return 0
+        best_level, best_diff = 0, float("inf")
+        for lvl in range(self.slide.level_count):
+            downsample = self.slide.level_downsamples[lvl]
+            lvl_mpp = self.mpp * downsample
+            diff = abs(lvl_mpp - target_mpp)
+            if diff < best_diff:
+                best_diff, best_level = diff, lvl
+        return best_level
+
+    def read_region_20x(self, x_thumb: int, y_thumb: int, size_px: int) -> np.ndarray:
+        """x_thumb/y_thumb are level-0 pixel coords already; reads a
+        `size_px` square at the pyramid level nearest 0.5 um/px."""
+        lvl = self.level_for_mpp(0.5)
+        downsample = self.slide.level_downsamples[lvl]
+        region = self.slide.read_region((int(x_thumb), int(y_thumb)), lvl, (size_px, size_px))
+        return np.asarray(region.convert("RGB"))
+
+    def sample_tissue_tile_coords(self, tissue_mask: np.ndarray, n_tiles: int, tile_px: int) -> list[tuple[int, int]]:
+        """Uniformly samples up to n_tiles level-0 coordinates from tissue
+        pixels in the thumbnail mask, spread across the tissue area rather
+        than clustered (Section 4: 'sample 50-100 tissue tiles')."""
+        ys, xs = np.where(tissue_mask)
+        if len(xs) == 0:
+            return []
+        rng = np.random.RandomState(0)
+        idx = rng.choice(len(xs), size=min(n_tiles, len(xs)), replace=False)
+        w0, h0 = self.dimensions
+        th, tw = tissue_mask.shape
+        scale_x, scale_y = w0 / tw, h0 / th
+        coords = []
+        for i in idx:
+            x0 = int(xs[i] * scale_x - tile_px / 2)
+            y0 = int(ys[i] * scale_y - tile_px / 2)
+            coords.append((max(0, x0), max(0, y0)))
+        return coords
+
+    def read_region_at_mpp(self, center_x_px: float, center_y_px: float, physical_size_um: float,
+                            out_px: int, source_mpp: float | None = None) -> np.ndarray:
+        """Reads a `physical_size_um`-wide square centered at
+        (center_x_px, center_y_px) in level-0 pixel coordinates, at the
+        level nearest 0.5 um/px, then resizes to out_px x out_px. Used both
+        for Step 2 (spatial tissue sampling) and Step 12 (ST-spot-centered
+        HEST patches)."""
+        from PIL import Image
+        mpp = source_mpp or self.mpp or 0.25
+        native_span = physical_size_um / mpp
+        half = native_span / 2.0
+        x0, y0 = int(round(center_x_px - half)), int(round(center_y_px - half))
+        size = max(1, int(round(native_span)))
+        region = self.slide.read_region((x0, y0), 0, (size, size)).convert("RGB")
+        if size != out_px:
+            region = region.resize((out_px, out_px), Image.BILINEAR)
+        return np.asarray(region, dtype=np.uint8)
+
+
+def sample_patch_grid(reader: OpenSlideReader, tissue_mask_thumb: np.ndarray, cfg: dict, rng_seed: int) -> list[tuple[int, int]]:
+    """Step 2: spatial-coverage sampling. Lays a regular grid at the target
+    patch spacing across the WSI, keeps only grid points overlapping the
+    thumbnail tissue mask above the tissue-fraction threshold, then
+    subsamples down to the target patch-count range -- this spreads
+    patches across the whole tissue area rather than taking many adjacent
+    redundant patches (Section 5)."""
+    patching = cfg["patching"]
+    patch_px, target_mpp = patching["patch_px"], patching["target_mpp"]
+    w0, h0 = reader.dimensions
+    stride_px = int(round(patch_px * (reader.mpp or target_mpp) / target_mpp))
+    th, tw = tissue_mask_thumb.shape
+    scale_x, scale_y = tw / w0, th / h0
+
+    xs = np.arange(0, w0 - stride_px, stride_px)
+    ys = np.arange(0, h0 - stride_px, stride_px)
+    candidates = []
+    for y in ys:
+        ty = int(y * scale_y)
+        row = tissue_mask_thumb[max(0, ty - 1):ty + 2, :]
+        for x in xs:
+            tx = int(x * scale_x)
+            patch_tissue = row[:, max(0, tx - 1):tx + 2]
+            if patch_tissue.size and patch_tissue.mean() >= patching["min_tissue_fraction"]:
+                candidates.append((int(x + stride_px // 2), int(y + stride_px // 2)))
+
+    lo, hi = patching["target_patches_per_wsi"]
+    rng = np.random.RandomState(rng_seed)
+    if len(candidates) > hi:
+        idx = rng.choice(len(candidates), size=hi, replace=False)
+        candidates = [candidates[i] for i in idx]
+    return candidates
+
+
+def patch_tissue_fraction(patch_rgb: np.ndarray) -> float:
+    mask = tissue_mask_from_thumbnail(patch_rgb)
+    return float(mask.mean())
+
+
+import h5py  # noqa: E402
+
+
+def write_patch_shard(out_path: str | Path, patch_ids: list[str], patches: np.ndarray, meta: dict) -> None:
+    """One HDF5 shard per WSI (Section 5 storage guidance: WebDataset/LMDB/
+    coordinate-based on-demand reading preferred over millions of PNGs; we
+    use HDF5 with per-image chunking so single-row training reads stay
+    cheap -- see the identical rationale in the PoC_5 patch store)."""
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(out_path, "w") as f:
+        f.create_dataset("patches", data=patches, dtype="uint8", compression="gzip",
+                          compression_opts=4, chunks=(1,) + patches.shape[1:])
+        f.create_dataset("patch_id", data=np.array(patch_ids, dtype="S"))
+        for k, v in meta.items():
+            f.create_dataset(k, data=np.asarray(v))

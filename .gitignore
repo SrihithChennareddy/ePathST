@@ -1,0 +1,10 @@
+runs/
+logs/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.h5
+*.pt
+*.pth
+README.md
+*.h5ad

@@ -1,0 +1,31 @@
+# Final_Project.txt Section 3 preferred packages, pinned loosely (cluster
+# modules typically provide torch/CUDA; leave torch/torchvision unpinned
+# here and load via `module load pytorch/...` instead when on a GPU node).
+torch>=2.1
+torchvision>=0.16
+timm>=0.9.12
+torch_geometric>=2.4
+openslide-bin>=4.0       # bundles libopenslide itself (no system lib needed) -- confirmed reading
+                         # HEST's real pyramidal-TIFF WSIs via sts.wsi_patches.OpenSlideReader.
+                         # Plain `openslide-python` needs a separately-installed libopenslide.so that
+                         # is not present on this cluster, so install openslide-bin instead/as well.
+wsidicom>=0.20           # confirmed reading CPTAC/IDC's real DICOM WSI series via
+                         # sts.wsi_patches.WsiDicomReader (open_slide() dispatches DICOM dirs here)
+pydicom>=2.4
+boto3>=1.34              # anonymous S3 download of CPTAC/IDC DICOM series (idc-open-data bucket)
+numpy>=1.24
+pandas>=2.0
+scipy>=1.11
+scikit-learn>=1.3
+scanpy>=1.9
+anndata>=0.10
+matplotlib>=3.7
+tqdm>=4.66
+pyarrow>=14
+h5py>=3.10
+safetensors>=0.4
+pyyaml>=6.0
+transformers>=4.38
+decoupler>=1.5
+umap-learn>=0.5
+fvcore>=0.1.5      # optional: FLOPs/MACs accounting (sts.efficiency degrades gracefully without it)

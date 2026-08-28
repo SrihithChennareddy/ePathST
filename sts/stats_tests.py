@@ -1,0 +1,82 @@
+"""Statistical inference (Final_Project.txt Section 25/26): patient
+bootstrap CI, paired sign-flip test, Benjamini-Hochberg FDR. Adapted
+verbatim from STS_PoC/PoC_5/crcspatial/stats.py."""
+from __future__ import annotations
+
+import numpy as np
+
+
+def patient_bootstrap_ci(deltas: np.ndarray, n_iterations: int = 10000, seed: int = 0,
+                          ci: tuple[float, float] = (2.5, 97.5)) -> dict:
+    """Section 25: D_p = R_p,real - R_p,shuffle. Resample PATIENTS with
+    replacement `n_iterations` times (10,000 per spec)."""
+    rng = np.random.RandomState(seed)
+    n = len(deltas)
+    boot_means = np.empty(n_iterations)
+    for i in range(n_iterations):
+        idx = rng.randint(0, n, size=n)
+        boot_means[i] = np.mean(deltas[idx])
+    return {
+        "mean_delta": float(np.mean(deltas)),
+        "ci_low": float(np.percentile(boot_means, ci[0])),
+        "ci_high": float(np.percentile(boot_means, ci[1])),
+        "n_patients": n,
+        "effect_size_cohens_d": float(np.mean(deltas) / (np.std(deltas, ddof=1) + 1e-12)) if n > 1 else float("nan"),
+    }
+
+
+def paired_sign_flip_test(deltas: np.ndarray, n_iterations: int = 10000, seed: int = 0) -> dict:
+    """One-sided test for H1: mean(delta) > 0 via sign-flip permutation."""
+    rng = np.random.RandomState(seed)
+    n = len(deltas)
+    observed = float(np.mean(deltas))
+    null = np.empty(n_iterations)
+    for i in range(n_iterations):
+        flips = rng.choice([-1.0, 1.0], size=n)
+        null[i] = np.mean(deltas * flips)
+    p = (1 + np.sum(null >= observed)) / (1 + n_iterations)
+    return {"observed_mean": observed, "p_value_one_sided": float(p)}
+
+
+def bh_fdr(pvalues: np.ndarray, q_threshold: float = 0.05) -> tuple[np.ndarray, np.ndarray]:
+    """Benjamini-Hochberg FDR correction (Section 26). Returns (reject_mask, q_values)."""
+    p = np.asarray(pvalues, dtype=np.float64)
+    valid = ~np.isnan(p)
+    q = np.full_like(p, np.nan)
+    if valid.sum() == 0:
+        return np.zeros_like(p, dtype=bool), q
+
+    idx = np.where(valid)[0]
+    pv = p[idx]
+    order = np.argsort(pv)
+    ranked = pv[order]
+    m = len(ranked)
+    raw_q = ranked * m / (np.arange(1, m + 1))
+    raw_q = np.minimum.accumulate(raw_q[::-1])[::-1]
+    raw_q = np.clip(raw_q, 0, 1)
+
+    q_full = np.empty(m)
+    q_full[order] = raw_q
+    q[idx] = q_full
+    reject = np.zeros_like(p, dtype=bool)
+    reject[idx] = q[idx] < q_threshold
+    return reject, q
+
+
+def primary_hypothesis_test(r_real: dict[str, float], r_shuffle: dict[str, float], cfg: dict) -> dict:
+    """Section 25: primary comparison, real multiscale graph vs
+    degree-preserving shuffled graph, per patient. `r_real`/`r_shuffle`:
+    {patient_id -> R_p}. Only patients present in both are used."""
+    common = sorted(set(r_real) & set(r_shuffle))
+    assert common, "no overlapping patients between real and shuffled results"
+    deltas = np.array([r_real[p] - r_shuffle[p] for p in common])
+    ci = patient_bootstrap_ci(deltas, n_iterations=cfg["statistics"]["n_bootstrap"], ci=tuple(cfg["statistics"]["ci"]))
+    sign_flip = paired_sign_flip_test(deltas, n_iterations=cfg["statistics"]["n_bootstrap"])
+    supported = ci["ci_low"] > 0.0
+    return {
+        "patients": common,
+        "deltas": deltas.tolist(),
+        "bootstrap": ci,
+        "sign_flip_test": sign_flip,
+        "h1_supported_ci_above_zero": bool(supported),
+    }

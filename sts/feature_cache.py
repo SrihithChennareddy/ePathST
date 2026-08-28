@@ -1,0 +1,72 @@
+"""Step 13 (Section 16): extract frozen GenBio-distilled ConvNeXt V2-Atto
+features on every HEST patch and cache them with stable spot IDs, plus
+strong spot_id <-> patch <-> coordinate <-> embedding <-> expression
+integrity assertions."""
+from __future__ import annotations
+
+from pathlib import Path
+
+import h5py
+import numpy as np
+import torch
+
+
+@torch.no_grad()
+def extract_student_features(encoder, patches_uint8: np.ndarray, device: str, batch_size: int = 256,
+                               downstream_proj=None) -> np.ndarray:
+    """h_i = StudentCNN(x_i) in R^320 (or R^256 if downstream_proj given).
+    Gene expression is never used as input here -- image only (Section 16)."""
+    from sts.distill_train import IMAGENET_MEAN, IMAGENET_STD
+
+    encoder.eval()
+    outs = []
+    for i in range(0, len(patches_uint8), batch_size):
+        batch = patches_uint8[i:i + batch_size].astype(np.float32) / 255.0
+        batch = (batch - IMAGENET_MEAN) / IMAGENET_STD
+        batch = np.transpose(batch, (0, 3, 1, 2)).astype(np.float32)
+        x = torch.from_numpy(batch).to(device)
+        with torch.no_grad():
+            feat = encoder(x)
+            if downstream_proj is not None:
+                feat = downstream_proj(feat)
+        outs.append(feat.cpu().numpy())
+    return np.concatenate(outs, axis=0)
+
+
+def cache_features(out_path: str | Path, spot_ids: list[str], features: np.ndarray, coords_um: np.ndarray) -> None:
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(out_path, "w") as f:
+        f.create_dataset("spot_id", data=np.array(spot_ids, dtype="S"))
+        f.create_dataset("embedding", data=features.astype(np.float32))
+        f.create_dataset("coords_um", data=coords_um.astype(np.float32))
+
+
+def load_cached_features(path: str | Path) -> dict:
+    with h5py.File(path, "r") as f:
+        return {
+            "spot_id": f["spot_id"][:].astype(str),
+            "embedding": f["embedding"][:],
+            "coords_um": f["coords_um"][:],
+        }
+
+
+def assert_full_alignment(spot_ids: list[str], embedding: np.ndarray, coords_um: np.ndarray,
+                           expr_df, expr_spot_col: str = None) -> dict:
+    """Section 16: 'spot_id <-> patch <-> coordinate <-> student embedding
+    <-> expression vector must remain exactly aligned.' `expr_df` is
+    indexed (or has a column) by spot_id."""
+    expr_ids = expr_df.index.astype(str).tolist() if expr_spot_col is None else expr_df[expr_spot_col].astype(str).tolist()
+    checks = {
+        "n_spot_ids": len(spot_ids),
+        "n_embeddings": embedding.shape[0],
+        "n_coords": coords_um.shape[0],
+        "n_expr_rows": len(expr_ids),
+        "spot_embedding_count_match": len(spot_ids) == embedding.shape[0],
+        "spot_coords_count_match": len(spot_ids) == coords_um.shape[0],
+        "spot_expr_order_match": list(spot_ids) == expr_ids,
+        "no_duplicate_spot_ids": len(spot_ids) == len(set(spot_ids)),
+    }
+    checks["all_ok"] = all(v for k, v in checks.items() if isinstance(v, bool))
+    assert checks["all_ok"], f"feature-cache integrity check failed: {checks}"
+    return checks

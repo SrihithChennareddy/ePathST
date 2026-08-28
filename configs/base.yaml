@@ -1,0 +1,197 @@
+# Final_Project.txt master configuration. Every major decision lives here;
+# nothing structural should be hard-coded in the scripts. Mirrored as
+# base.json (see sts/utils.load_config) so GPU nodes without PyYAML can
+# still read it.
+
+experiment_name: cptac_genbio_distill_hest_pna
+seeds: [0, 1, 2]
+
+paths:
+  cptac_root: /lustre/nvwulf/scratch/schennareddy/CPTAC/data      # real download landed under data/{BRCA,COAD,ccRCC}/{patient_id}/*.dcm
+  cptac_metadata: /lustre/nvwulf/scratch/schennareddy/CPTAC/metadata
+  hest_root: /lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026
+  # `lfs quota -u schennareddy /lustre/nvwulf` reports a 20GB per-user quota
+  # ALREADY ~9x over (200GB used) across home+scratch -- the ~500-WSI patch
+  # cache alone would be 100GB+ (measured: 205MB for one WSI's 1664
+  # patches), so work_dir must NOT live under /home or /scratch. The
+  # YurovskyGroup-nvwulf project space has a real 10TB group quota with
+  # only 150GB used, so both the ephemeral work_dir and the persistent
+  # artifacts below live there instead.
+  work_dir: /lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/${experiment_name}_work
+  # Reusable, expensive artifacts (Step 4's cached GenBio-PathFM teacher
+  # embeddings, Step 9's locked ConvNeXt V2-Atto encoder) persist here,
+  # independent of any one run's work_dir -- see sts.utils.resolve_run_paths.
+  persist_dir: /lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/${experiment_name}
+  configs: configs
+  logs: logs
+  manifests: manifests
+  qc: qc
+  teacher_embeddings: teacher_embeddings
+  student_checkpoints: student_checkpoints
+  student_embeddings: student_embeddings
+  graphs: graphs
+  predictions: predictions
+  results: results
+  figures: figures
+
+cancers:
+  cptac: [BRCA, COAD, CCRCC]
+  hest: [IDC, COAD, CCRCC]
+
+# ---------------------------------------------------------------- Step 1 --
+wsi_selection:
+  target_n_patients: 500
+  thumbnail_max_dim: 2048
+  n_qc_tiles: 80                # sampled 50-100 tiles at ~20x for focus/artifact QC
+  qc_tile_px: 512
+  hard_filters:
+    min_tissue_fraction: 0.05
+    max_blurry_tissue_fraction: 0.5
+    max_artifact_fraction: 0.35
+    min_mpp: 0.1
+    max_mpp: 1.0
+  quality_weights:              # Q = sum(weight * component)
+    usable_tissue: 0.35
+    focus: 0.25
+    artifact_free: 0.20
+    stain_quality: 0.10
+    representativeness: 0.10
+
+# ---------------------------------------------------------------- Step 2 --
+patching:
+  target_mpp: 0.5
+  patch_px: 224
+  min_tissue_fraction: 0.60
+  target_patches_per_wsi: [1000, 2000]
+  jpeg_quality: 92
+  storage_backend: hdf5          # hdf5 | webdataset | lmdb
+
+# ---------------------------------------------------------------- Step 3 --
+cptac_split:
+  train_frac: 0.80
+  val_frac: 0.10
+  test_frac: 0.10
+  stratify_by_cancer: true
+
+# ---------------------------------------------------------------- Step 4 --
+teacher:
+  name: genbio-pathfm
+  hf_repo: genbio-ai/genbio-pathfm
+  embedding_dim: 4608
+  dtype: bf16
+  batch_size: 64
+  normalize_l2: true
+
+# ---------------------------------------------------------------- Step 5 --
+student:
+  backbone: convnextv2_atto
+  pretrained: imagenet
+  backbone_dim: 320
+  projection_head: [320, 1024, 4608]   # training-only, deleted after distillation (Step 9)
+  downstream_projection: [320, 256]    # optional, learned during HEST downstream training
+
+# ---------------------------------------------------------------- Step 6 --
+distillation:
+  loss: cosine_plus_feature
+  lambda_feature: 0.1
+  feature_loss: smooth_l1        # smooth_l1 | normalized_mse
+  optimizer: adamw
+  backbone_lr: 1.0e-4
+  projection_lr: 3.0e-4
+  weight_decay: 0.05
+  warmup_epochs: 3
+  max_epochs: 60
+  min_epochs: 30
+  early_stop_patience: 10
+  grad_clip_norm: 1.0
+  batch_size: 256
+  amp: true
+  augmentation:
+    hflip: true
+    vflip: true
+    rot90: true
+    color_jitter: 0.1
+    brightness_contrast: 0.1
+
+# ---------------------------------------------------------------- Step 7 --
+baselines:
+  S0_imagenet_no_distill: true
+  S1_genbio_distilled: true
+  S2_random_init_distilled: true
+
+# --------------------------------------------------------- Steps 10-12 ---
+hest:
+  patch_um: 112.0                # 224px @ 0.5 um/px, centered on ST spot
+  patch_px: 224
+  target_mpp: 0.5
+  exclude_species: [mouse]
+  n_alignment_qc_samples: 30
+
+# --------------------------------------------------------- Step 11 -------
+molecular_targets:
+  hvg1000: 1000
+  hvg50: 50
+  pathway_set: PROGENy14
+  pathway_top_genes: 100
+  normalize_total_target_sum: 10000
+
+# --------------------------------------------------------- Step 14 -------
+patch_head:
+  bottleneck: [320, 128, 64]      # 320/256 -> 128 -> 64 molecular latent
+  gene_head_dim: 1000
+  pathway_head_dim: 14
+  pathway_loss_weight: 0.2
+  optimizer: adamw
+  lr: 3.0e-4
+  weight_decay: 1.0e-4
+  batch_size: 256
+  max_epochs: 100
+  early_stop_patience: 12
+
+# --------------------------------------------------------- Step 15 -------
+graph:
+  local_radius_um: 150.0
+  meso_radius_um: 300.0
+  macro_radius_um: 600.0
+  max_local_neighbors: 8
+  max_meso_neighbors: 12
+  max_macro_neighbors: 16
+  n_rbf: 16
+  rbf_gamma: 10.0
+
+# --------------------------------------------------------- Step 16 -------
+pna:
+  input_dim: 320                  # or 256 if downstream_projection is used
+  hidden_dim: 128
+  n_layers: 2
+  aggregators: [mean, max, min, std]
+  scalers: [identity, amplification, attenuation]
+  dropout: 0.1
+  molecular_latent_dim: 64
+  optimizer: adamw
+  lr: 3.0e-4
+  weight_decay: 1.0e-4
+  max_epochs: 100
+  early_stop_patience: 15
+  residual_zero_init: true        # Section 20: final correction layer init near zero
+
+# --------------------------------------------------------- Step 18 -------
+destruction_dose_response:
+  q_values: [0.0, 0.25, 0.5, 0.75, 1.0]
+
+# --------------------------------------------------------- Step 19 -------
+cross_validation:
+  n_outer_folds: 5
+  n_seeds: 3
+  seeds: [0, 1, 2]
+  min_folds_if_too_few_patients: 3
+
+# --------------------------------------------------------- Step 21 -------
+statistics:
+  n_bootstrap: 10000
+  ci: [2.5, 97.5]
+  fdr_q: 0.05
+
+evaluation:
+  min_regions_per_patient: 10
+  gene_r_thresholds: [0.0, 0.2, 0.3]
