@@ -100,9 +100,9 @@ distillation:
   projection_lr: 3.0e-4
   weight_decay: 0.05
   warmup_epochs: 3
-  max_epochs: 60
-  min_epochs: 30
-  early_stop_patience: 10
+  max_epochs: 100
+  min_epochs: 50
+  early_stop_patience: 15
   grad_clip_norm: 1.0
   batch_size: 256
   amp: true

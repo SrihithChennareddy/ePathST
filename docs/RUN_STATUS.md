@@ -123,6 +123,15 @@ job's Step 1-2).
   means a **later resubmission will automatically retry them** -- no
   manual intervention needed, just don't forget this when checking final
   WSI/patch counts against the 363-selected number.
+- **Steps 1-3 complete** (as of 03:16): 363 WSIs selected -> 321 WSIs
+  successfully patch-extracted (42 lost to the WsiDicomOutOfBoundsError
+  bug above, now fixed for future runs) -> 494,268 total CPTAC patches ->
+  patient split written for all 3 seeds (e.g. seed2: BRCA 85/11/10
+  train/val/test, CCRCC 168/21/21, COAD 38/5/4).
+- **Step 4 (GenBio-PathFM teacher embedding) started 03:16:10**: single
+  GPU, 493,469 patches to embed (1,664 already cached from the earlier
+  validation session). At the ~72 patches/sec measured earlier on this
+  GPU family, expect roughly ~1.9h, i.e. finishing around **05:10-05:20**.
 - **This is the currently active real run as of 2026-08-28.** Check
   `squeue -j 83723` for live status, or `tail -f
   STS_src/logs/slurm_b40_83723.out` for progress.
