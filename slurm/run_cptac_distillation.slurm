@@ -5,6 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=60
+#SBATCH --mem=700G
 #SBATCH --gres=gpu:h200:4
 #SBATCH --time=08:00:00
 #SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_%j.out
@@ -25,6 +26,12 @@
 # reserve for Step 9's lock/strip + buffer) goes to Step 5's distillation
 # training, prioritizing S1 seed 0 (Section 10's main comparison target)
 # -- see scripts/05_train_student_distill.py's --time-budget-hours.
+#
+# --mem=700G is required, not a tuning knob: an earlier b40x4 run of this
+# same pipeline without --mem was OOM-killed ~1 minute into Step 1 (60
+# parallel WSI-QC workers, each holding a multi-hundred-MB DICOM pyramid +
+# decompressed tiles, spike well past Slurm's small default cgroup limit).
+# h200x4 nodes have 773GB RAM; 700G leaves headroom.
 
 set -euo pipefail
 cd /lustre/nvwulf/home/schennareddy/cellvit_project/STS_src

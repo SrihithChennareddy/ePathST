@@ -4,7 +4,8 @@
 #SBATCH --partition=b40x4
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=28
+#SBATCH --cpus-per-task=20
+#SBATCH --mem=220G
 #SBATCH --gres=gpu:nvidia_rtx_pro_6000_blackwell:1
 #SBATCH --time=08:00:00
 #SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_b40_%j.out
@@ -38,6 +39,13 @@
 # Only 1 GPU here (vs. the H200 script's 4-way Step-4 shard), so Step 4
 # runs unsharded (--num-shards 1) -- teacher embedding takes longer but
 # still benefits fully from every already-cached embedding.
+#
+# --mem=220G is REQUIRED, not a tuning knob: the first submission of this
+# job (83721) omitted --mem, got Slurm's small default allocation, and was
+# OOM-killed ~1 minute into Step 1 (28 parallel workers each holding a
+# multi-hundred-MB DICOM WSI pyramid + decompressed tile buffers spikes
+# well past a default few-GB cgroup limit). b40x4-09 had ~468GB free at
+# the time; 220G leaves headroom for other jobs on the shared node.
 
 set -euo pipefail
 cd /lustre/nvwulf/home/schennareddy/cellvit_project/STS_src
@@ -75,5 +83,9 @@ python3 scripts/06_eval_distillation.py --config "$CONFIG" --device cuda || \
 
 log "=== Step 9: lock student, strip teacher-projection head, save to persist_dir ==="
 python3 scripts/07_lock_student.py --config "$CONFIG" --device cuda --mode A
+
+log "=== snapshotting results to experimental_runs/ for later comparison ==="
+python3 scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4 \
+  --gpu "1x RTX PRO 6000 Blackwell" --label cptac_distill_b40x4 --stage "end of 8h job"
 
 log "=== DONE (total elapsed: $((SECONDS - JOB_START))s) ==="
