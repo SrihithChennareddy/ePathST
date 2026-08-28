@@ -4,8 +4,8 @@
 #SBATCH --partition=b40x4-long
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=400G
+#SBATCH --cpus-per-task=20
+#SBATCH --mem=100G
 #SBATCH --gres=gpu:nvidia_rtx_pro_6000_blackwell:1
 #SBATCH --time=24:00:00
 #SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_full_%j.out
@@ -19,11 +19,17 @@
 # 100/50/15 (from 60/30/10) specifically for this run, with a full 24h
 # budget to actually reach that range rather than being cut off early.
 #
-# WHY h200x8-02 / h200x8-long: at submission time this was the only node
-# anywhere in the cluster with a free H200 (`scontrol show node` showed
-# every h200x4-0[1-4] and every other h200x8 node fully allocated;
-# h200x8-02 had 2/8 GPUs free). h200x8-long carries the same 8-H200 GRES
-# as h200x8 but with a 2-day time limit, so --time=24:00:00 fits.
+# WHY b40x4-01 / b40x4-long: h200x8-02 had 2/8 free H200s at first look,
+# but h200x8-long's backfill scheduler predicted a ~24h wait for it
+# (reason: "reserved for jobs in higher priority partitions") -- -long
+# partitions apparently sit behind their short-partition siblings for the
+# SAME physical GPUs. b40x4-01 had 1/4 free RTX PRO 6000 Blackwell and
+# ~25 free CPUs / ~135GB free RAM; b40x4-long carries the same GRES as
+# b40x4 but with a 2-day time limit, so --time=24:00:00 fits.
+# --cpus-per-task=20/--mem=100G are sized to that node's actual free
+# headroom (NOT the H200 node's -- an earlier submission requesting
+# 32 CPUs/400G against this smaller node stayed PENDING("Resources")
+# indefinitely since neither fit).
 #
 # CRITICAL SAFETY REQUIREMENT -- do not remove the wait loop below: job
 # 83723 (still running on b40x4-09) is, at submission time, mid-Step-4,
@@ -102,7 +108,7 @@ log "=== Step 9: lock student, strip teacher-projection head, save to persist_di
 python3 scripts/07_lock_student.py --config "$CONFIG" --device cuda --mode A
 
 log "=== snapshotting results to experimental_runs/ for later comparison ==="
-python3 scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition h200x8-long \
-  --gpu "1x H200" --label cptac_distill_full_convergence --stage "end of 24h job (target 50-100 epochs)"
+python3 scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4-long \
+  --gpu "1x RTX PRO 6000 Blackwell" --label cptac_distill_full_convergence --stage "end of 24h job (target 50-100 epochs)"
 
 log "=== DONE (total elapsed: $((SECONDS - JOB_START))s) ==="

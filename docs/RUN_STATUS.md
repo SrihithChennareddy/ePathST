@@ -148,6 +148,49 @@ job's Step 1-2).
   budget -- expect a partial, resumable run. **Resubmit the same script
   after this job ends** to continue training where it left off.
 
+### Job 83737 -- b40x4-01, RUNNING (started 2026-08-28T03:21:27), 24h budget
+- Second, LONGER-HORIZON run requested by the user: target 50-100 epochs
+  for full convergence (vs. 83723's partial run), 24h wall clock,
+  **without cancelling 83723**.
+- `configs/base.yaml`'s `distillation.{max_epochs,min_epochs,
+  early_stop_patience}` raised 60/30/10 -> 100/50/15 to actually support
+  this target -- shared config, so 83723 also sees the higher ceiling
+  (harmless: 83723 is still bounded by its own much shorter
+  `--time-budget-hours`, so this doesn't change its real behavior).
+- **Runs on `b40x4-long`, NOT h200x8-long as first attempted.**
+  h200x8-02 showed 2/8 free H200s, but h200x8-long's backfill scheduler
+  predicted a ~24h wait (reason: "reserved for jobs in higher priority
+  partitions") -- **-long partitions sit behind their short-partition
+  siblings for the same physical GPUs**, so a node showing free GPUs
+  right now does not mean a `-long` job can claim them immediately.
+  Switched to b40x4-long targeting b40x4-01 (1/4 GPUs free) instead.
+- **Also hit, and fixed, a resource-sizing mismatch**: first submission
+  requested `--cpus-per-task=32 --mem=400G` (sized for the H200 node) and
+  sat `PENDING(Resources)` indefinitely on b40x4-01, which only had ~25
+  free CPUs and ~135GB free RAM. Reduced to `--cpus-per-task=20 --mem=100G`
+  to match what was actually free; started running immediately after.
+  **Lesson: always check the SPECIFIC target node's free CPU/mem via
+  `scontrol show node <name> | grep -E "CPUAlloc|FreeMem"` before sizing
+  `--cpus-per-task`/`--mem`, not just GPU availability.**
+- **Safety design**: this job's script begins with a poll loop (max 4h
+  wait) checking `logs/slurm_b40_83723.out` for the `"=== Step 5"` marker
+  (or 83723 leaving the queue) before touching Steps 1-4 at all, since
+  83723 was still mid-Step-4 (writing directly to the canonical teacher-
+  embeddings cache, unsharded) at 83737's submission time. This avoids a
+  concurrent-HDF5-writer conflict on
+  `persist_dir/teacher_embeddings/cptac_teacher_embeddings.h5`. Once past
+  the wait, it reruns Steps 1-3 (safe, resumable, and recovers the ~42
+  WSIs 83723 lost to the WsiDicomOutOfBoundsError bug) then Step 4 (only
+  new patches) then Step 5 with the remaining ~23h budget.
+- Both 83723 and 83737 are `sbatch` batch jobs, not interactive
+  `srun`/`salloc` sessions -- they run under the SLURM controller
+  independent of any terminal/session, so they continue unattended even
+  if this session disconnects. Only live *monitoring* (Monitor-tool
+  notifications in a Claude Code session) pauses on disconnect; re-attach
+  by tailing the log files in any future session, no functionality lost.
+- Job scripts: `slurm/run_cptac_distillation_b40x4.slurm` (83723's, 8h),
+  `slurm/run_cptac_distillation_full_convergence.slurm` (83737's, 24h).
+
 ## Recovery checklist (read this first after any interruption)
 
 1. `squeue -u schennareddy` -- is anything still running/queued?
