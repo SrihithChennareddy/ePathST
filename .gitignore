@@ -6,5 +6,5 @@ __pycache__/
 *.h5
 *.pt
 *.pth
-README.md
+PIPELINE_NOTES.md
 *.h5ad
