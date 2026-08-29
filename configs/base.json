@@ -146,7 +146,14 @@
     ],
     "gene_head_dim": 1000,
     "pathway_head_dim": 14,
-    "pathway_loss_weight": 0.2,
+    "dropout": 0.1,
+    "pathway_loss_weight": 0.0,
+    "pathway_loss_sweep": [
+      0.0,
+      0.05,
+      0.1,
+      0.2
+    ],
     "optimizer": "adamw",
     "lr": 0.0003,
     "weight_decay": 0.0001,
@@ -188,6 +195,12 @@
     "early_stop_patience": 15,
     "residual_zero_init": true
   },
+  "gatv2": {
+    "heads": 4
+  },
+  "scale_aware_pna": {
+    "gate_hidden_dim": 128
+  },
   "destruction_dose_response": {
     "q_values": [
       0.0,
@@ -205,7 +218,8 @@
       1,
       2
     ],
-    "min_folds_if_too_few_patients": 3
+    "min_folds_if_too_few_patients": 3,
+    "primary_analysis_unit": "per_cancer"
   },
   "statistics": {
     "n_bootstrap": 10000,
@@ -222,5 +236,23 @@
       0.2,
       0.3
     ]
+  },
+  "genbio_fair_comparison": {
+    "pca_n_components": 256,
+    "ridge_alpha": 1.0
+  },
+  "primary_gates": {
+    "gate1_distillation": {
+      "better": "A2_distilled_patch",
+      "worse": "A1_imagenet_patch"
+    },
+    "gate2_spatial_context": {
+      "better": "A8_scale_aware_pna",
+      "worse": "A2_distilled_patch"
+    },
+    "gate3_true_topology": {
+      "better": "A8_scale_aware_pna",
+      "worse": "A5_shuffled_graph"
+    }
   }
 }

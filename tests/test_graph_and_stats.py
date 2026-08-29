@@ -18,11 +18,35 @@ def test_multiscale_edges_within_radius():
     assert set(np.unique(edges["scale"])) <= {"local", "meso", "macro"}
 
 
-def test_rbf_edge_features_shape():
+def test_union_edge_features_shape():
+    # V2 Phase 9 correction: 1 normalized distance + 16 RBF + 3-D scale one-hot = 20-D
+    # (V1's original implementation omitted the explicit distance scalar -> 19-D, a bug).
     d = np.array([10.0, 200.0, 500.0], dtype=np.float32)
     scale = np.array(["local", "meso", "macro"], dtype=object)
-    feats = graph_builder.rbf_edge_features(d, scale, 600.0, n_rbf=16)
-    assert feats.shape == (3, 19)
+    feats = graph_builder.union_edge_features(d, scale, 600.0, n_rbf=16)
+    assert feats.shape == (3, 20)
+    # back-compat alias must produce the identical corrected output
+    assert np.allclose(feats, graph_builder.rbf_edge_features(d, scale, 600.0, n_rbf=16))
+
+
+def test_per_scale_edge_features_shape():
+    # V2 Phase 9: scale-aware branches don't need the one-hot (branch identity IS the scale)
+    # -> 1 normalized distance + 16 RBF = 17-D.
+    d = np.array([10.0, 200.0, 500.0], dtype=np.float32)
+    feats = graph_builder.per_scale_edge_features(d, 600.0, n_rbf=16)
+    assert feats.shape == (3, 17)
+
+
+def test_split_edges_by_scale():
+    rng = np.random.RandomState(2)
+    coords = rng.uniform(0, 1000, size=(40, 2))
+    edges = graph_builder.build_multiscale_edges(coords, 150, 300, 600, 8, 12, 16)
+    split = graph_builder.split_edges_by_scale(edges)
+    assert set(split.keys()) == {"local", "meso", "macro"}
+    total_split_edges = sum(e["edge_index"].shape[1] for e in split.values())
+    assert total_split_edges == edges["edge_index"].shape[1]
+    for name, e in split.items():
+        assert set(e["scale"].tolist()) <= {name}
 
 
 def test_degree_preserving_rewire_keeps_degree_and_edge_count():

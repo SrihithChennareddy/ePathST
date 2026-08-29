@@ -140,7 +140,14 @@ patch_head:
   bottleneck: [320, 128, 64]      # 320/256 -> 128 -> 64 molecular latent
   gene_head_dim: 1000
   pathway_head_dim: 14
-  pathway_loss_weight: 0.2
+  dropout: 0.1
+  # V2 Phase 7: primary loss is gene-only (V1's mandatory 0.2 pathway
+  # weight showed no consistent benefit in PoC_5). pathway_loss_weight is
+  # now the DEFAULT for the primary run; the post-lock ablation sweep
+  # (V2 Phase 19) iterates pathway_loss_sweep instead, on validation
+  # patients only, after the architecture is frozen.
+  pathway_loss_weight: 0.0
+  pathway_loss_sweep: [0.0, 0.05, 0.10, 0.20]
   optimizer: adamw
   lr: 3.0e-4
   weight_decay: 1.0e-4
@@ -149,6 +156,10 @@ patch_head:
   early_stop_patience: 12
 
 # --------------------------------------------------------- Step 15 -------
+# V2 Phase 9: two edge-feature widths now, not one 19-D feature everywhere
+# (see sts/graph_builder.py's union_edge_features / per_scale_edge_features):
+#   union_edge_dim = 1 (normalized distance) + n_rbf + 3 (scale one-hot) = 20
+#   per_scale_edge_dim = 1 (normalized distance) + n_rbf = 17
 graph:
   local_radius_um: 150.0
   meso_radius_um: 300.0
@@ -163,7 +174,7 @@ graph:
 pna:
   input_dim: 320                  # or 256 if downstream_projection is used
   hidden_dim: 128
-  n_layers: 2
+  n_layers: 2                     # V2 Phase 10: two layers per branch, do NOT add APPNP
   aggregators: [mean, max, min, std]
   scalers: [identity, amplification, attenuation]
   dropout: 0.1
@@ -173,18 +184,38 @@ pna:
   weight_decay: 1.0e-4
   max_epochs: 100
   early_stop_patience: 15
-  residual_zero_init: true        # Section 20: final correction layer init near zero
+  residual_zero_init: true        # Section 20 / V2 Phase 11: final correction layer init near zero
+
+# V2 Phase 15 (A9 architecture control): GATv2 backend, matched depth/
+# hidden dim to `pna` above so the PNA-vs-GATv2 comparison isolates the
+# message-passing operator, not capacity.
+gatv2:
+  heads: 4                        # hidden_dim (128, from `pna`) must be divisible by heads
+
+# V2 Phase 12 (A8, the proposed final model): Scale-Aware Residual
+# Multiscale PNA -- three independent per-scale PNA branches (reusing
+# `pna`'s hidden_dim/n_layers/aggregators/scalers/dropout for each branch)
+# fused by a learned softmax gate.
+scale_aware_pna:
+  gate_hidden_dim: 128
 
 # --------------------------------------------------------- Step 18 -------
+# V2 Phase 20: run only after A8 is trained and behaves correctly.
+# "ideally preserve local/meso/macro edge counts" per scale, not just the
+# aggregate degree distribution, when implementing the per-q replacement.
 destruction_dose_response:
   q_values: [0.0, 0.25, 0.5, 0.75, 1.0]
 
 # --------------------------------------------------------- Step 19 -------
+# V2 Phase 1: report per-cancer (IDC/COAD/CCRCC) as three SEPARATE primary
+# experiments; pooled-across-cancers is secondary (see
+# sts.cv_folds.build_cv_grid's "primary_analysis_unit" field).
 cross_validation:
   n_outer_folds: 5
   n_seeds: 3
   seeds: [0, 1, 2]
   min_folds_if_too_few_patients: 3
+  primary_analysis_unit: per_cancer
 
 # --------------------------------------------------------- Step 21 -------
 statistics:
@@ -195,3 +226,21 @@ statistics:
 evaluation:
   min_regions_per_patient: 10
   gene_r_thresholds: [0.0, 0.2, 0.3]
+
+# --------------------------------------------------------- Step 24 -------
+# V2 Phase 21: fair GenBio-vs-student comparison via training-fold-only
+# PCA (replaces V1's ambiguous raw-4608-D-into-a-mismatched-head
+# approach). Run only after the A0-A9 student model matrix is locked.
+genbio_fair_comparison:
+  pca_n_components: 256
+  ridge_alpha: 1.0
+
+# --------------------------------------------------------- V2 Phase 22 ---
+# Three primary statistical gates (replaces V1's single primary-hypothesis
+# test). Gate 3 is the same "real vs shuffled" test as V1's Section 25,
+# now explicitly run against A8 (scale-aware) rather than A7 (union
+# multiscale), since A8 is the proposed final model.
+primary_gates:
+  gate1_distillation: {better: A2_distilled_patch, worse: A1_imagenet_patch}
+  gate2_spatial_context: {better: A8_scale_aware_pna, worse: A2_distilled_patch}
+  gate3_true_topology: {better: A8_scale_aware_pna, worse: A5_shuffled_graph}
