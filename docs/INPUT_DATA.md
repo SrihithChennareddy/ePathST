@@ -75,6 +75,67 @@ One BRCA patient (`18BR003`) has a single candidate slide that fails to
 decode (OpenJPEG `SOC marker` error) — included with `qc_status == error`
 since it's the only candidate.
 
+### Real post-QC selection funnel (job 83825, first clean run, 2026-08-28)
+
+Section 4's hard filters (human / H&E / tumor specimen / readable / mpp
+known / adequate tissue) were applied to all 598 candidates via
+`sts/cptac_select.py`. Full results, for the paper's Data/Methods section:
+
+| Stage | BRCA | COAD | CCRCC | Total |
+|---|---|---|---|---|
+| Initial candidates (metadata) | 198 | 178 | 222 | 598 |
+| Excluded: `not_tumor_specimen` | 90 | 131 | 0 | 221 |
+| Excluded: `insufficient_tissue` | 2 | 0 | 6 | 8 |
+| Excluded: `unreadable_or_corrupt` | 0 | 0 | 6 | 6 |
+| **Selected (passed all hard filters)** | **106** | **47** | **210** | **363** |
+
+**Why COAD's yield is disproportionately low (74% excluded vs. BRCA's 45%
+and CCRCC's 0%) — a documented limitation, not a pipeline bug.** The
+`not_tumor_specimen` filter checks whether `specimen_label` contains the
+substring "tumor". The raw label distributions differ sharply by cancer
+type in CPTAC/IDC's own metadata:
+
+| Cancer | `"HE tumor_tissue"` (passes) | `"HE"` bare (excluded) | `"HE normal_tissue"` (excluded) |
+|---|---|---|---|
+| CCRCC | 222 (100%, labeled `"HE tumor"`) | 0 | 0 |
+| BRCA | 108 | 90 | 0 |
+| COAD | 47 | 88 | 43 |
+
+Two distinct effects combine for COAD: (1) 43 patients' only available
+slide is genuinely matched-normal tissue (correctly excluded from a
+tumor-focused study — this is real, expected, and already noted above),
+and (2) a much larger fraction than BRCA (88/178 = 49% vs. 90/198 = 45%,
+comparable rate, but combined with (1) it compounds) carry only the bare,
+unqualified `"HE"` label with no explicit tumor/normal designation in this
+specific metadata field. **The current filter treats "no explicit 'tumor'
+substring" as "not a tumor specimen," which is a conservative
+approximation, not a verified fact** — some of these 88 (COAD) + 90 (BRCA)
+bare-`"HE"` specimens may well be genuine tumor sections that simply
+weren't tagged with that word in `specimen_label`. This has not been
+cross-checked against a more authoritative CPTAC diagnosis/pathology field
+and should be flagged as a limitation (or resolved, if a better field is
+found) before the final cohort composition is reported in the paper.
+
+### Patient-level train/val/test split (seed 0, from the selected 363)
+
+Split is **patient-level, 80/10/10, stratified per cancer type**
+(`configs/base.yaml`: `train_frac/val_frac/test_frac`), computed by
+`sts/patient_split.py` *before* any patch is extracted — no patient's
+patches ever cross a split boundary (enforced by
+`assert_no_patch_leakage`). Real counts:
+
+| Cancer | Train | Val | Test | Total |
+|---|---|---|---|---|
+| BRCA | 85 | 11 | 10 | 106 |
+| CCRCC | 168 | 21 | 21 | 210 |
+| COAD | 38 | 5 | 4 | 47 |
+| **Total** | **291** | **37** | **35** | **363** |
+
+Three independent patient-level splits (seeds 0, 1, 2) are generated the
+same way for later multi-seed robustness reporting; only seed 0 has been
+trained on as of this writing (see `docs/RUN_STATUS.md` /
+`docs/COMPUTE_RESOURCES.md` for training progress).
+
 ## 2. HEST (Phase 2 — downstream spatial transcriptomics)
 
 **What**: Paired H&E whole-slide images and spatial transcriptomics (ST)
