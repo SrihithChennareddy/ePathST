@@ -139,46 +139,55 @@ trained on as of this writing (see `docs/RUN_STATUS.md` /
 ## 2. HEST (Phase 2 — downstream spatial transcriptomics)
 
 **What**: Paired H&E whole-slide images and spatial transcriptomics (ST)
-expression data (Visium-style spot arrays) from the HEST benchmark,
-restricted to the same three cancer types (colon/COAD, breast/IDC,
-kidney/CCRCC) where available. Used to train/evaluate the graph-based
-molecular expression prediction — the locked CPTAC-distilled student
-encoder is applied here as a frozen feature extractor; no further
-distillation happens in this phase.
+expression data (Visium-style spot arrays) from the HEST benchmark, across
+all three of this project's cancer types (colon/COAD, breast/IDC,
+kidney/CCRCC — all now confirmed present on disk, see below). Used to
+train/evaluate the graph-based molecular expression prediction — the
+locked CPTAC-distilled student encoder is applied here as a frozen feature
+extractor; no further distillation happens in this phase.
 
-**Source / provenance**: Yurovsky-lab HEST cohort (`simons_2026`), the same
-CRC23 colon/COAD cohort referenced as "23 slides = 23 unique patients" in
-the project's PoC_5 work. As of the current run, only the `colon` (COAD)
-directory has a populated `copy_log_*.csv`; `breast` (IDC) and `kidney`
-(CCRCC) directories exist on disk but have no metadata log yet —
-`scripts/08_prepare_hest_metadata.py` skips-and-reports missing cancers
-rather than failing when this is the case.
+**Source / provenance** (confirmed on-disk 2026-08-29 — all three cancers
+now available, two different provenances):
 
-**On-disk layout** (`paths.hest_root` in `configs/base.yaml`):
+| Cancer | Location | Provenance | Scale |
+|---|---|---|---|
+| Breast (IDC) | `/lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026/breast/{wsis,st}/` | Yurovsky-lab HEST cohort, used **in place** (not copied locally) | 127 WSI (~62GB) / 125 ST (~7.4GB) |
+| Colon (COAD) | `/lustre/nvwulf/scratch/schennareddy/HEST-1k/data/colon/{wsis,st}/` | Downloaded from HuggingFace `MahmoodLab/hest` | 58 WSI / 58 ST (~184GB total) — supersedes the earlier 23-slide `simons_2026/colon` CRC23 subset used for PoC_5/early validation |
+| Kidney (CCRCC) | `/lustre/nvwulf/scratch/schennareddy/HEST-1k/data/kidney/{wsis,st}/` | Downloaded from HuggingFace `MahmoodLab/hest` | 25 WSI / 25 ST (~18GB total) |
+
+Each cancer's metadata is a standard HEST-1k per-organ CSV under
+`/lustre/nvwulf/scratch/schennareddy/HEST-1k/metadata/{breast,colon,kidney}_metadata.csv`
+(downloaded alongside the colon/kidney WSI+ST data; also covers breast even
+though breast's WSI/ST files themselves live at the `simons_2026` path
+above). `configs/base.yaml`'s `paths.hest_by_cancer` records all three
+locations (`wsi_dir`, `st_dir`, `metadata_csv`) per cancer; the pipeline no
+longer assumes a single shared `hest_root` layout — see
+`scripts/08_prepare_hest_metadata.py`'s `load_hest_raw_metadata`, which
+reads each cancer's config entry independently and skips-and-reports any
+cancer with no configured/found source, same fallback behavior as before.
+
+**On-disk layout** (`paths.hest_by_cancer.{IDC,COAD,CCRCC}` in
+`configs/base.yaml`):
 
 ```
-HEST_ROOT/
-  copy_log_{colon,breast,kidney}_cancer.csv   metadata index, one row/sample
-  {colon,breast,kidney}/
-    wsis/{id}.tif    pyramidal generic TIFF, openslide-readable
-    st/{id}.h5ad      standard scanpy/Visium AnnData
+{wsi_dir}/{id}.tif    pyramidal generic TIFF, openslide-readable
+{st_dir}/{id}.h5ad     standard scanpy/Visium AnnData
 ```
 
-**`copy_log_{organ}_cancer.csv` columns** (only the ones this pipeline
-uses):
+**`{organ}_metadata.csv` columns** (only the ones this pipeline uses; the
+breast CSV additionally carries stale `wsi_path`/`h5ad_path` columns
+pointing at a different group's directory — **ignored**, since `id` +
+`hest_by_cancer.IDC.{wsi_dir,st_dir}` is the source of truth for where the
+real files actually are):
 
 | column | meaning |
 |---|---|
 | `id` | sample identifier — doubles as `patient_id` (one section per patient; no separate patient_id column exists) |
-| `metadata_organ` / `destination_organ` | organ subdirectory name (`colon`/`breast`/`kidney`) |
-| `disease_state` | filtered to `"cancer"` only |
-| `oncotree_code` | `COAD`, `COADREAD`, or `READ` for the colon cohort — all three map to this project's single `"COAD"` cancer bucket (`ONCOTREE_TO_CANCER`); analogous mappings apply once breast/kidney logs land |
-| `st_technology` | ST platform (Visium, etc.) |
-| `image_filename` | filename under `{organ}/wsis/` |
-| `dest_h5ad` / the derived `{id}.h5ad` | expression file under `{organ}/st/` |
-
-There is no `species` column — every present sample is confirmed human, so
-`sts.hest_prep` hardcodes `species: human` rather than reading it.
+| `organ` | `Breast`/`Bowel`/`Kidney` |
+| `disease_state` | filtered to `"cancer"` (case-insensitive) only |
+| `oncotree_code` | mapped onto this project's three cancer buckets via `ONCOTREE_TO_CANCER`: `IDC`→IDC (excludes 4/125 `ILC` breast rows — a biologically distinct histology); `COAD`/`COADREAD`/`READ`→COAD (all colorectal); `SCCRCC`→CCRCC (excludes 1/25 `PRCC` kidney row — papillary RCC, a distinct RCC subtype) |
+| `st_technology` | ST platform (Visium, Visium HD, Xenium, etc.) |
+| `species` | present for colon/kidney (`Homo sapiens`); absent from the breast CSV — every present breast sample is confirmed human, so `sts.hest_prep` defaults to `species: human` when the column is missing |
 
 **`{id}.h5ad` structure** (standard scanpy/Visium AnnData):
 
@@ -194,8 +203,16 @@ a sample is excluded as `likely_misaligned` if this check fails, since a
 coordinate-system mismatch would otherwise silently corrupt every
 downstream patch/graph.
 
-**Scale (current)**: 23 real colon/COAD WSIs (the confirmed CRC23 cohort),
-0 excluded by the metadata audit. Breast/kidney pending metadata arrival.
+**Scale (current, post metadata-audit, before file-existence/alignment
+filtering)**: 202 real samples across all three cancers — IDC 120, COAD 58,
+CCRCC 24 (verified live against the actual metadata CSVs + on-disk
+WSI/ST files, 2026-08-29; IDC's 120 vs. 121 oncotree-matched rows reflects
+one sample missing its paired WSI/ST file on disk). 0 excluded by
+`audit_hest_samples`'s mouse/cancer-bucket/duplicate-id filters. Full
+alignment QC + patch extraction across all 202 has not yet been run at
+scale — `scripts/08_prepare_hest_metadata.py` has only been exercised on a
+1-2 sample subset for real-data validation so far (see
+`docs/V1_TO_V2_MIGRATION.md`); the full run is future work.
 
 ## 3. Derived artifacts (not raw input, generated by the pipeline)
 

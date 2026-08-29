@@ -9,6 +9,26 @@
     "cptac_root": "/lustre/nvwulf/scratch/schennareddy/CPTAC/data",
     "cptac_metadata": "/lustre/nvwulf/scratch/schennareddy/CPTAC/metadata",
     "hest_root": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026",
+    "hest_by_cancer": {
+      "IDC": {
+        "wsi_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026/breast/wsis",
+        "st_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026/breast/st",
+        "metadata_csv": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/metadata/breast_metadata.csv",
+        "study": "hest1k_breast"
+      },
+      "COAD": {
+        "wsi_dir": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/data/colon/wsis",
+        "st_dir": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/data/colon/st",
+        "metadata_csv": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/metadata/colon_metadata.csv",
+        "study": "hest1k_colon"
+      },
+      "CCRCC": {
+        "wsi_dir": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/data/kidney/wsis",
+        "st_dir": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/data/kidney/st",
+        "metadata_csv": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/metadata/kidney_metadata.csv",
+        "study": "hest1k_kidney"
+      }
+    },
     "work_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/${experiment_name}_work",
     "persist_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/${experiment_name}",
     "configs": "configs",

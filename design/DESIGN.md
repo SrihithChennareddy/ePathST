@@ -113,7 +113,7 @@ as a frozen feature extractor.
 | Teacher embedding | patches | `[N, 4608]` GenBio-PathFM embeddings, HDF5 cache (run-once) |
 | Student distillation | teacher embeddings + patches | student checkpoint (backbone 320-D + training-only projection head to 4608-D) |
 | Lock/strip | best student checkpoint | encoder-only state dict, 3,387,400 params |
-| HEST metadata audit | `copy_log_{organ}_cancer.csv` + `{organ}/wsis/*.tif` + `{organ}/st/*.h5ad` | per-sample manifest, alignment QC pass/fail |
+| HEST metadata audit | per-cancer `{organ}_metadata.csv` + `{wsi_dir}/*.tif` + `{st_dir}/*.h5ad` (`paths.hest_by_cancer`, all three cancers) | per-sample manifest, alignment QC pass/fail |
 | HEST patch extraction + features | HEST WSI + ST spot coordinates (`obsm['spatial']`) | 320-D node feature per ST spot (via locked encoder) |
 | Graph construction | ST spot coordinates (real microns) | multiscale graph: local (≤150µm, ≤8 neighbors), meso (≤300µm, ≤12), macro (≤600µm, ≤16), RBF-encoded edge distances |
 | Patch head | node features | baseline per-spot gene/pathway prediction (no graph) |
@@ -238,11 +238,17 @@ fold set (see `docs/POC5_RESULTS.md`).
 
 ## 6. Known constraints / follow-ups
 
-- HEST metadata (`copy_log_*.csv`) is confirmed present only for `colon`
-  (COAD, the CRC23 cohort at `simons_2026/`) as of 2026-08-29; `breast`
-  (IDC) and `kidney` (CCRCC) have no `copy_log_*.csv` there yet —
-  `load_hest_raw_metadata` skips-and-reports missing cancers rather than
-  failing.
+- HEST metadata + WSI/ST data is now confirmed present for all three
+  cancers as of 2026-08-29 (`configs/base.yaml`'s `paths.hest_by_cancer`;
+  202 real samples post metadata-audit — IDC 120, COAD 58, CCRCC 24; see
+  `docs/INPUT_DATA.md` §2 for exact locations/provenance/scale). Breast's
+  files live at `simons_2026/breast/` (used in place); colon/kidney were
+  downloaded from HuggingFace `MahmoodLab/hest` into scratch and supersede
+  the earlier 23-slide `simons_2026/colon` CRC23 subset used for PoC_5/early
+  validation. `load_hest_raw_metadata` still skips-and-reports any cancer
+  with no configured/found source, for whenever a future cohort is added.
+  Full alignment QC + patch extraction across all 202 samples at scale has
+  not yet been run (only exercised on a 1-2 sample subset so far).
 - `10_run_patient_cv.py`'s A0 (mean-expression) and A3 (parameter-matched
   `MolecularBottleneckHead`) ablations are real implementations (fixed
   during the V1->V2 migration — V1's driver silently skipped both).

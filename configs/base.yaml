@@ -10,6 +10,29 @@ paths:
   cptac_root: /lustre/nvwulf/scratch/schennareddy/CPTAC/data      # real download landed under data/{BRCA,COAD,ccRCC}/{patient_id}/*.dcm
   cptac_metadata: /lustre/nvwulf/scratch/schennareddy/CPTAC/metadata
   hest_root: /lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026
+  # Real per-cancer HEST source locations confirmed on-disk 2026-08-29.
+  # Two different provenances: breast's WSI/ST are used in place at the
+  # YurovskyGroup project space (not copied locally); colon/kidney were
+  # downloaded from HuggingFace MahmoodLab/hest into scratch. Each has its
+  # own standard HEST-1k metadata CSV (`id` is the join key for both the
+  # WSI file `{wsi_dir}/{id}.tif` and the ST file `{st_dir}/{id}.h5ad`) --
+  # see sts/hest_prep.py / scripts/08_prepare_hest_metadata.py.
+  hest_by_cancer:
+    IDC:                                                            # breast, 127 WSI / 125 ST (~62GB + ~7.4GB), 121/125 rows are oncotree=IDC (4 ILC excluded)
+      wsi_dir: /lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026/breast/wsis
+      st_dir: /lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026/breast/st
+      metadata_csv: /lustre/nvwulf/scratch/schennareddy/HEST-1k/metadata/breast_metadata.csv
+      study: hest1k_breast
+    COAD:                                                           # colon, 58 WSI / 58 ST (~184GB), oncotree=COAD
+      wsi_dir: /lustre/nvwulf/scratch/schennareddy/HEST-1k/data/colon/wsis
+      st_dir: /lustre/nvwulf/scratch/schennareddy/HEST-1k/data/colon/st
+      metadata_csv: /lustre/nvwulf/scratch/schennareddy/HEST-1k/metadata/colon_metadata.csv
+      study: hest1k_colon
+    CCRCC:                                                          # kidney, 25 WSI / 25 ST (~18GB), 24/25 rows are oncotree=SCCRCC mapped to CCRCC (1 PRCC excluded, distinct RCC subtype)
+      wsi_dir: /lustre/nvwulf/scratch/schennareddy/HEST-1k/data/kidney/wsis
+      st_dir: /lustre/nvwulf/scratch/schennareddy/HEST-1k/data/kidney/st
+      metadata_csv: /lustre/nvwulf/scratch/schennareddy/HEST-1k/metadata/kidney_metadata.csv
+      study: hest1k_kidney
   # `lfs quota -u schennareddy /lustre/nvwulf` reports a 20GB per-user quota
   # ALREADY ~9x over (200GB used) across home+scratch -- the ~500-WSI patch
   # cache alone would be 100GB+ (measured: 205MB for one WSI's 1664
