@@ -4,8 +4,8 @@
 #SBATCH --partition=b40x4
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=20
-#SBATCH --mem=220G
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=44G
 #SBATCH --gres=gpu:nvidia_rtx_pro_6000_blackwell:1
 #SBATCH --time=08:00:00
 #SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_b40_%j.out
@@ -40,12 +40,29 @@
 # runs unsharded (--num-shards 1) -- teacher embedding takes longer but
 # still benefits fully from every already-cached embedding.
 #
-# --mem=220G is REQUIRED, not a tuning knob: the first submission of this
-# job (83721) omitted --mem, got Slurm's small default allocation, and was
-# OOM-killed ~1 minute into Step 1 (28 parallel workers each holding a
-# multi-hundred-MB DICOM WSI pyramid + decompressed tile buffers spikes
-# well past a default few-GB cgroup limit). b40x4-09 had ~468GB free at
-# the time; 220G leaves headroom for other jobs on the shared node.
+# --mem/--cpus-per-task must be sized to what's ACTUALLY free, checked via
+# `scontrol show node <n> | grep -E "RealMemory|AllocMem"` (RealMemory -
+# AllocMem = what Slurm's scheduler will actually let a new job claim --
+# the node's live `FreeMem` OS metric is NOT what the scheduler uses and
+# can look far more generous than what's really allocatable). Two
+# lessons learned the hard way on this line:
+#   1. job 83721 omitted --mem entirely, got Slurm's small default
+#      allocation, and was OOM-killed ~1 minute into Step 1 (parallel
+#      workers each holding a multi-hundred-MB DICOM WSI pyramid +
+#      decompressed tile buffers spike well past a default few-GB limit).
+#   2. job 83815 (resubmitted after the truncation-bug fix, see
+#      docs/RUN_STATUS.md) requested --mem=220G (sized for a node that
+#      had ~468GB truly free at 83721/83723's fix time) but got pinned via
+#      --nodelist to b40x4-11, which only had ~47GB actually allocatable
+#      at THAT submission time -- sat PENDING(Resources) indefinitely
+#      despite showing a free GPU and "generous" live FreeMem, because
+#      220G > 47GB by Slurm's own accounting. Reduced to 12 CPUs / 44GB
+#      (fits comfortably under the tightest free-GPU node's ~47GB budget
+#      observed across this cluster's b40x4 nodes) and dropped the
+#      --nodelist pin so the scheduler can pick ANY node that currently
+#      fits, rather than forcing one specific node that might not.
+# Always re-check current headroom before resubmitting -- these numbers
+# describe conditions at write time, not a permanent cluster state.
 
 set -euo pipefail
 cd /lustre/nvwulf/home/schennareddy/cellvit_project/STS_src

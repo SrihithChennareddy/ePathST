@@ -1,1 +1,2 @@
 run_id,date,job_id,partition,gpu,stage_reached,headline_metric,notes
+2026-08-28_job83825_cptac_distill_b40x4,2026-08-28,83825,b40x4,1x RTX PRO 6000 Blackwell,end of 8h job,S1 val cosine_sim=0.8843,

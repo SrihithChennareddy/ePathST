@@ -214,6 +214,20 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
                     "scaler_state_dict": scaler.state_dict(), "epoch": epoch, "best_val_cos": best_val_cos,
                     "best_epoch": best_epoch, "patience_ctr": patience_ctr, "global_step": global_step,
                     "history": history}, resume_path)
+
+        # Milestone snapshots (every 10 COMPLETED epochs -- epoch is
+        # 0-indexed, so epoch+1 is the completed-epoch count, covering
+        # e.g. 20/50/100): separate, permanent, never-overwritten files so
+        # the model at different training stages can be compared later,
+        # unlike `ckpt_path` (only ever the single best-so-far) or
+        # `resume_path` (overwritten every epoch, resume-only).
+        completed = epoch + 1
+        if completed % 10 == 0:
+            milestone_path = out_dir / f"{baseline}_seed{seed}_epoch{completed}.pt"
+            torch.save({"model_state_dict": model.state_dict(), "epoch": epoch, "val_cosine_sim": val_cos,
+                        "train_loss": float(np.mean(epoch_losses)), "baseline": baseline, "seed": seed},
+                       milestone_path)
+            print(f"[{baseline} seed{seed}] saved milestone checkpoint at epoch {completed} -> {milestone_path}")
         save_json({"history": history, "best_epoch": best_epoch, "best_val_cosine_sim": best_val_cos,
                    "stopped_early_for_time": stopped_early_for_time}, history_path)
 

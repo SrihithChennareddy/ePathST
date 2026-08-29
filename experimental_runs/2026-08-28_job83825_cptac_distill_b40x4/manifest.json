@@ -1,0 +1,21 @@
+{
+  "run_id": "2026-08-28_job83825_cptac_distill_b40x4",
+  "captured_at": "2026-08-28",
+  "job_id": "83825",
+  "partition": "b40x4",
+  "gpu": "1x RTX PRO 6000 Blackwell",
+  "stage": "end of 8h job",
+  "source_work_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_genbio_distill_hest_pna_work",
+  "source_persist_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith",
+  "files_captured": {
+    "results": [
+      "distillation_evaluation.json",
+      "distillation_training_summary.json",
+      "student_encoder_param_count_seed0.json"
+    ],
+    "figures": [
+      "umap_S0_seed0.npz",
+      "umap_S1_seed0.npz"
+    ]
+  }
+}

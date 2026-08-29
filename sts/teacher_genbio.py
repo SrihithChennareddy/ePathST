@@ -93,20 +93,41 @@ import h5py  # noqa: E402
 
 def cache_teacher_embeddings(out_path: str | Path, patch_ids: list[str], embeddings: np.ndarray) -> None:
     """Section 7: store patch_id <-> teacher_embedding, FP16 on disk to
-    reduce footprint (values are unit-norm so FP16 precision is adequate)."""
+    reduce footprint (values are unit-norm so FP16 precision is adequate).
+
+    Uses h5py's VARIABLE-length string dtype for `patch_id`, not a fixed-
+    width numpy `dtype="S"` array. This dataset is appended to across many
+    separate calls over the life of a run (one per batch, potentially
+    tens of thousands of calls); a fixed-width `S` dtype freezes its
+    per-element byte-width at whatever the FIRST call's longest string
+    happened to be, and every later `dataset[slice] = np.array(longer_ids,
+    dtype='S')` silently TRUNCATES any id exceeding that width -- no error,
+    no warning. This bit a real run: CPTAC patch_ids
+    (`{dicom_series_uid}_{x}_{y}`) vary in length with the sampled (x, y)
+    pixel coordinates' digit counts (up to ~6 chars difference between a
+    slide's smallest and largest coordinates), so a dataset created from
+    an early, short-coordinate batch truncated later, longer patch_ids --
+    corrupting them into collisions with unrelated patches (two different
+    truncated-to-the-same-prefix ids look identical) and permanently
+    breaking this cache's own resumability (a fresh, untruncated patch_id
+    string from patch_manifest.csv never string-matches its own truncated
+    form already on disk, so `_already_cached_patch_ids` never recognizes
+    it as done and re-embeds it every run). Variable-length strings have
+    no such width limit."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    str_dtype = h5py.string_dtype(encoding="utf-8")
     with h5py.File(out_path, "a") as f:
         if "teacher_embedding" not in f:
             f.create_dataset("teacher_embedding", data=embeddings.astype(np.float16), maxshape=(None, embeddings.shape[1]))
-            f.create_dataset("patch_id", data=np.array(patch_ids, dtype="S"), maxshape=(None,))
+            f.create_dataset("patch_id", data=np.array(patch_ids, dtype=object), dtype=str_dtype, maxshape=(None,))
         else:
             n0 = f["teacher_embedding"].shape[0]
             n1 = n0 + len(patch_ids)
             f["teacher_embedding"].resize(n1, axis=0)
             f["teacher_embedding"][n0:n1] = embeddings.astype(np.float16)
             f["patch_id"].resize(n1, axis=0)
-            f["patch_id"][n0:n1] = np.array(patch_ids, dtype="S")
+            f["patch_id"][n0:n1] = np.array(patch_ids, dtype=object)
 
 
 def verify_teacher_cache(path: str | Path, expected_dim: int) -> dict:

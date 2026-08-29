@@ -1,0 +1,8 @@
+{
+  "S1_seed0": {
+    "checkpoint": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_genbio_distill_hest_pna/student_checkpoints/S1_seed0_best.pt",
+    "best_epoch": 14,
+    "best_val_cosine_sim": 0.888020396232605,
+    "stopped_early_for_time": true
+  }
+}
