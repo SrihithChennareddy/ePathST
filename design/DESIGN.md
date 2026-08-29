@@ -6,6 +6,12 @@ top-level `README.md` for the paper abstract and a one-line-per-script
 summary; this doc goes one level deeper into *why* the pipeline is shaped
 the way it is.
 
+This reflects the **V2** architecture (`Final_Project_V2.txt`, the current
+spec) — see `docs/V1_TO_V2_MIGRATION.md` for the full change log against
+the original V1 build (ablation grid restructuring, the new Scale-Aware
+PNA and GATv2 backends, fold-completeness enforcement, etc.). Nothing
+about Phase 1 (CPTAC distillation) changed in that migration.
+
 ## 1. Problem and approach
 
 Spatial transcriptomics (ST) measures gene expression at spatial locations
@@ -52,9 +58,9 @@ CPTAC WSIs (DICOM, BRCA/COAD/ccRCC)             HEST WSIs + paired ST (.h5ad)
         ▼                                    [10] per-fold: fold-safe HVG
  [4] frozen GenBio-PathFM teacher                  target selection, patch-head
      (1.1B params) embeds every patch                baseline, multiscale physical
-        │                                             graph construction, PNA
-        ▼                                             residual correction, A0-A7
- [5] train ConvNeXt V2-Atto student                   ablations
+        │                                             graph construction, residual
+        ▼                                             PNA/GATv2 correction, full
+ [5] train ConvNeXt V2-Atto student                   A0-A9 ablation grid
      (S0 imagenet / S1 genbio-distilled /                    │
       S2 random-init-distilled)                              ▼
         │                                    [11] spatial destruction dose-
@@ -77,7 +83,9 @@ CPTAC WSIs (DICOM, BRCA/COAD/ccRCC)             HEST WSIs + paired ST (.h5ad)
                                                          │             │
                                                          │             ▼
                                                          │  [15] fair GenBio-PathFM
-                                                         │       comparison (A8/A9)
+                                                         │       comparison
+                                                         │       (PCA-256 encoder,
+                                                         │        separate from A8/A9)
                                                          │             │
                                                          └──────► [16] sanity checks
                                                                   (must pass first)
@@ -109,7 +117,7 @@ as a frozen feature extractor.
 | HEST patch extraction + features | HEST WSI + ST spot coordinates (`obsm['spatial']`) | 320-D node feature per ST spot (via locked encoder) |
 | Graph construction | ST spot coordinates (real microns) | multiscale graph: local (≤150µm, ≤8 neighbors), meso (≤300µm, ≤12), macro (≤600µm, ≤16), RBF-encoded edge distances |
 | Patch head | node features | baseline per-spot gene/pathway prediction (no graph) |
-| PNA residual correction | node features + graph | `y_final = y_patch + GNN(node_features, graph)`, correction head near-zero-initialized so it starts as a no-op |
+| Residual graph correction | node features + graph | `y_final = y_patch + GNN(node_features, graph)`, correction head near-zero-initialized so it starts as a no-op; 3 interchangeable backends — union multiscale PNA, scale-aware per-branch PNA (A8, proposed final model), GATv2 (A9, architecture control) |
 | Evaluation | predictions vs. held-out targets | patient-level Pearson r (Fisher-z), bootstrap CIs, FDR-corrected significance |
 
 Everything structural (paths, hyperparameters, radii, ablation toggles) is
@@ -128,17 +136,34 @@ without PyYAML) — nothing is hard-coded in the scripts. See
   HF preprocessing/output handling), `student_model.py` (ConvNeXt V2-Atto +
   projection head + lock/strip logic), `distill_loss.py` /
   `distill_train.py` (cosine + feature distillation loop), `patch_head.py`
-  (bottleneck MLP baseline), `graph_model.py` (residual PNA correction
-  head), `pna_block.py` (PNA graph-conv layer).
+  (bottleneck MLP baseline, LayerNorm+GELU+Dropout trunk — kept in `.eval()`
+  permanently once wrapped by `ResidualGraphPredictor`), `graph_model.py`
+  (`ResidualGraphPredictor` residual-correction wrapper, backend-agnostic,
+  over three interchangeable backends: `GraphCorrectionModel` (union
+  multiscale PNA), `ScaleAwareGraphCorrectionModel` (A8, three per-scale PNA
+  branches + learned softmax gate — the proposed final model),
+  `GATv2CorrectionModel` (A9, architecture control, identical structure with
+  GATv2 as the message-passing op); also `assert_zero_residual_at_init`),
+  `pna_block.py` (PNA graph-conv layer), `gatv2_block.py` (GATv2 graph-conv
+  layer, mirrors `pna_block.py`), `genbio_pca.py` (`TrainOnlyPCA` + Ridge
+  baseline for the fair GenBio-PathFM comparison), `pathway_posthoc.py`
+  (post-hoc PROGENy scoring from a model's predicted genes, rather than a
+  dedicated pathway head).
 - **Graph**: `graph_builder.py` (multiscale radius graph from real spatial
-  coordinates), `graph_training.py` (training loop for the graph model),
+  coordinates; `union_edge_features` 20-D for mixed-scale backends,
+  `per_scale_edge_features` 17-D for per-branch backends,
+  `split_edges_by_scale`), `graph_training.py` (backend-parameterized
+  training loop, shared by all three `graph_model.py` backends via a
+  `backend` argument and an optional per-edge `edge_scale` tag),
   `destruction.py` (edge-randomization dose-response controls).
 - **Targets / evaluation**: `expression.py` (leakage-free HVG selection —
   computed from the training fold/slide only), `pathways.py` (PROGENy
   pathway activity targets), `metrics.py`, `stats_tests.py` (bootstrap,
   Fisher-z, FDR), `distill_eval.py` (retrieval/probe/UMAP eval for the
   distillation step), `efficiency.py` (params/FLOPs/throughput), `cv_folds.py`
-  (patient-level k-fold), `ablations.py` (A0–A9 ablation definitions),
+  (patient-level k-fold, `expected_run_keys`/`assert_run_completeness` fold-
+  completeness gate), `ablations.py` (A0-A9 ablation definitions, primary
+  block A1/A2/A5/A6/A7/A8 then secondary A0/A3/A4/A9),
   `analysis.py` / `report.py` / `figures.py` (aggregation and plotting).
 - **`utils.py`**: config loading, path resolution, shared helpers.
 
@@ -155,45 +180,83 @@ during training.
 ## 5. Experimental design (why the ablation set exists)
 
 The core hypothesis test needs to rule out confounds, so the ablation grid
-includes:
+(`sts/ablations.ABLATION_GRID`, A0-A9) includes:
 
 - **S0 / S1 / S2 student variants** (Phase 1): ImageNet-only, GenBio-distilled,
   and random-init-distilled — isolates how much of the student's usefulness
   comes from distillation vs. architecture alone.
-- **Patch-only vs. graph-corrected** (Phase 2 main comparison).
-- **Parameter-matched non-spatial baseline** — same parameter count as the
-  GNN but no spatial structure, to rule out "more parameters" as the
-  explanation for any graph benefit.
-- **Random graph / degree-preserving shuffled graph** — same graph
+- **A1 ImageNet patch / A2 distilled patch** — patch-only baselines,
+  isolating how much of any downstream benefit is attributable to
+  distillation itself (primary Gate 1, see below).
+- **A5 shuffled graph / A6 local-only PNA / A7 multiscale union PNA / A8
+  scale-aware multiscale PNA** — the graph-corrected models, run against
+  the same patch features. A8 (three independent per-scale PNA branches +
+  a learned softmax gate) is the **proposed final architecture**; A6/A7 are
+  intermediate structural ablations (single-scale vs. union-multiscale
+  message passing).
+- **A0 mean-expression / A3 parameter-matched MLP** (secondary) — A0 is a
+  trivial floor; A3 has the *same parameter count* as the GNN but no
+  spatial structure, ruling out "more parameters" as the explanation for
+  any graph benefit (a real `MolecularBottleneckHead`, not a placeholder).
+- **A4 random graph / A5 degree-preserving shuffled graph** — same graph
   statistics (degree distribution) but destroyed or randomized spatial
   semantics, to isolate *topology* from *graph structure in general*.
+- **A9 GATv2 multiscale** (secondary) — identical residual-correction
+  wrapper and multiscale graph as A7/A8, but GATv2 instead of PNA as the
+  message-passing operator — an architecture control isolating "PNA
+  specifically" from "graph message-passing in general."
 - **Progressive spatial-edge destruction (q ∈ {0, 25, 50, 75, 100}%)** — a
   dose-response curve: performance should degrade monotonically toward the
   patch-only floor as real edges are replaced with random ones, if the
   graph benefit is genuinely spatial.
-- **Fair GenBio-PathFM comparison (A8/A9)** — runs the *teacher itself* on
-  the same HEST split, to contextualize how much performance the ~300x
-  compression actually costs.
+- **Fair GenBio-PathFM comparison** (`sts/genbio_pca.py`, separate from the
+  A-grid above) — a training-fold-only 256-D PCA of the *teacher's* own
+  4608-D embeddings + a Ridge baseline, to contextualize how much
+  performance the ~300x compression actually costs, run only after the
+  A-grid above is locked. Library-level as of this writing; the driver
+  script (`scripts/15_genbio_fair_comparison.py`) rewrite to use it is a
+  follow-up — see `docs/V1_TO_V2_MIGRATION.md`.
+
+Three primary statistical gates (`configs/base.yaml`'s `primary_gates`,
+`scripts/12_primary_hypothesis_test.py`) formalize the central question,
+reported both pooled and per-cancer (per-cancer is primary):
+
+| Gate | Comparison |
+|---|---|
+| 1 — Distillation | R(A2 distilled patch) > R(A1 ImageNet patch) |
+| 2 — Spatial context | R(A8 scale-aware PNA) > R(A2 distilled patch) |
+| 3 — True topology (decisive) | R(A8 scale-aware PNA) > R(A5 shuffled graph) |
 
 Statistics: patient-level Pearson r per gene/pathway, Fisher-z aggregation
 across patients, 10,000-resample bootstrap CIs, Benjamini-Hochberg FDR
 correction (q=0.05) across genes — everything is evaluated at the patient
-level (not spot level) to avoid pseudo-replication.
+level (not spot level) to avoid pseudo-replication. Before any statistic is
+aggregated, `sts/cv_folds.assert_run_completeness` hard-fails on a
+mismatch between the expected and completed (cancer, fold, seed, ablation)
+run set — added after PoC_5's own aggregate silently pooled an incomplete
+fold set (see `docs/POC5_RESULTS.md`).
 
 ## 6. Known constraints / follow-ups
 
-- HEST metadata schema is confirmed correct for the `colon` (COAD) cohort;
-  `breast` (IDC) and `kidney` (CCRCC) directories exist but have no
-  `copy_log_*.csv` yet — `load_hest_raw_metadata` skips-and-reports missing
-  cancers rather than failing.
-- `10_run_patient_cv.py`'s A3 (parameter-matched MLP) ablation currently
-  reuses the patch-head architecture as a placeholder; a dedicated wider
-  `MolecularBottleneckHead` needs to be wired in via
-  `sts.ablations.matched_mlp_hidden_dim` before the full run.
+- HEST metadata (`copy_log_*.csv`) is confirmed present only for `colon`
+  (COAD, the CRC23 cohort at `simons_2026/`) as of 2026-08-29; `breast`
+  (IDC) and `kidney` (CCRCC) have no `copy_log_*.csv` there yet —
+  `load_hest_raw_metadata` skips-and-reports missing cancers rather than
+  failing.
+- `10_run_patient_cv.py`'s A0 (mean-expression) and A3 (parameter-matched
+  `MolecularBottleneckHead`) ablations are real implementations (fixed
+  during the V1->V2 migration — V1's driver silently skipped both).
 - Large artifacts (patch caches, teacher embeddings, checkpoints) are kept
   out of `/home` and `/scratch` (20GB per-user quota) and instead live under
   the `YurovskyGroup-nvwulf` project space — see `docs/RUN_STATUS.md` for
   current paths and job status.
+- V2 migration follow-ups not yet done: `scripts/15_genbio_fair_comparison.py`
+  still needs its `sts/genbio_pca.py`-based rewrite; `sts/pathway_posthoc.py`
+  and the `pathway_loss_sweep` config aren't yet driven by a script; the
+  spatial-destruction dose-response doesn't yet preserve per-scale
+  (local/meso/macro) edge counts, only aggregate degree; the primary
+  hypothesis test's bootstrap unit is (cancer, fold, seed), not individual
+  patients — full list in `docs/V1_TO_V2_MIGRATION.md`.
 - See `docs/RUN_STATUS.md` for what has actually been run against real data
   so far vs. what is still pending, and `experimental_runs/` for dated
   result snapshots once runs complete.
