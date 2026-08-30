@@ -399,6 +399,166 @@ submitting). At the ~40min/epoch pace observed in link 3, ~11 more epochs
 (39->50) should take ~7.3h, fitting inside the 8h budget -- expected to
 either reach epoch 50 or land very close to it.
 
+### HEST Phase-2 (Step 8-12) full 3-cancer run + new GenBio-PathFM baseline (2026-08-30)
+
+All 3 real HEST cancers (breast/IDC, colon/COAD, kidney/CCRCC -- 202
+samples total) became available together for the first time this session
+(`docs/RUN_STATUS.md`'s earlier entries only had colon). This section
+covers: (1) parallelizing Step 8 (the previous bottleneck), (2) building
+a second, independent frozen-GenBio-PathFM patch-only baseline for
+comparison, and (3) four real, previously-hidden bugs Step 10 hit the
+first time it ever ran end-to-end against the full 3-cancer dataset --
+Steps 8-12 had never gotten this far before (earlier attempts always hit
+an 8h wall-clock cutoff mid-Step-8).
+
+**Job chain**: 84327 (b40x4, 8h) -> hit wall-clock mid-Step-8 -> 84331
+(dependent resume) -> also hit wall-clock -> 84527/84530/84531 (manual
+resubmits, added parallelization) -> 84717/84722/84733 (successive bug
+fixes below, main pipeline) running in parallel with 84343/84344/84715/
+84723 (GenBio baseline chain, see its own bugs below). Every step in
+this chain is a plain resubmit of the same `.slurm` script after a code
+fix -- no manual data surgery was ever needed, confirming Steps 8-12's
+resumability design holds under real, repeated failure.
+
+**Step 8 parallelization** (previously ~single-threaded, one WSI region
+read at a time -- confirmed the actual bottleneck, not GPU-bound: Step 8
+touches no CUDA code path at all):
+- `sts/hest_prep.extract_hest_patches_for_sample` now reads a sample's
+  spots concurrently via a `ThreadPoolExecutor` -- openslide's
+  `read_region` releases the GIL during the tile decode, so this is
+  genuine I/O parallelism on one WSI handle.
+- `scripts/08_prepare_hest_metadata.py` now also runs multiple SAMPLES
+  concurrently via `ProcessPoolExecutor` (`--sample-workers`, default 4)
+  each running its own `--threads-per-sample` (default 6) thread pool --
+  4x6=24 matches the job's `--cpus-per-task=24`. Checkpointing (every 5
+  completed samples) and misalignment-exclusion semantics unchanged.
+- Measured real speedup on the same 4 samples (131-134) that took 59.1
+  min combined sequentially: **~7.35 min combined in parallel, ~8x**.
+  `--mem`/`--cpus-per-task`/`--time` were also bumped (12->24 CPUs,
+  8h->24h on `b40x4-long` since `b40x4` caps at 8h) to give the new
+  concurrency room -- see the OOM bug below for why `--mem` needed a
+  SECOND, much larger bump on top of this.
+- New H200x4 attempt (backup job for a possible faster GPU) was tried and
+  abandoned: `h200x4-04` showed 3/4 GPUs free but its RAM was already
+  ~99% allocated by another user's job (`AllocMem=768000` of
+  `RealMemory=773578`), so the scheduler's backfill estimate for this
+  job was ~6h out despite the "free GPU" appearance -- same class of
+  lesson as the earlier `RealMemory - AllocMem` vs `FreeMem` bug in this
+  file's Job 83815 entry, just for a different partition. Reverted to
+  `b40x4`/`b40x4-long`, which has consistently had usable headroom.
+
+**New GenBio-PathFM baseline** (`scripts/run_genbio_hest_baseline.py` /
+`slurm/run_genbio_hest_baseline.slurm`): a standalone, frozen
+GenBio-PathFM (1.1B params, 4608-D embedding) patch-only comparison --
+no GNN, no fine-tuning, reuses the main pipeline's exact seed=0/fold=0
+split and HVG1000/HVG50/PROGENy14 target definitions via
+`scripts/10_run_patient_cv.load_fold_expression` (imported via
+`importlib`, never copy-pasted, so every Step-10 fix below applies to it
+automatically). Writes `results/genbio_baseline/genbio_summary.csv` (one
+row per cancer: `HVG50_r/HVG1000_r/PROGENy14_r` + now also
+`*_mse`/`*_mae`, see below), plus per-patient-per-gene detail in
+`genbio_gene_metrics.csv`/`genbio_pathway_metrics.csv` for later
+graphing.
+
+**GenBio bug 1 -- manifest-wait race** (job 84343): read the shared
+`hest_samples.csv`/`hest_spot_manifest.csv` once at startup and got a
+snapshot showing only IDC (120 samples) since the main pipeline's Step 8
+hadn't reached COAD/CCRCC yet -- would have silently run the entire
+experiment on 1/3 of the intended cohort. **Fixed**: added
+`wait_for_hest_manifest_complete()`, a read-only poll loop that waits
+until every configured cancer has at least one QC-eligible sample AND
+the count has gone stable across 3 consecutive polls. First version had
+a `timeout_seconds` escape hatch (originally 7h) that could still let it
+proceed with a partially-missing cancer -- **that itself caused job
+84344 to burn 7h08m of GPU time** (proceeded with IDC+COAD only, then
+hard-crashed the smoke test on 0 CCRCC samples). **Re-fixed**: the
+timeout now only fires once every cancer has at least one sample but the
+count hasn't gone fully stable yet -- a cancer that's still completely
+absent just waits for the SLURM wall-clock, a clean failure mode instead
+of a wasted silent-partial run.
+
+**Step 10 bug 1 -- OOM (job 84714, then 84717)**: `load_fold_expression`
+pools EVERY train-fold sample's FULL (non-HVG) dense expression matrix
+via `pd.concat` -- IDC fold0 alone is ~92k spots x ~18k genes (~13GB for
+one copy), and holding the per-sample DataFrame list plus the
+concatenated result simultaneously roughly doubles that peak, well past
+the `--mem=44G` sized for the much lighter earlier CPTAC-only jobs.
+Confirmed via a real `oom_kill` event. **Fixed**: bumped `--mem` to
+160G (b40x4 nodes have 500G+ RAM, confirmed ample headroom).
+
+**Step 10 bug 2 -- gene-ID convention mismatch (job 84717)**:
+`AssertionError: No sources with more than tmin=5 targets` from
+decoupler's PROGENy scoring. Root cause: some breast/IDC HEST slides
+(`SPA1xx`, confirmed live) index `var` by Ensembl gene ID
+(`ENSG00000000003`) with the actual symbol in a separate `var['SYMBOL']`
+column, while others (`NCBI*`) already index by symbol directly --
+0 gene-symbol overlap with PROGENy's symbol-keyed net for the
+Ensembl-indexed ones. **Fixed**: `sts.expression.ensure_gene_symbol_index`
+detects an Ensembl-style index with a `SYMBOL` column and remaps to it
+(dropping genes with no symbol, deduping). Confirmed COAD/CCRCC (a
+different data source, HuggingFace HEST-1k) don't have this specific
+issue.
+
+**Step 10 bug 3 -- fixed-dimension model vs. variable HVG count (job
+84722)**: `RuntimeError: tensor a (1000) must match tensor b (171)`.
+Root cause: `load_fold_expression` selects ONE shared HVG1000 list per
+cancer (the intersection of every training sample's genes -- necessary
+since the model is one network trained across all of that cancer's
+pooled training spots at once), but `build_patch_head`/
+`GenBioDownstreamHead` were both built with the fixed CONFIG value
+(1000) rather than the ACTUAL selected count. The real cause of the
+undersized intersection: **11/202 samples (6 IDC, 5 COAD) run on a
+Xenium-style targeted ~541-gene panel** instead of whole-transcriptome
+ST, and `common_genes = set.intersection(...)` requires every sample in
+the fold to have a gene -- a handful of tiny-panel outliers silently
+collapsed IDC's shared pool from ~1000 to 171. **Fixed per explicit user
+decision** (excluding the outliers, not accepting a degraded HVG171):
+`sts.cv_folds.exclude_targeted_panel_samples` (threshold 2000 genes --
+real whole-transcriptome panels seen are 14700+, real targeted panels
+seen are 541) drops these 11 samples from the CV split entirely in both
+`scripts/10_run_patient_cv.py` and `scripts/run_genbio_hest_baseline.py`,
+so the remaining 191 samples (IDC 114, COAD 53, CCRCC 24) all get the
+full HVG1000/HVG50, keeping the `HVG1000_r`/`HVG50_r` comparison
+apples-to-apples across all 3 cancers. Also fixed the dimension bug
+itself in both scripts (`len(hvg["hvg1000"])` instead of the fixed
+config value) as defense in depth.
+
+**Step 10 bug 4 -- duplicate gene symbols (job 84722, again)**:
+`AssertionError: mat contains repeated feature names` from decoupler,
+DIFFERENT root cause from bug 2 above -- 4 real COAD slides
+(TENX156/155/154/128) already index by symbol correctly but have a
+handful (3/18085) of naturally duplicate gene symbols, which the earlier
+`ensure_gene_symbol_index` fix didn't dedupe since it only touched the
+Ensembl-remap code path. **Fixed**: that function now unconditionally
+calls `adata.var_names_make_unique()` regardless of which path was
+taken -- duplicate symbols get suffixed (`GENE`, `GENE-1`, ...) rather
+than crashing; the suffixed copies simply won't match any gene-symbol-
+keyed net/HVG list, same harmless outcome as any other absent gene.
+
+**MSE/MAE surfaced for GenBio too** (per explicit user request, "for
+later"): `sts.metrics.evaluate_predictions` (used by the main pipeline's
+`cv_ablation_metrics.csv`) already computed `mean_mse`/`mean_mae`
+alongside Pearson r for every target block -- nothing to do there.
+GenBio's own summary row only had the `_r` values though (it uses
+`per_patient_per_column_pearson`/`target_summary` directly, not
+`evaluate_predictions`); added `HVG50_mse/mae`, `HVG1000_mse/mae`,
+`PROGENy14_mse/mae` to `genbio_summary.csv`'s summary row (the
+per-patient mse/mae values were already being computed either way, just
+not aggregated into the summary before).
+
+**As of this entry**: main pipeline resubmitted as **84733** (all 4
+Step-10 fixes + the memory bump), GenBio baseline still running as
+**84723** (has the manifest-wait and targeted-panel-exclusion fixes
+live, since it was resubmitted after those landed, but is still running
+code from before the var_names-dedup fix -- it hasn't reached its own
+per-cancer training loop yet, where the same dedup bug could in
+principle still hit it; will be fixed+restarted if/when it does, without
+losing its already-cached embedding-extraction progress, which is
+resumable per-sample). Neither has completed a full pass yet, so
+`results/cv_ablation_metrics.csv` and `results/genbio_baseline/
+genbio_summary.csv` don't exist yet as of this entry -- see the Run log
+above/this file's future entries for real numbers once available.
+
 ## Recovery checklist (read this first after any interruption)
 
 1. `squeue -u schennareddy` -- is anything still running/queued?
