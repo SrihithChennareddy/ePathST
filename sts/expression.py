@@ -30,15 +30,22 @@ def ensure_gene_symbol_index(adata):
     `SYMBOL` column present and remaps to it; drops genes with no symbol
     and collapses duplicate symbols (keep first -- confirmed a small
     minority, ~3 in 16.7k genes on a real affected slide) so var_names
-    stay unique. Slides already indexed by symbol are returned unchanged."""
-    if adata.var.index.size and not str(adata.var.index[0]).startswith("ENSG"):
-        return adata
-    if "SYMBOL" not in adata.var.columns:
-        return adata
-    symbol = adata.var["SYMBOL"].astype(str)
-    keep = symbol.notna() & (symbol != "nan") & ~symbol.duplicated(keep="first")
-    adata = adata[:, keep.values].copy()
-    adata.var_names = symbol[keep].tolist()
+    stay unique. Slides already indexed by symbol are returned unchanged
+    EXCEPT for a final var_names_make_unique() pass -- confirmed live,
+    2026-08-30: 4 real COAD slides (TENX156/155/154/128) already index by
+    symbol but have a handful (3/18085) of naturally duplicate gene
+    symbols, which decoupler's mlm hard-crashes on ('mat contains repeated
+    feature names') regardless of whether the Ensembl-remap path above
+    ran. var_names_make_unique() suffixes duplicates (GENE, GENE-1, ...)
+    rather than dropping them -- the suffixed copies just won't match any
+    gene-symbol-keyed net/HVG list, which is the same harmless outcome as
+    any other gene absent from those, not a crash."""
+    if adata.var.index.size and str(adata.var.index[0]).startswith("ENSG") and "SYMBOL" in adata.var.columns:
+        symbol = adata.var["SYMBOL"].astype(str)
+        keep = symbol.notna() & (symbol != "nan") & ~symbol.duplicated(keep="first")
+        adata = adata[:, keep.values].copy()
+        adata.var_names = symbol[keep].tolist()
+    adata.var_names_make_unique()
     return adata
 
 
