@@ -4,7 +4,7 @@
 #SBATCH --partition=b40x4
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=12
+#SBATCH --cpus-per-task=24
 #SBATCH --mem=44G
 #SBATCH --gres=gpu:nvidia_rtx_pro_6000_blackwell:1
 #SBATCH --time=08:00:00
