@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
-#SBATCH --mem=44G
+#SBATCH --mem=160G
 #SBATCH --gres=gpu:nvidia_rtx_pro_6000_blackwell:1
 #SBATCH --time=24:00:00
 #SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_hest_full_%j.out
@@ -18,9 +18,14 @@
 # extraction, the full A0-A9 ablation grid (all 3 GNN backends), and the
 # primary hypothesis test gates.
 #
-# --mem/--cpus-per-task sized the same as the proven b40x4 CPTAC
-# distillation job (run_cptac_distillation_b40x4.slurm) -- same headroom
-# constraints apply on this partition.
+# --mem=160G (confirmed 2026-08-30 via a real OOM kill at the old 44G):
+# Step 10's load_fold_expression pools every train-fold sample's FULL
+# (non-HVG) dense expression matrix via pd.concat -- IDC fold0 alone is
+# ~92k spots x ~18k genes (~13GB for one copy), and pd.concat plus the
+# per-sample DataFrame list held simultaneously roughly doubles that
+# peak, well past the old 44G limit sized for the (much lighter) CPTAC
+# distillation job. b40x4 nodes have 500G+ RAM with plenty of headroom
+# for this.
 #
 # CV DESIGN NOTE: per explicit user instruction this run uses a SINGLE real
 # 80/20 patient-level split per cancer (--max-folds-per-cancer 1 --seeds 0),
