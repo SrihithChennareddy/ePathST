@@ -218,7 +218,8 @@ def main():
                         preds, r_metrics = run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test,
                                                          y_gene_train, y_path_train, y_gene_val, y_path_val,
                                                          y_gene_test, y_path_test, patch_head, spot_manifest, cfg,
-                                                         seed, args.device)
+                                                         seed, args.device, n_hvg50=len(hvg["hvg50"]),
+                                                         pathway_names=list(net["source"].unique()))
                         for pid, g_pred, p_pred, g_true, p_true in zip(ids_test, preds["gene"], preds["pathway"],
                                                                         y_gene_test, y_path_test):
                             all_predictions.append({"cancer": cancer, "fold": fold["fold"], "seed": seed,
@@ -241,7 +242,8 @@ def main():
 
 
 def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_gene_train, y_path_train,
-                  y_gene_val, y_path_val, y_gene_test, y_path_test, patch_head, spot_manifest, cfg, seed, device):
+                  y_gene_val, y_path_val, y_gene_test, y_path_test, patch_head, spot_manifest, cfg, seed, device,
+                  n_hvg50, pathway_names):
     """Trains/evaluates one ablation from sts.ablations.ABLATION_GRID and
     returns (test predictions, headline metrics). Dispatches on
     (spec.graph_source, spec.backend):
@@ -338,10 +340,24 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
         # spot-level metadata downstream (e.g. via a per-patient stable sort).
         ids_test = np.concatenate([ids_test[patient_for(ids_test) == p] for p in np.unique(patient_for(ids_test))])
 
+    # Section 30/31's required MODEL x {HVG50, HVG1000, PATHWAY} results table needs all three
+    # evaluated separately, not one pooled HVG1000 number relabeled after the fact -- HVG50 is exactly
+    # the first n_hvg50 columns of the HVG1000 target (nested by construction, see
+    # sts.expression.select_hvg_for_fold), so no separate model/prediction is needed, just a column slice.
     from sts.metrics import evaluate_predictions as _eval
-    metrics = _eval(y_gene_test, gene_pred, patient_for(ids_test), np.array(["cancer"] * len(ids_test)),
-                     [str(i) for i in range(y_gene_test.shape[1])], cfg)
-    return {"gene": gene_pred, "pathway": path_pred}, metrics.get("overall", {})
+    pids, cancer_placeholder = patient_for(ids_test), np.array(["cancer"] * len(ids_test))
+    m_hvg1000 = _eval(y_gene_test, gene_pred, pids, cancer_placeholder,
+                       [str(i) for i in range(y_gene_test.shape[1])], cfg).get("overall", {})
+    m_hvg50 = _eval(y_gene_test[:, :n_hvg50], gene_pred[:, :n_hvg50], pids, cancer_placeholder,
+                     [str(i) for i in range(n_hvg50)], cfg).get("overall", {})
+    m_pathway = _eval(y_path_test, path_pred, pids, cancer_placeholder, pathway_names, cfg).get("overall", {})
+    metrics = {f"hvg1000_{k}": v for k, v in m_hvg1000.items()}
+    metrics.update({f"hvg50_{k}": v for k, v in m_hvg50.items()})
+    metrics.update({f"pathway_{k}": v for k, v in m_pathway.items()})
+    # back-compat: the primary hypothesis test / completeness gate key off this exact name for the
+    # decisive HVG1000 comparison (Gate 1-3, sts.cv_folds); keep it unprefixed too.
+    metrics["fisher_z_mean_patient_R"] = m_hvg1000.get("fisher_z_mean_patient_R")
+    return {"gene": gene_pred, "pathway": path_pred}, metrics
 
 
 if __name__ == "__main__":
