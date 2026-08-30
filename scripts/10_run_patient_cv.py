@@ -40,7 +40,8 @@ from torch_geometric.data import Data
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sts.ablations import (ABLATION_GRID, build_graph_for_ablation, edge_features_for_ablation,
                             matched_mlp_hidden_dim, scale_aware_edge_data)
-from sts.cv_folds import assert_run_completeness, build_cv_grid, carve_validation_from_train, expected_run_keys
+from sts.cv_folds import (assert_run_completeness, build_cv_grid, carve_validation_from_train,
+                           exclude_targeted_panel_samples, expected_run_keys)
 from sts.expression import TrainOnlyStandardizer, ensure_gene_symbol_index, normalize_log1p_slide, select_hvg_for_fold
 from sts.feature_cache import load_cached_features
 from sts.graph_model import ResidualGraphPredictor
@@ -117,6 +118,7 @@ def main():
         cfg["cross_validation"]["seeds"] = args.seeds
 
     hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
+    hest_samples = exclude_targeted_panel_samples(hest_samples)
     spot_manifest = pd.read_csv(paths["manifests"] / "hest_spot_manifest.csv")
     feat_dir = paths["student_embeddings"] / "distilled"
 
@@ -180,7 +182,7 @@ def main():
 
                     x_train, x_val, x_test = load_feats(ids_train), load_feats(ids_val), load_feats(ids_test)
 
-                    patch_head = build_patch_head(cfg, x_train.shape[1], mt["hvg1000"], 14).to(args.device)
+                    patch_head = build_patch_head(cfg, x_train.shape[1], len(hvg["hvg1000"]), 14).to(args.device)
                     opt = torch.optim.AdamW(patch_head.parameters(), lr=cfg["patch_head"]["lr"],
                                              weight_decay=cfg["patch_head"]["weight_decay"])
                     best_val, patience_ctr, best_state = float("inf"), 0, None

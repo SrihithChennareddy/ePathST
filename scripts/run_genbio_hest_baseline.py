@@ -53,7 +53,7 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.cv_folds import build_cv_grid, carve_validation_from_train
+from sts.cv_folds import build_cv_grid, carve_validation_from_train, exclude_targeted_panel_samples
 from sts.expression import TrainOnlyStandardizer, select_hvg_for_fold
 from sts.metrics import patient_macro_fisher_z, per_patient_per_column_pearson, target_summary
 from sts.patch_head import patch_head_loss
@@ -353,6 +353,7 @@ def main():
     # "eligible" (requirement 4): passed scripts/08's alignment QC, i.e. has a real patch shard + spot_manifest rows.
     eligible_sample_ids = set(spot_manifest["sample_id"].unique())
     hest_samples = hest_samples[hest_samples["sample_id"].isin(eligible_sample_ids)].reset_index(drop=True)
+    hest_samples = exclude_targeted_panel_samples(hest_samples)
     print(f"[run_genbio_hest_baseline] {len(hest_samples)} QC-eligible HEST samples across "
           f"{hest_samples['cancer'].value_counts().to_dict()}")
 
@@ -488,7 +489,8 @@ def main():
               f"(split source: {split_source})")
 
         seed_everything(args.seed)
-        head = GenBioDownstreamHead(gene_dim=mt["hvg1000"], pathway_dim=14, dropout=cfg["patch_head"].get("dropout", 0.1)).to(device)
+        head = GenBioDownstreamHead(gene_dim=len(hvg["hvg1000"]), pathway_dim=14,
+                                     dropout=cfg["patch_head"].get("dropout", 0.1)).to(device)
         opt = torch.optim.AdamW(head.parameters(), lr=cfg["patch_head"]["lr"], weight_decay=cfg["patch_head"]["weight_decay"])
         if device == "cuda":
             torch.cuda.reset_peak_memory_stats()

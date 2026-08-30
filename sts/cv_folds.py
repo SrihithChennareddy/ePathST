@@ -16,7 +16,42 @@ computing any cross-fold statistic."""
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import GroupKFold
+
+
+def exclude_targeted_panel_samples(hest_samples: pd.DataFrame, min_genes: int = 2000) -> pd.DataFrame:
+    """Drops samples run on a targeted gene panel (e.g. Xenium, ~541 genes)
+    rather than whole-transcriptome ST -- confirmed live, 2026-08-30: 5/96
+    of IDC fold0's train patients (TENX97, TENX95, NCBI785, NCBI784,
+    NCBI783) have only 541 genes each, versus 14700+ for every other
+    breast sample. Because scripts/10_run_patient_cv.py's
+    load_fold_expression pools ALL of a cancer's training patients into
+    one matrix and selects ONE shared HVG1000 list (`common_genes =
+    set.intersection(*genes_by_sample.values())`), a handful of tiny-panel
+    outliers silently drags the whole cancer's shared-gene pool down to
+    whatever those outliers happen to cover (171 genes, confirmed) --
+    collapsing IDC's HVG1000 target to HVG171 while COAD/CCRCC (no
+    targeted-panel samples) keep the full ~1000, making a same-name
+    "HVG1000_r" comparison across cancers apples-to-oranges. `min_genes`
+    is set far below every real whole-transcriptome panel seen (14700+)
+    and far above every real targeted panel seen (541), so it cleanly
+    separates the two without being sensitive to the exact threshold.
+    Reads each sample's gene count via h5py (not a full anndata load, to
+    stay cheap over hundreds of samples)."""
+    import h5py
+
+    def n_genes(path: str) -> int:
+        with h5py.File(path, "r") as f:
+            return f["var"]["_index"].shape[0]
+
+    counts = hest_samples["expression_path"].map(n_genes)
+    keep = counts >= min_genes
+    dropped = hest_samples.loc[~keep]
+    if len(dropped):
+        print(f"[exclude_targeted_panel_samples] dropping {len(dropped)} targeted-gene-panel sample(s) "
+              f"(<{min_genes} genes) from the CV split: {sorted(dropped['sample_id'].tolist())}")
+    return hest_samples.loc[keep].reset_index(drop=True)
 
 
 def patient_level_kfold(patient_ids: list[str], n_splits_requested: int, min_folds: int) -> tuple[list[dict], int, str | None]:
