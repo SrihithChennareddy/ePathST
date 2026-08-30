@@ -550,6 +550,16 @@ def main():
             "cancer": cancer, "n_train_patients": len(train_p), "n_test_patients": len(test_patients),
             "n_train_spots": len(ids_train), "n_test_spots": len(ids_test),
             "HVG50_r": r_hvg50, "HVG1000_r": r_hvg1000, "PROGENy14_r": r_pathway,
+            # mean_mse/mean_mae: same per-patient-per-column mse/mae per_patient_per_column_pearson already
+            # computes (mirrors sts.metrics.evaluate_predictions's mean_mse/mean_mae, which target_summary
+            # itself doesn't surface -- added per explicit user request to keep alongside Pearson r for
+            # every target block, matching what cv_ablation_metrics.csv already has for the CNN/GNN run).
+            "HVG50_mse": float(pp_hvg50["mse"].mean()) if len(pp_hvg50) else float("nan"),
+            "HVG50_mae": float(pp_hvg50["mae"].mean()) if len(pp_hvg50) else float("nan"),
+            "HVG1000_mse": float(pp_hvg1000["mse"].mean()) if len(pp_hvg1000) else float("nan"),
+            "HVG1000_mae": float(pp_hvg1000["mae"].mean()) if len(pp_hvg1000) else float("nan"),
+            "PROGENy14_mse": float(pp_pathway["mse"].mean()) if len(pp_pathway) else float("nan"),
+            "PROGENy14_mae": float(pp_pathway["mae"].mean()) if len(pp_pathway) else float("nan"),
             "feature_extraction_time": extraction_stats_by_cancer.get(cancer, {}).get("seconds"),
             "head_training_time": head_training_seconds, "peak_vram": peak_vram_gb,
         }
