@@ -182,7 +182,7 @@ def _read_csv_with_retry(path: Path, retries: int = 5, delay: float = 2.0) -> pd
 
 # --------------------------------------------------------------- wait for scripts/08 to finish
 def wait_for_hest_manifest_complete(cfg: dict, paths: dict, poll_seconds: float = 60.0,
-                                     stable_checks: int = 3, timeout_seconds: float = 7 * 3600) -> None:
+                                     stable_checks: int = 3, timeout_seconds: float = 20 * 3600) -> None:
     """scripts/08 (job 84327/84331) writes manifests/hest_samples.csv and
     hest_spot_manifest.csv in full at every checkpoint, but partway through
     its run only a subset of cancers (e.g. IDC first, then COAD, then
@@ -192,9 +192,14 @@ def wait_for_hest_manifest_complete(cfg: dict, paths: dict, poll_seconds: float 
     at least one QC-eligible sample AND the total eligible-sample count is
     unchanged across `stable_checks` consecutive polls (i.e. scripts/08 has
     stopped adding rows), then returns. Read-only -- never touches
-    scripts/08's files. Gives up and proceeds anyway after `timeout_seconds`
-    so this job can't hang forever if scripts/08 stalls or a cancer never
-    QC-passes any sample."""
+    scripts/08's files. `timeout_seconds` only lets this proceed early once
+    every cancer has at least one sample but the count hasn't gone stable yet
+    (scripts/08 still trickling in more of the same cancers) -- it never
+    proceeds while a whole cancer is still completely missing, since the
+    downstream smoke test hard-requires a sample from every cancer and would
+    just crash. If a cancer never appears this waits until the SLURM
+    wall-clock kills the job, which is a clean failure rather than a wasted
+    silent partial run."""
     expected_cancers = set(cfg["cancers"]["hest"])
     samples_path = paths["manifests"] / "hest_samples.csv"
     manifest_path = paths["manifests"] / "hest_spot_manifest.csv"
@@ -216,10 +221,9 @@ def wait_for_hest_manifest_complete(cfg: dict, paths: dict, poll_seconds: float 
             print(f"[run_genbio_hest_baseline] manifest complete: {n} samples across all "
                   f"{sorted(expected_cancers)}, stable across {stable_checks} checks -- proceeding", flush=True)
             return
-        if time.monotonic() - start > timeout_seconds:
+        if not missing and time.monotonic() - start > timeout_seconds:
             print(f"[run_genbio_hest_baseline] WARNING: manifest wait timed out after {timeout_seconds:.0f}s "
-                  f"(still missing {sorted(missing)}) -- proceeding anyway with whatever is currently eligible",
-                  flush=True)
+                  f"before going stable (all cancers present, count still {n}) -- proceeding anyway", flush=True)
             return
         last_n = n
         time.sleep(poll_seconds)
