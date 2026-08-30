@@ -54,7 +54,18 @@ from sts.utils import RunEnvironment, load_config, resolve_run_paths, save_json,
 
 def load_fold_expression(hest_samples, spot_manifest, hest_root, patients, cfg):
     """Loads + per-slide normalizes+log1p's every sample belonging to
-    `patients`, returns (expr_df[spot x common_genes], progeny_df, spot_meta)."""
+    `patients`, returns (expr_df[spot x common_genes], progeny_df, spot_meta).
+
+    Indexed by `spot_uid` (`{sample_id}::{spot_id}`), NOT bare `spot_id` --
+    HEST spot ids are Visium array-grid coordinates (e.g. "010x016"), not
+    global barcodes, and collide heavily across different samples/slides
+    (confirmed live, 2026-08-29: two real breast samples shared 144/176
+    spot_ids). Since a fold's train/val/test patient sets always span
+    multiple samples, `pd.concat`-ing frames indexed by bare spot_id would
+    silently produce a duplicate-keyed index and every downstream `.loc[]`
+    lookup (coords_for/patient_for/load_feats below) would then be
+    ambiguous across patients -- see scripts/08_prepare_hest_metadata.py's
+    `spot_uid` column, the source of truth for this join key."""
     frames, progeny_frames, genes_by_sample = [], [], {}
     net = fetch_and_cache_progeny_net(Path(cfg["paths"]["work_dir"]) / "progeny_net.csv",
                                        cfg["molecular_targets"]["pathway_top_genes"])
@@ -62,13 +73,15 @@ def load_fold_expression(hest_samples, spot_manifest, hest_root, patients, cfg):
         row = hest_samples[hest_samples["sample_id"] == sample_id].iloc[0]
         adata = ad.read_h5ad(row["expression_path"])
         normalize_log1p_slide(adata, cfg["molecular_targets"]["normalize_total_target_sum"])
+        uid_index = [f"{sample_id}::{sid}" for sid in adata.obs_names.astype(str)]
         expr = pd.DataFrame(adata.X.toarray() if hasattr(adata.X, "toarray") else adata.X,
-                             index=adata.obs_names.astype(str), columns=adata.var_names.astype(str))
+                             index=uid_index, columns=adata.var_names.astype(str))
         genes_by_sample[sample_id] = set(expr.columns)
         frames.append(expr)
         progeny_frames.append(compute_progeny_scores(expr, net))
     expr_all = pd.concat(frames)
     progeny_all = pd.concat(progeny_frames)
+    assert expr_all.index.is_unique, "spot_uid collision within one fold's pooled expression -- should be impossible"
     return expr_all, progeny_all, genes_by_sample, net
 
 
@@ -88,10 +101,19 @@ def main():
     ap.add_argument("--config", default="configs/base.yaml")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--feature-seed", type=int, default=0, help="which locked-encoder seed's cached features to use")
+    ap.add_argument("--max-folds-per-cancer", type=int, default=None,
+                     help="run only the first N of build_cv_grid's folds per cancer (default: all n_outer_folds). "
+                          "With the default n_outer_folds=5 (an 80/20 GroupKFold split per fold), "
+                          "--max-folds-per-cancer 1 runs a single real 80/20 patient-level split instead of "
+                          "the full V2 Phase 3 5-fold design -- for time-budgeted runs; NOT the primary design.")
+    ap.add_argument("--seeds", type=int, nargs="+", default=None,
+                     help="override cfg.cross_validation.seeds (default: all configured seeds)")
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
     hest_root = Path(cfg["paths"]["hest_root"])
+    if args.seeds is not None:
+        cfg["cross_validation"]["seeds"] = args.seeds
 
     hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
     spot_manifest = pd.read_csv(paths["manifests"] / "hest_spot_manifest.csv")
@@ -100,6 +122,12 @@ def main():
     patients_by_cancer = {c: hest_samples[hest_samples["cancer"] == c]["patient_id"].unique().tolist()
                            for c in cfg["cancers"]["hest"]}
     cv_grid = build_cv_grid(patients_by_cancer, cfg)
+    if args.max_folds_per_cancer is not None:
+        for cancer, info in cv_grid["per_cancer"].items():
+            info["folds"] = info["folds"][:args.max_folds_per_cancer]
+        cv_grid["pooled"]["folds"] = cv_grid["pooled"]["folds"][:args.max_folds_per_cancer]
+        print(f"[10_run_patient_cv] --max-folds-per-cancer {args.max_folds_per_cancer}: trimmed cv_grid "
+              f"(this run's expected_run_keys below must be computed from the TRIMMED grid, not the full V2 design)")
     save_json(cv_grid, paths["manifests"] / "hest_cv_folds.json")
 
     mt = cfg["molecular_targets"]
@@ -135,12 +163,17 @@ def main():
                     y_gene_val, y_path_val, ids_val = build_targets(val_p)
                     y_gene_test, y_path_test, ids_test = build_targets(test_p)
 
-                    def load_feats(spot_ids):
+                    spot_by_uid = spot_manifest.set_index("spot_uid")
+                    feat_cache_by_sample = {}
+
+                    def load_feats(spot_uids):
                         out = []
-                        for sid in spot_ids:
-                            sample_id = spot_manifest.set_index("spot_id").loc[sid, "sample_id"]
-                            cache = load_cached_features(feat_dir / f"{sample_id}.h5")
-                            pos = list(cache["spot_id"]).index(sid)
+                        for uid in spot_uids:
+                            sample_id, bare_spot_id = spot_by_uid.loc[uid, ["sample_id", "spot_id"]]
+                            if sample_id not in feat_cache_by_sample:
+                                feat_cache_by_sample[sample_id] = load_cached_features(feat_dir / f"{sample_id}.h5")
+                            cache = feat_cache_by_sample[sample_id]
+                            pos = list(cache["spot_id"]).index(bare_spot_id)
                             out.append(cache["embedding"][pos])
                         return np.stack(out)
 
@@ -189,8 +222,8 @@ def main():
                         for pid, g_pred, p_pred, g_true, p_true in zip(ids_test, preds["gene"], preds["pathway"],
                                                                         y_gene_test, y_path_test):
                             all_predictions.append({"cancer": cancer, "fold": fold["fold"], "seed": seed,
-                                                     "ablation": spec.name, "spot_id": pid,
-                                                     "patient_id": spot_manifest.set_index("spot_id").loc[pid, "patient_id"]})
+                                                     "ablation": spec.name, "spot_uid": pid,
+                                                     "patient_id": spot_by_uid.loc[pid, "patient_id"]})
                         all_metrics.append({"cancer": cancer, "fold": fold["fold"], "seed": seed,
                                              "ablation": spec.name, **r_metrics})
                         completed_keys.add((cancer, fold["fold"], seed, spec.name))
@@ -217,11 +250,16 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
       A3 (graph_source='none', but NOT reusing patch_head): parameter-matched MLP, no neighbors.
       A4/A5/A6/A7 (backend='pna_union'), A9 (backend='gatv2'): residual graph correction, union edge features.
       A8 (backend='scale_aware'): residual graph correction, per-scale edge features + edge_scale tags."""
-    def coords_for(spot_ids):
-        return spot_manifest.set_index("spot_id").loc[spot_ids, ["x_um", "y_um"]].values
+    # Joined on `spot_uid` (`{sample_id}::{spot_id}`), never bare `spot_id` -- HEST spot ids are
+    # Visium array-grid coordinates that collide across different samples, and `ids_train/val/test`
+    # here always span multiple patients (see load_fold_expression's docstring / scripts/08's spot_uid).
+    spot_by_uid = spot_manifest.set_index("spot_uid")
 
-    def patient_for(spot_ids):
-        return spot_manifest.set_index("spot_id").loc[spot_ids, "patient_id"].values
+    def coords_for(spot_uids):
+        return spot_by_uid.loc[spot_uids, ["x_um", "y_um"]].values
+
+    def patient_for(spot_uids):
+        return spot_by_uid.loc[spot_uids, "patient_id"].values
 
     if spec.name == "A0_mean_expression":
         gene_mean = y_gene_train.mean(axis=0, keepdims=True)

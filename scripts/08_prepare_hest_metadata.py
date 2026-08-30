@@ -140,8 +140,17 @@ def main():
                                {"x_um": coords_px[:, 0] * mpp, "y_um": coords_px[:, 1] * mpp})
 
             for i, sid in enumerate(spot_ids):
+                # `spot_id` (bare) is only unique WITHIN one sample's own patch shard/feature-cache file
+                # (both are per-sample HDF5s, so a bare lookup is always correctly scoped there). HEST
+                # spot ids are Visium array-grid coordinates like "010x016", not global barcodes -- they
+                # collide heavily ACROSS different samples/slides (confirmed live, 2026-08-29: two real
+                # breast samples SPA142/SPA137 shared 144/176 spot_ids). Any code that pools multiple
+                # samples' spots together (scripts/10_run_patient_cv.py's per-fold expression/feature
+                # tables, which always span multiple patients) must join on `spot_uid`, never bare
+                # `spot_id`, or it silently misattributes coordinates/features/targets across patients.
                 spot_manifest_rows.append({"sample_id": sample["sample_id"], "patient_id": sample["patient_id"],
                                             "cancer": sample["cancer"], "spot_id": sid,
+                                            "spot_uid": f"{sample['sample_id']}::{sid}",
                                             "x_um": coords_px[i, 0] * mpp, "y_um": coords_px[i, 1] * mpp})
 
         save_json(alignment_reports, paths["qc"] / "hest_alignment_qc.json")
