@@ -116,10 +116,25 @@ def main():
 
         patch_shard_dir = paths["work_dir"] / "hest_patches"
         patch_shard_dir.mkdir(parents=True, exist_ok=True)
-        alignment_reports = {}
-        spot_manifest_rows = []
+        qc_path = paths["qc"] / "hest_alignment_qc.json"
+        manifest_path = paths["manifests"] / "hest_spot_manifest.csv"
+        samples_path = paths["manifests"] / "hest_samples.csv"
+        import json
+        alignment_reports = json.loads(qc_path.read_text()) if qc_path.exists() else {}
+        spot_manifest_rows = pd.read_csv(manifest_path).to_dict("records") if manifest_path.exists() else []
+        done_samples = {r["sample_id"] for r in spot_manifest_rows}
+        if done_samples:
+            print(f"[08_prepare_hest_metadata] resuming: {len(done_samples)} samples already have a patch shard "
+                  f"+ manifest rows from a prior run -- skipping those", file=sys.stderr)
 
-        for _, sample in tqdm(list(clean.iterrows()), desc="HEST samples"):
+        def checkpoint(included_samples):
+            save_json(alignment_reports, qc_path)
+            included_samples.to_csv(samples_path, index=False)
+            pd.DataFrame(spot_manifest_rows).to_csv(manifest_path, index=False)
+
+        for idx, sample in tqdm(list(clean.iterrows()), desc="HEST samples"):
+            if sample["sample_id"] in done_samples:
+                continue
             reader = open_slide(sample["he_path"])
             import anndata as ad
             adata = ad.read_h5ad(sample["expression_path"])
@@ -152,11 +167,13 @@ def main():
                                             "cancer": sample["cancer"], "spot_id": sid,
                                             "spot_uid": f"{sample['sample_id']}::{sid}",
                                             "x_um": coords_px[i, 0] * mpp, "y_um": coords_px[i, 1] * mpp})
+            done_samples.add(sample["sample_id"])
+            if (idx + 1) % 5 == 0:
+                checkpoint(clean)  # periodic checkpoint so a wall-clock cutoff mid-run loses at most a few samples
 
-        save_json(alignment_reports, paths["qc"] / "hest_alignment_qc.json")
-        clean.to_csv(paths["manifests"] / "hest_samples.csv", index=False)
-        pd.DataFrame(spot_manifest_rows).to_csv(paths["manifests"] / "hest_spot_manifest.csv", index=False)
-        print(f"[08_prepare_hest_metadata] wrote {paths['manifests'] / 'hest_samples.csv'} and hest_spot_manifest.csv")
+        checkpoint(clean)
+        print(f"[08_prepare_hest_metadata] wrote {samples_path} and {manifest_path} "
+              f"({len(done_samples)}/{len(clean)} samples processed)")
 
 
 if __name__ == "__main__":

@@ -54,6 +54,9 @@ def main():
             out_dir = paths["student_embeddings"] / feat_name
             out_dir.mkdir(parents=True, exist_ok=True)
             for sample_id, group in tqdm(spot_manifest.groupby("sample_id"), desc=f"HEST features ({feat_name})"):
+                out_path = out_dir / f"{sample_id}.h5"
+                if out_path.exists():
+                    continue  # resumability: a wall-clock cutoff mid-run should not redo already-cached samples
                 with h5py.File(patch_shard_dir / f"{sample_id}.h5", "r") as f:
                     shard_pids = f["patch_id"][:].astype(str)
                     shard_patches = f["patches"][:]
@@ -61,7 +64,6 @@ def main():
 
                 feats = extract_student_features(encoder, shard_patches, args.device)
                 coords = group[["x_um", "y_um"]].values
-                out_path = out_dir / f"{sample_id}.h5"
                 cache_features(out_path, shard_pids.tolist(), feats, coords)
 
                 expr_idx = load_expression_index(sample_id, Path(cfg["paths"]["hest_root"]), hest_samples)

@@ -33,9 +33,16 @@ def main():
     ap.add_argument("--config", default="configs/base.yaml")
     ap.add_argument("--skip-completeness-check", action="store_true",
                      help="only for partial/debug runs -- the real pipeline must never skip this")
+    ap.add_argument("--max-folds-per-cancer", type=int, default=None,
+                     help="must match whatever value scripts/10_run_patient_cv.py was run with, so the "
+                          "completeness gate compares against the same (trimmed) design it actually ran")
+    ap.add_argument("--seeds", type=int, nargs="+", default=None,
+                     help="must match whatever value scripts/10_run_patient_cv.py was run with")
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
+    if args.seeds is not None:
+        cfg["cross_validation"]["seeds"] = args.seeds
 
     df = pd.read_csv(paths["results"] / "cv_ablation_metrics.csv")
     stats_cfg = cfg["statistics"]
@@ -47,6 +54,10 @@ def main():
         patients_by_cancer = {c: hest_samples[hest_samples["cancer"] == c]["patient_id"].unique().tolist()
                                for c in cfg["cancers"]["hest"]}
         cv_grid = build_cv_grid(patients_by_cancer, cfg)
+        if args.max_folds_per_cancer is not None:
+            for info in cv_grid["per_cancer"].values():
+                info["folds"] = info["folds"][:args.max_folds_per_cancer]
+            cv_grid["pooled"]["folds"] = cv_grid["pooled"]["folds"][:args.max_folds_per_cancer]
         ablation_names = sorted(df["ablation"].unique())
         expected = expected_run_keys(cv_grid, ablation_names, unit="per_cancer")
         completed = set(zip(df["cancer"], df["fold"], df["seed"], df["ablation"]))
