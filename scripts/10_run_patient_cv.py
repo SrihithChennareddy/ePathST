@@ -41,7 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sts.ablations import (ABLATION_GRID, build_graph_for_ablation, edge_features_for_ablation,
                             matched_mlp_hidden_dim, scale_aware_edge_data)
 from sts.cv_folds import assert_run_completeness, build_cv_grid, carve_validation_from_train, expected_run_keys
-from sts.expression import TrainOnlyStandardizer, normalize_log1p_slide, select_hvg_for_fold
+from sts.expression import TrainOnlyStandardizer, ensure_gene_symbol_index, normalize_log1p_slide, select_hvg_for_fold
 from sts.feature_cache import load_cached_features
 from sts.graph_model import ResidualGraphPredictor
 from sts.graph_training import _build_correction_model, make_pyg_data, predict_graph_model, train_graph_model
@@ -72,6 +72,7 @@ def load_fold_expression(hest_samples, spot_manifest, hest_root, patients, cfg):
     for sample_id in hest_samples[hest_samples["patient_id"].isin(patients)]["sample_id"]:
         row = hest_samples[hest_samples["sample_id"] == sample_id].iloc[0]
         adata = ad.read_h5ad(row["expression_path"])
+        adata = ensure_gene_symbol_index(adata)
         normalize_log1p_slide(adata, cfg["molecular_targets"]["normalize_total_target_sum"])
         uid_index = [f"{sample_id}::{sid}" for sid in adata.obs_names.astype(str)]
         expr = pd.DataFrame(adata.X.toarray() if hasattr(adata.X, "toarray") else adata.X,

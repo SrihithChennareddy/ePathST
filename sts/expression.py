@@ -17,6 +17,31 @@ def normalize_log1p_slide(adata, target_sum: float = 1e4) -> None:
     sc.pp.log1p(adata)
 
 
+def ensure_gene_symbol_index(adata):
+    """Some HEST slides (confirmed live, 2026-08-30: a real mix within the
+    breast/IDC cohort -- e.g. `NCBI*` samples already index by HGNC gene
+    SYMBOL, `SPA1xx` samples index by Ensembl gene ID with the symbol
+    stashed in `var['SYMBOL']` instead) don't share one gene-ID convention.
+    Everything downstream (PROGENy's net, HVG selection, cross-sample gene
+    intersection) is keyed by gene SYMBOL, so an Ensembl-indexed slide has
+    ~zero overlap with any of that and silently produces nonsense (or, for
+    PROGENy, decoupler hard-crashes with 'No sources with more than
+    tmin=N targets'). Detects an Ensembl-style index (`ENSG...`) with a
+    `SYMBOL` column present and remaps to it; drops genes with no symbol
+    and collapses duplicate symbols (keep first -- confirmed a small
+    minority, ~3 in 16.7k genes on a real affected slide) so var_names
+    stay unique. Slides already indexed by symbol are returned unchanged."""
+    if adata.var.index.size and not str(adata.var.index[0]).startswith("ENSG"):
+        return adata
+    if "SYMBOL" not in adata.var.columns:
+        return adata
+    symbol = adata.var["SYMBOL"].astype(str)
+    keep = symbol.notna() & (symbol != "nan") & ~symbol.duplicated(keep="first")
+    adata = adata[:, keep.values].copy()
+    adata.var_names = symbol[keep].tolist()
+    return adata
+
+
 class TrainOnlyStandardizer:
     """Fits mu/sigma on training spots only; applies identically to val/
     test (Section 14: 'Never allow test-patient gene-expression statistics
