@@ -180,6 +180,51 @@ def _read_csv_with_retry(path: Path, retries: int = 5, delay: float = 2.0) -> pd
     raise last_err
 
 
+# --------------------------------------------------------------- wait for scripts/08 to finish
+def wait_for_hest_manifest_complete(cfg: dict, paths: dict, poll_seconds: float = 60.0,
+                                     stable_checks: int = 3, timeout_seconds: float = 7 * 3600) -> None:
+    """scripts/08 (job 84327/84331) writes manifests/hest_samples.csv and
+    hest_spot_manifest.csv in full at every checkpoint, but partway through
+    its run only a subset of cancers (e.g. IDC first, then COAD, then
+    CCRCC) have any QC-passed rows yet. Reading the manifest before that job
+    finishes Step 8 would silently give this script an incomplete,
+    single-cancer view. Polls until every cfg['cancers']['hest'] cancer has
+    at least one QC-eligible sample AND the total eligible-sample count is
+    unchanged across `stable_checks` consecutive polls (i.e. scripts/08 has
+    stopped adding rows), then returns. Read-only -- never touches
+    scripts/08's files. Gives up and proceeds anyway after `timeout_seconds`
+    so this job can't hang forever if scripts/08 stalls or a cancer never
+    QC-passes any sample."""
+    expected_cancers = set(cfg["cancers"]["hest"])
+    samples_path = paths["manifests"] / "hest_samples.csv"
+    manifest_path = paths["manifests"] / "hest_spot_manifest.csv"
+    start = time.monotonic()
+    last_n, stable_streak = -1, 0
+    while True:
+        hest_samples = _read_csv_with_retry(samples_path)
+        spot_manifest = _read_csv_with_retry(manifest_path)
+        eligible_ids = set(spot_manifest["sample_id"].unique())
+        eligible = hest_samples[hest_samples["sample_id"].isin(eligible_ids)]
+        seen_cancers = set(eligible["cancer"].unique())
+        n = len(eligible)
+        missing = expected_cancers - seen_cancers
+        stable_streak = stable_streak + 1 if (not missing and n == last_n) else 0
+        print(f"[run_genbio_hest_baseline] waiting for scripts/08 manifest: {n} QC-eligible samples, "
+              f"cancers seen={sorted(seen_cancers)}, missing={sorted(missing)}, "
+              f"stable_streak={stable_streak}/{stable_checks}", flush=True)
+        if not missing and stable_streak >= stable_checks:
+            print(f"[run_genbio_hest_baseline] manifest complete: {n} samples across all "
+                  f"{sorted(expected_cancers)}, stable across {stable_checks} checks -- proceeding", flush=True)
+            return
+        if time.monotonic() - start > timeout_seconds:
+            print(f"[run_genbio_hest_baseline] WARNING: manifest wait timed out after {timeout_seconds:.0f}s "
+                  f"(still missing {sorted(missing)}) -- proceeding anyway with whatever is currently eligible",
+                  flush=True)
+            return
+        last_n = n
+        time.sleep(poll_seconds)
+
+
 # --------------------------------------------------------------------------- CV split reuse
 def load_or_recompute_split(cfg: dict, paths: dict, hest_samples: pd.DataFrame, cancer: str, seed: int, fold: int) -> tuple[dict, str]:
     """Requirement: reuse the EXACT seed/fold patient split
@@ -298,6 +343,7 @@ def main():
         print(f"[run_genbio_hest_baseline] GPU={torch.cuda.get_device_name(0)} capability={cap} "
               f"bf16_supported={torch.cuda.is_bf16_supported()}")
 
+    wait_for_hest_manifest_complete(cfg, paths)
     hest_samples = _read_csv_with_retry(paths["manifests"] / "hest_samples.csv")
     spot_manifest = _read_csv_with_retry(paths["manifests"] / "hest_spot_manifest.csv")
     # "eligible" (requirement 4): passed scripts/08's alignment QC, i.e. has a real patch shard + spot_manifest rows.
