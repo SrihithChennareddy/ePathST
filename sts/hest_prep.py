@@ -81,14 +81,26 @@ def alignment_qc_sample(he_reader, spot_coords_px: np.ndarray, spot_ids: list[st
 
 
 def extract_hest_patches_for_sample(he_reader, spot_ids: list[str], coords_px: np.ndarray, mpp: float,
-                                     cfg: dict) -> np.ndarray:
-    """Step 12: 224x224 patch centered on every ST spot at ~0.5 um/px."""
+                                     cfg: dict, n_threads: int = 8) -> np.ndarray:
+    """Step 12: 224x224 patch centered on every ST spot at ~0.5 um/px.
+    Reads spots concurrently via a thread pool on the one shared WSI
+    handle -- openslide's C `read_region` releases the GIL during the
+    actual tile decode, so this is genuine I/O-bound parallelism (each
+    thread mostly waits on disk/decoded-tile fetches), not just Python-
+    level interleaving. Each thread writes to its own disjoint index of
+    `patches`, so no locking is needed."""
+    from concurrent.futures import ThreadPoolExecutor
+
     patches = np.empty((len(spot_ids), cfg["hest"]["patch_px"], cfg["hest"]["patch_px"], 3), dtype=np.uint8)
-    for i in range(len(spot_ids)):
+
+    def _read_one(i: int) -> None:
         patches[i] = he_reader.read_region_at_mpp(
             coords_px[i, 0], coords_px[i, 1], physical_size_um=cfg["hest"]["patch_um"],
             out_px=cfg["hest"]["patch_px"], source_mpp=mpp,
         )
+
+    with ThreadPoolExecutor(max_workers=max(1, n_threads)) as pool:
+        list(pool.map(_read_one, range(len(spot_ids))))
     return patches
 
 

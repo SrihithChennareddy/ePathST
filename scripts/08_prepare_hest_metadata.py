@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -88,9 +89,52 @@ def load_hest_raw_metadata(cfg: dict) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=HEST_SAMPLE_COLUMNS)
 
 
+def _process_one_sample(sample: dict, cfg: dict, patch_shard_dir: str, n_threads: int, seed: int = 0) -> dict:
+    """Runs in a worker process: alignment QC + patch extraction + shard
+    write for exactly ONE HEST sample. Fully self-contained (opens its own
+    WSI/expression handles) so different samples can safely run in
+    different processes with no shared mutable state -- each writes only
+    its own `{sample_id}.h5` shard, never touching another sample's files.
+    Returns manifest-row-sized data only, never the patch array itself,
+    since that would otherwise get pickled back across the process
+    boundary for no reason (it's already on disk)."""
+    import anndata as ad
+
+    reader = open_slide(sample["he_path"])
+    adata = ad.read_h5ad(sample["expression_path"])
+    coords_px = adata.obsm["spatial"]
+    spot_ids = adata.obs_names.tolist()
+    meta_mpp = sample.get("mpp")
+    mpp = meta_mpp if (meta_mpp is not None and meta_mpp == meta_mpp) else reader.mpp  # `x == x` is False for NaN
+
+    qc = alignment_qc_sample(reader, coords_px, spot_ids, mpp, cfg, seed=seed)
+    if qc["likely_misaligned"]:
+        return {"sample_id": sample["sample_id"], "qc": qc, "misaligned": True, "manifest_rows": []}
+
+    patches = extract_hest_patches_for_sample(reader, spot_ids, coords_px, mpp, cfg, n_threads=n_threads)
+    write_patch_shard(Path(patch_shard_dir) / f"{sample['sample_id']}.h5", spot_ids, patches,
+                       {"x_um": coords_px[:, 0] * mpp, "y_um": coords_px[:, 1] * mpp})
+
+    manifest_rows = [{"sample_id": sample["sample_id"], "patient_id": sample["patient_id"],
+                       "cancer": sample["cancer"], "spot_id": sid,
+                       "spot_uid": f"{sample['sample_id']}::{sid}",
+                       "x_um": coords_px[i, 0] * mpp, "y_um": coords_px[i, 1] * mpp}
+                      for i, sid in enumerate(spot_ids)]
+    return {"sample_id": sample["sample_id"], "qc": qc, "misaligned": False, "manifest_rows": manifest_rows}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/base.yaml")
+    ap.add_argument("--sample-workers", type=int, default=4,
+                     help="how many HEST samples (WSIs) to process concurrently, each in its own process "
+                          "(default 4 -- sized against this job's --mem=44G budget: a worst-case ~26k-spot "
+                          "sample's in-flight patch array is ~3.8GB, so 4 concurrent worst-case samples is "
+                          "~15GB, well inside budget; the real ceiling beyond that is shared disk/network "
+                          "I/O bandwidth, not memory or CPU, so more workers may not scale linearly)")
+    ap.add_argument("--threads-per-sample", type=int, default=6,
+                     help="per-sample thread-pool size for concurrent per-spot WSI reads (default 6; "
+                          "sample-workers x threads-per-sample = 24 matches this job's --cpus-per-task=24)")
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
@@ -132,44 +176,33 @@ def main():
             included_samples.to_csv(samples_path, index=False)
             pd.DataFrame(spot_manifest_rows).to_csv(manifest_path, index=False)
 
-        for idx, sample in tqdm(list(clean.iterrows()), desc="HEST samples"):
-            if sample["sample_id"] in done_samples:
-                continue
-            reader = open_slide(sample["he_path"])
-            import anndata as ad
-            adata = ad.read_h5ad(sample["expression_path"])
-            coords_px = adata.obsm["spatial"]
-            spot_ids = adata.obs_names.tolist()
-            meta_mpp = sample.get("mpp")
-            mpp = meta_mpp if (meta_mpp is not None and meta_mpp == meta_mpp) else reader.mpp  # `x == x` is False for NaN
-
-            qc = alignment_qc_sample(reader, coords_px, spot_ids, mpp, cfg, seed=0)
-            alignment_reports[sample["sample_id"]] = qc
-            if qc["likely_misaligned"]:
-                print(f"[08_prepare_hest_metadata] WARNING sample {sample['sample_id']} looks misaligned "
-                      f"(pct_spots_with_tissue={qc['pct_spots_with_tissue']:.2f}) -- excluding", file=sys.stderr)
-                continue
-
-            patches = extract_hest_patches_for_sample(reader, spot_ids, coords_px, mpp, cfg)
-            write_patch_shard(patch_shard_dir / f"{sample['sample_id']}.h5", spot_ids, patches,
-                               {"x_um": coords_px[:, 0] * mpp, "y_um": coords_px[:, 1] * mpp})
-
-            for i, sid in enumerate(spot_ids):
-                # `spot_id` (bare) is only unique WITHIN one sample's own patch shard/feature-cache file
-                # (both are per-sample HDF5s, so a bare lookup is always correctly scoped there). HEST
-                # spot ids are Visium array-grid coordinates like "010x016", not global barcodes -- they
-                # collide heavily ACROSS different samples/slides (confirmed live, 2026-08-29: two real
-                # breast samples SPA142/SPA137 shared 144/176 spot_ids). Any code that pools multiple
-                # samples' spots together (scripts/10_run_patient_cv.py's per-fold expression/feature
-                # tables, which always span multiple patients) must join on `spot_uid`, never bare
-                # `spot_id`, or it silently misattributes coordinates/features/targets across patients.
-                spot_manifest_rows.append({"sample_id": sample["sample_id"], "patient_id": sample["patient_id"],
-                                            "cancer": sample["cancer"], "spot_id": sid,
-                                            "spot_uid": f"{sample['sample_id']}::{sid}",
-                                            "x_um": coords_px[i, 0] * mpp, "y_um": coords_px[i, 1] * mpp})
-            done_samples.add(sample["sample_id"])
-            if (idx + 1) % 5 == 0:
-                checkpoint(clean)  # periodic checkpoint so a wall-clock cutoff mid-run loses at most a few samples
+        # `spot_id` (bare) is only unique WITHIN one sample's own patch shard/feature-cache file (both are
+        # per-sample HDF5s, so a bare lookup is always correctly scoped there). HEST spot ids are Visium
+        # array-grid coordinates like "010x016", not global barcodes -- they collide heavily ACROSS
+        # different samples/slides (confirmed live, 2026-08-29: two real breast samples SPA142/SPA137
+        # shared 144/176 spot_ids). Any code that pools multiple samples' spots together (scripts/
+        # 10_run_patient_cv.py's per-fold expression/feature tables, which always span multiple patients)
+        # must join on `spot_uid`, never bare `spot_id`, or it silently misattributes coordinates/
+        # features/targets across patients. (`_process_one_sample` builds `spot_uid` this same way.)
+        pending = [row.to_dict() for _, row in clean.iterrows() if row["sample_id"] not in done_samples]
+        n_since_checkpoint = 0
+        with ProcessPoolExecutor(max_workers=args.sample_workers) as executor:
+            futures = [executor.submit(_process_one_sample, s, cfg, str(patch_shard_dir),
+                                        args.threads_per_sample) for s in pending]
+            for fut in tqdm(as_completed(futures), total=len(futures), desc="HEST samples"):
+                result = fut.result()
+                alignment_reports[result["sample_id"]] = result["qc"]
+                if result["misaligned"]:
+                    print(f"[08_prepare_hest_metadata] WARNING sample {result['sample_id']} looks misaligned "
+                          f"(pct_spots_with_tissue={result['qc']['pct_spots_with_tissue']:.2f}) -- excluding",
+                          file=sys.stderr)
+                else:
+                    spot_manifest_rows.extend(result["manifest_rows"])
+                    done_samples.add(result["sample_id"])
+                n_since_checkpoint += 1
+                if n_since_checkpoint >= 5:
+                    checkpoint(clean)  # periodic checkpoint so a wall-clock cutoff mid-run loses at most a few samples
+                    n_since_checkpoint = 0
 
         checkpoint(clean)
         print(f"[08_prepare_hest_metadata] wrote {samples_path} and {manifest_path} "
