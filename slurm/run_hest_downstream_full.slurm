@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=hest_downstream_full
 #SBATCH --account=pn_alyu012826n
-#SBATCH --partition=b40x4
+#SBATCH --partition=b40x4-long
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=44G
 #SBATCH --gres=gpu:nvidia_rtx_pro_6000_blackwell:1
-#SBATCH --time=08:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_hest_full_%j.out
 #SBATCH --error=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_hest_full_%j.err
 
@@ -28,7 +28,7 @@
 # 80/20 GroupKFold split is exactly what n_outer_folds=5's fold 0 already
 # is (configs/base.yaml's cross_validation.n_outer_folds=5 is unchanged;
 # only how many of those 5 folds this particular run executes is trimmed).
-# This is a deliberate time-budget tradeoff for one 8h job, not the
+# This is a deliberate time-budget tradeoff for one 24h job, not the
 # project's primary/final design -- rerun with --max-folds-per-cancer 5
 # --seeds 0 1 2 for the real V2 Phase 18 full patient-level experiment once
 # there is a multi-job or longer-wall-clock budget for it.
@@ -40,7 +40,7 @@
 #
 # Resumable: scripts/08 and scripts/09 now skip already-processed samples
 # (checkpointed every 5 samples / per-sample respectively) -- rerunning
-# this script after an 8h cutoff picks up wherever it left off, same
+# this script after a 24h cutoff picks up wherever it left off, same
 # pattern as the CPTAC distillation jobs. scripts/10/12 are NOT
 # checkpointed mid-run; if the job runs out of time inside Step 10, rerun
 # from Step 10 (Steps 8/9's resumability means that part is cheap to skip).
@@ -51,7 +51,7 @@ module load pytorch/2.7.1
 
 CONFIG=configs/base.yaml
 JOB_START=$SECONDS
-WALL_CLOCK_SECONDS=$((8 * 3600))
+WALL_CLOCK_SECONDS=$((24 * 3600))
 RESERVE_SECONDS=$((15 * 60))
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
@@ -80,8 +80,8 @@ python3 scripts/12_primary_hypothesis_test.py --config "$CONFIG" --max-folds-per
   log "Step 12 failed or incomplete -- non-fatal, results/cv_ablation_metrics.csv is still valid, rerun once fixed"
 
 log "=== snapshotting results to experimental_runs/ for later comparison ==="
-python3 scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4 \
-  --gpu "1x RTX PRO 6000 Blackwell" --label hest_downstream_full_3cancer --stage "end of 8h job" || \
+python3 scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4-long \
+  --gpu "1x RTX PRO 6000 Blackwell" --label hest_downstream_full_3cancer --stage "end of 24h job" || \
   log "snapshot failed -- non-fatal"
 
 log "=== DONE (total elapsed: $((SECONDS - JOB_START))s) ==="
