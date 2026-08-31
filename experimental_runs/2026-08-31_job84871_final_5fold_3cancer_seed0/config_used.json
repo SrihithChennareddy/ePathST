@@ -1,0 +1,278 @@
+{
+  "experiment_name": "cptac_genbio_distill_hest_pna",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "paths": {
+    "cptac_root": "/lustre/nvwulf/scratch/schennareddy/CPTAC/data",
+    "cptac_metadata": "/lustre/nvwulf/scratch/schennareddy/CPTAC/metadata",
+    "hest_root": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026",
+    "hest_by_cancer": {
+      "IDC": {
+        "wsi_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026/breast/wsis",
+        "st_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026/breast/st",
+        "metadata_csv": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/metadata/breast_metadata.csv",
+        "study": "hest1k_breast"
+      },
+      "COAD": {
+        "wsi_dir": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/data/colon/wsis",
+        "st_dir": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/data/colon/st",
+        "metadata_csv": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/metadata/colon_metadata.csv",
+        "study": "hest1k_colon"
+      },
+      "CCRCC": {
+        "wsi_dir": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/data/kidney/wsis",
+        "st_dir": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/data/kidney/st",
+        "metadata_csv": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/metadata/kidney_metadata.csv",
+        "study": "hest1k_kidney"
+      }
+    },
+    "work_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/${experiment_name}_work",
+    "persist_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/${experiment_name}",
+    "configs": "configs",
+    "logs": "logs",
+    "manifests": "manifests",
+    "qc": "qc",
+    "teacher_embeddings": "teacher_embeddings",
+    "student_checkpoints": "student_checkpoints",
+    "student_embeddings": "student_embeddings",
+    "graphs": "graphs",
+    "predictions": "predictions",
+    "results": "results",
+    "figures": "figures"
+  },
+  "cancers": {
+    "cptac": [
+      "BRCA",
+      "COAD",
+      "CCRCC"
+    ],
+    "hest": [
+      "IDC",
+      "COAD",
+      "CCRCC"
+    ]
+  },
+  "wsi_selection": {
+    "target_n_patients": 500,
+    "thumbnail_max_dim": 2048,
+    "n_qc_tiles": 80,
+    "qc_tile_px": 512,
+    "hard_filters": {
+      "min_tissue_fraction": 0.05,
+      "max_blurry_tissue_fraction": 0.5,
+      "max_artifact_fraction": 0.35,
+      "min_mpp": 0.1,
+      "max_mpp": 1.0
+    },
+    "quality_weights": {
+      "usable_tissue": 0.35,
+      "focus": 0.25,
+      "artifact_free": 0.2,
+      "stain_quality": 0.1,
+      "representativeness": 0.1
+    }
+  },
+  "patching": {
+    "target_mpp": 0.5,
+    "patch_px": 224,
+    "min_tissue_fraction": 0.6,
+    "target_patches_per_wsi": [
+      1000,
+      2000
+    ],
+    "jpeg_quality": 92,
+    "storage_backend": "hdf5"
+  },
+  "cptac_split": {
+    "train_frac": 0.8,
+    "val_frac": 0.1,
+    "test_frac": 0.1,
+    "stratify_by_cancer": true
+  },
+  "teacher": {
+    "name": "genbio-pathfm",
+    "hf_repo": "genbio-ai/genbio-pathfm",
+    "embedding_dim": 4608,
+    "dtype": "bf16",
+    "batch_size": 64,
+    "normalize_l2": true
+  },
+  "student": {
+    "backbone": "convnextv2_atto",
+    "pretrained": "imagenet",
+    "backbone_dim": 320,
+    "projection_head": [
+      320,
+      1024,
+      4608
+    ],
+    "downstream_projection": [
+      320,
+      256
+    ]
+  },
+  "distillation": {
+    "loss": "cosine_plus_feature",
+    "lambda_feature": 0.1,
+    "feature_loss": "smooth_l1",
+    "optimizer": "adamw",
+    "backbone_lr": 0.0001,
+    "projection_lr": 0.0003,
+    "weight_decay": 0.05,
+    "warmup_epochs": 3,
+    "max_epochs": 100,
+    "min_epochs": 50,
+    "early_stop_patience": 15,
+    "grad_clip_norm": 1.0,
+    "batch_size": 256,
+    "amp": true,
+    "augmentation": {
+      "hflip": true,
+      "vflip": true,
+      "rot90": true,
+      "color_jitter": 0.1,
+      "brightness_contrast": 0.1
+    }
+  },
+  "baselines": {
+    "S0_imagenet_no_distill": true,
+    "S1_genbio_distilled": true,
+    "S2_random_init_distilled": true
+  },
+  "hest": {
+    "patch_um": 112.0,
+    "patch_px": 224,
+    "target_mpp": 0.5,
+    "exclude_species": [
+      "mouse"
+    ],
+    "n_alignment_qc_samples": 30
+  },
+  "molecular_targets": {
+    "hvg1000": 1000,
+    "hvg50": 50,
+    "pathway_set": "PROGENy14",
+    "pathway_top_genes": 100,
+    "normalize_total_target_sum": 10000
+  },
+  "patch_head": {
+    "bottleneck": [
+      320,
+      128,
+      64
+    ],
+    "gene_head_dim": 1000,
+    "pathway_head_dim": 14,
+    "dropout": 0.1,
+    "pathway_loss_weight": 0.2,
+    "pathway_loss_sweep": [
+      0.0,
+      0.05,
+      0.1,
+      0.2
+    ],
+    "optimizer": "adamw",
+    "lr": 0.0003,
+    "weight_decay": 0.0001,
+    "batch_size": 256,
+    "max_epochs": 100,
+    "early_stop_patience": 12
+  },
+  "graph": {
+    "local_radius_um": 150.0,
+    "meso_radius_um": 300.0,
+    "macro_radius_um": 600.0,
+    "max_local_neighbors": 8,
+    "max_meso_neighbors": 12,
+    "max_macro_neighbors": 16,
+    "n_rbf": 16,
+    "rbf_gamma": 10.0
+  },
+  "pna": {
+    "input_dim": 320,
+    "hidden_dim": 128,
+    "n_layers": 2,
+    "aggregators": [
+      "mean",
+      "max",
+      "min",
+      "std"
+    ],
+    "scalers": [
+      "identity",
+      "amplification",
+      "attenuation"
+    ],
+    "dropout": 0.3,
+    "molecular_latent_dim": 64,
+    "optimizer": "adamw",
+    "lr": 0.0003,
+    "weight_decay": 0.001,
+    "max_epochs": 100,
+    "early_stop_patience": 8,
+    "residual_zero_init": true
+  },
+  "gatv2": {
+    "heads": 4
+  },
+  "scale_aware_pna": {
+    "gate_hidden_dim": 128
+  },
+  "destruction_dose_response": {
+    "q_values": [
+      0.0,
+      0.25,
+      0.5,
+      0.75,
+      1.0
+    ]
+  },
+  "cross_validation": {
+    "n_outer_folds": 5,
+    "n_seeds": 3,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "min_folds_if_too_few_patients": 3,
+    "primary_analysis_unit": "per_cancer"
+  },
+  "statistics": {
+    "n_bootstrap": 10000,
+    "ci": [
+      2.5,
+      97.5
+    ],
+    "fdr_q": 0.05
+  },
+  "evaluation": {
+    "min_regions_per_patient": 10,
+    "gene_r_thresholds": [
+      0.0,
+      0.2,
+      0.3
+    ]
+  },
+  "genbio_fair_comparison": {
+    "pca_n_components": 256,
+    "ridge_alpha": 1.0
+  },
+  "primary_gates": {
+    "gate1_distillation": {
+      "better": "A2_distilled_patch",
+      "worse": "A1_imagenet_patch"
+    },
+    "gate2_spatial_context": {
+      "better": "A8_scale_aware_pna",
+      "worse": "A2_distilled_patch"
+    },
+    "gate3_true_topology": {
+      "better": "A8_scale_aware_pna",
+      "worse": "A5_shuffled_graph"
+    }
+  }
+}

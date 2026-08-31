@@ -1,0 +1,26 @@
+{
+  "run_id": "2026-08-31_job84871_final_5fold_3cancer_seed0",
+  "captured_at": "2026-08-31",
+  "job_id": "84871",
+  "partition": "b40x4-long",
+  "gpu": "1x RTX PRO 6000 Blackwell",
+  "stage": "LOCKED final 5-fold x 3-cancer x seed-0 primary experiment, post-diagnostic-fix",
+  "source_work_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_genbio_distill_hest_pna_work",
+  "source_persist_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith",
+  "files_captured": {
+    "results": [
+      "cv_ablation_metrics.csv",
+      "distillation_evaluation.json",
+      "distillation_training_summary.json",
+      "genbio_baseline",
+      "official_hest_benchmark",
+      "primary_hypothesis_test.json",
+      "secondary_hypothesis_tests.json",
+      "student_encoder_param_count_seed0.json"
+    ],
+    "figures": [
+      "umap_S0_seed0.npz",
+      "umap_S1_seed0.npz"
+    ]
+  }
+}

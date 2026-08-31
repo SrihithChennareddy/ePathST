@@ -36,8 +36,18 @@ def _headline_metric(results_dir: Path) -> str:
     primary = results_dir / "primary_hypothesis_test.json"
     if primary.exists():
         d = json.loads(primary.read_text())
-        b = d.get("bootstrap", {})
-        return f"primary_delta_R={b.get('mean_delta'):.4f} CI=[{b.get('ci_low'):.4f},{b.get('ci_high'):.4f}]"
+        # Bug fix (2026-08-31): this used to read d["bootstrap"] directly, but script 12
+        # actually nests results as {"pooled": {"<gate_name>": {"bootstrap": {...}}, ...},
+        # "per_cancer": {...}} -- there is no top-level "bootstrap" key, so b.get(...) always
+        # returned None and crashed the :.4f format below. Pick gate2 (spatial context, the
+        # flagship comparison) as the headline, falling back to whichever gate exists.
+        pooled = d.get("pooled", {})
+        gate_name = next((g for g in ("gate2_spatial_context", "gate3_true_topology", "gate1_distillation")
+                           if g in pooled), next(iter(pooled), None))
+        b = pooled.get(gate_name, {}).get("bootstrap", {}) if gate_name else {}
+        if b.get("mean_delta") is not None:
+            return (f"{gate_name}_delta_R={b['mean_delta']:.4f} "
+                    f"CI=[{b.get('ci_low', float('nan')):.4f},{b.get('ci_high', float('nan')):.4f}]")
 
     table = results_dir / "final_results_table.csv"
     if table.exists():

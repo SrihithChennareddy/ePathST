@@ -1,0 +1,310 @@
+{
+  "S0_seed0": {
+    "overall": {
+      "n_patches": 56133,
+      "cosine_similarity": {
+        "mean": 0.001975409686565399,
+        "median": 0.002036614576354623,
+        "ci_low": 0.0018711760640144348,
+        "ci_high": 0.0020786700770258904,
+        "n": 56133
+      },
+      "retrieval": {
+        "overlap_at_1": 0.0465,
+        "overlap_at_5": 0.056299999999999996,
+        "overlap_at_10": 0.06665,
+        "n_queries": 2000
+      }
+    },
+    "BRCA": {
+      "n_patches": 14351,
+      "cosine_similarity": {
+        "mean": 0.003960113041102886,
+        "median": 0.00433725118637085,
+        "ci_low": 0.0037415262777358294,
+        "ci_high": 0.004175981506705284,
+        "n": 14351
+      },
+      "retrieval": {
+        "overlap_at_1": 0.072,
+        "overlap_at_5": 0.0821,
+        "overlap_at_10": 0.09155,
+        "n_queries": 2000
+      }
+    },
+    "CCRCC": {
+      "n_patches": 34360,
+      "cosine_similarity": {
+        "mean": 0.0029824567027390003,
+        "median": 0.0028720838017761707,
+        "ci_low": 0.002862080466002226,
+        "ci_high": 0.0031042906921356916,
+        "n": 34360
+      },
+      "retrieval": {
+        "overlap_at_1": 0.025,
+        "overlap_at_5": 0.0426,
+        "overlap_at_10": 0.054950000000000006,
+        "n_queries": 2000
+      }
+    },
+    "COAD": {
+      "n_patches": 7422,
+      "cosine_similarity": {
+        "mean": -0.006524271331727505,
+        "median": -0.00615999149158597,
+        "ci_low": -0.006802923511713743,
+        "ci_high": -0.0062485081143677235,
+        "n": 7422
+      },
+      "retrieval": {
+        "overlap_at_1": 0.109,
+        "overlap_at_5": 0.0765,
+        "overlap_at_10": 0.07665000000000001,
+        "n_queries": 2000
+      }
+    },
+    "linear_probe_cancer_type": {
+      "mean_accuracy": 0.9091808530030182,
+      "std_accuracy": 0.05104054544873768,
+      "fold_scores": [
+        0.9136011401086666,
+        0.9544847243252873,
+        0.8106350761556961,
+        0.9285587030108676,
+        0.9386246214145733
+      ]
+    }
+  },
+  "S1_seed0": {
+    "overall": {
+      "n_patches": 56133,
+      "cosine_similarity": {
+        "mean": 0.8843207955360413,
+        "median": 0.9032787084579468,
+        "ci_low": 0.8837642073631287,
+        "ci_high": 0.8848692774772644,
+        "n": 56133
+      },
+      "retrieval": {
+        "overlap_at_1": 0.223,
+        "overlap_at_5": 0.3261,
+        "overlap_at_10": 0.36875,
+        "n_queries": 2000
+      }
+    },
+    "BRCA": {
+      "n_patches": 14351,
+      "cosine_similarity": {
+        "mean": 0.890428900718689,
+        "median": 0.9010598659515381,
+        "ci_low": 0.8896891474723816,
+        "ci_high": 0.8911892771720886,
+        "n": 14351
+      },
+      "retrieval": {
+        "overlap_at_1": 0.2605,
+        "overlap_at_5": 0.35280000000000006,
+        "overlap_at_10": 0.39875,
+        "n_queries": 2000
+      }
+    },
+    "CCRCC": {
+      "n_patches": 34360,
+      "cosine_similarity": {
+        "mean": 0.8766605854034424,
+        "median": 0.8962578773498535,
+        "ci_low": 0.8758535385131836,
+        "ci_high": 0.8774817585945129,
+        "n": 34360
+      },
+      "retrieval": {
+        "overlap_at_1": 0.2015,
+        "overlap_at_5": 0.3057,
+        "overlap_at_10": 0.35729999999999995,
+        "n_queries": 2000
+      }
+    },
+    "COAD": {
+      "n_patches": 7422,
+      "cosine_similarity": {
+        "mean": 0.9079725742340088,
+        "median": 0.9165456295013428,
+        "ci_low": 0.9071907997131348,
+        "ci_high": 0.9087539911270142,
+        "n": 7422
+      },
+      "retrieval": {
+        "overlap_at_1": 0.3205,
+        "overlap_at_5": 0.3456,
+        "overlap_at_10": 0.37989999999999996,
+        "n_queries": 2000
+      }
+    },
+    "linear_probe_cancer_type": {
+      "mean_accuracy": 0.9860511402681471,
+      "std_accuracy": 0.01664393484994061,
+      "fold_scores": [
+        0.9991983610937918,
+        0.9964371604168523,
+        0.9538612273982364,
+        0.9942989488686976,
+        0.986460003563157
+      ]
+    }
+  },
+  "S0_seed1": {
+    "overall": {
+      "n_patches": 54643,
+      "cosine_similarity": {
+        "mean": 0.0019384679617360234,
+        "median": 0.0014865044504404068,
+        "ci_low": 0.0018376483349129558,
+        "ci_high": 0.00204216199927032,
+        "n": 54643
+      },
+      "retrieval": {
+        "overlap_at_1": 0.023,
+        "overlap_at_5": 0.040600000000000004,
+        "overlap_at_10": 0.0493,
+        "n_queries": 2000
+      }
+    },
+    "BRCA": {
+      "n_patches": 13965,
+      "cosine_similarity": {
+        "mean": 0.006758823059499264,
+        "median": 0.006813587620854378,
+        "ci_low": 0.006564087700098753,
+        "ci_high": 0.006951281800866127,
+        "n": 13965
+      },
+      "retrieval": {
+        "overlap_at_1": 0.036,
+        "overlap_at_5": 0.05990000000000001,
+        "overlap_at_10": 0.07094999999999999,
+        "n_queries": 2000
+      }
+    },
+    "CCRCC": {
+      "n_patches": 34064,
+      "cosine_similarity": {
+        "mean": 0.00019928741676267236,
+        "median": -0.0004426366649568081,
+        "ci_low": 7.731552614131942e-05,
+        "ci_high": 0.00032455011387355626,
+        "n": 34064
+      },
+      "retrieval": {
+        "overlap_at_1": 0.0165,
+        "overlap_at_5": 0.032299999999999995,
+        "overlap_at_10": 0.04134999999999999,
+        "n_queries": 2000
+      }
+    },
+    "COAD": {
+      "n_patches": 6614,
+      "cosine_similarity": {
+        "mean": 0.0007179031963460147,
+        "median": 0.0011141190771013498,
+        "ci_low": 0.00040961295599117875,
+        "ci_high": 0.0010230311891064048,
+        "n": 6614
+      },
+      "retrieval": {
+        "overlap_at_1": 0.095,
+        "overlap_at_5": 0.0712,
+        "overlap_at_10": 0.07560000000000001,
+        "n_queries": 2000
+      }
+    },
+    "linear_probe_cancer_type": {
+      "mean_accuracy": 0.8924284936031274,
+      "std_accuracy": 0.0829257500476803,
+      "fold_scores": [
+        0.9693476072833745,
+        0.9569951505169731,
+        0.7807667673163144,
+        0.8020680819912153,
+        0.9529648609077599
+      ]
+    }
+  },
+  "S0_seed2": {
+    "overall": {
+      "n_patches": 54131,
+      "cosine_similarity": {
+        "mean": 0.008011956699192524,
+        "median": 0.00867155846208334,
+        "ci_low": 0.007906805723905563,
+        "ci_high": 0.008118601515889168,
+        "n": 54131
+      },
+      "retrieval": {
+        "overlap_at_1": 0.046,
+        "overlap_at_5": 0.052,
+        "overlap_at_10": 0.06080000000000001,
+        "n_queries": 2000
+      }
+    },
+    "BRCA": {
+      "n_patches": 15857,
+      "cosine_similarity": {
+        "mean": 0.0032554890494793653,
+        "median": 0.0030105039477348328,
+        "ci_low": 0.003044858807697892,
+        "ci_high": 0.003466661088168621,
+        "n": 15857
+      },
+      "retrieval": {
+        "overlap_at_1": 0.082,
+        "overlap_at_5": 0.08209999999999999,
+        "overlap_at_10": 0.09245000000000002,
+        "n_queries": 2000
+      }
+    },
+    "CCRCC": {
+      "n_patches": 31715,
+      "cosine_similarity": {
+        "mean": 0.011176993139088154,
+        "median": 0.011639270931482315,
+        "ci_low": 0.011052867397665977,
+        "ci_high": 0.011299267411231995,
+        "n": 31715
+      },
+      "retrieval": {
+        "overlap_at_1": 0.025,
+        "overlap_at_5": 0.038,
+        "overlap_at_10": 0.048850000000000005,
+        "n_queries": 2000
+      }
+    },
+    "COAD": {
+      "n_patches": 6559,
+      "cosine_similarity": {
+        "mean": 0.004207132384181023,
+        "median": 0.004425734747201204,
+        "ci_low": 0.0039281053468585014,
+        "ci_high": 0.004492491949349642,
+        "n": 6559
+      },
+      "retrieval": {
+        "overlap_at_1": 0.1125,
+        "overlap_at_5": 0.082,
+        "overlap_at_10": 0.0856,
+        "n_queries": 2000
+      }
+    },
+    "linear_probe_cancer_type": {
+      "mean_accuracy": 0.9056549190209129,
+      "std_accuracy": 0.030389358200946393,
+      "fold_scores": [
+        0.8992333979865152,
+        0.9424533530389803,
+        0.9380195824866063,
+        0.8844448549787548,
+        0.8641234066137078
+      ]
+    }
+  }
+}
