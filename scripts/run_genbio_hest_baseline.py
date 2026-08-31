@@ -458,8 +458,14 @@ def main():
                 gene_std.assert_no_leakage(expr.index)  # test/val patients must never overlap the fit set
             gene_t = gene_std.transform(expr[hvg["hvg1000"]].reindex(columns=hvg["hvg1000"]).values)
             path_t = path_std.transform(progeny.reindex(columns=pathway_names).values)
-            assert np.isfinite(gene_t).all() and np.isfinite(path_t).all(), \
-                f"{cancer}: NaN/Inf in standardized targets for {'train' if is_train else 'eval'} patients"
+            # NaN is expected here, not a bug: sts.pathways.compute_progeny_scores documents that spots
+            # decoupler drops as degenerate come back NaN, "handled by the same missingness-aware QC as
+            # any other target" -- confirmed live, 2026-08-30: real IDC spots hit this (decoupler dropped
+            # 1/306 and 1/292 spots as degenerate). patch_head_loss (shared with scripts/10_run_patient_cv.py,
+            # which has no equivalent finite-only assertion) already masks NaN via gene_mask/path_mask, so
+            # training tolerates it correctly -- only Inf would indicate a real standardization bug.
+            assert not np.isinf(gene_t).any() and not np.isinf(path_t).any(), \
+                f"{cancer}: Inf in standardized targets for {'train' if is_train else 'eval'} patients"
             return gene_t, path_t, expr.index.astype(str)
 
         y_gene_train, y_path_train, ids_train = build_targets(train_p, is_train=True)
