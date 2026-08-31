@@ -546,18 +546,114 @@ GenBio's own summary row only had the `_r` values though (it uses
 per-patient mse/mae values were already being computed either way, just
 not aggregated into the summary before).
 
-**As of this entry**: main pipeline resubmitted as **84733** (all 4
-Step-10 fixes + the memory bump), GenBio baseline still running as
-**84723** (has the manifest-wait and targeted-panel-exclusion fixes
-live, since it was resubmitted after those landed, but is still running
-code from before the var_names-dedup fix -- it hasn't reached its own
-per-cancer training loop yet, where the same dedup bug could in
-principle still hit it; will be fixed+restarted if/when it does, without
-losing its already-cached embedding-extraction progress, which is
-resumable per-sample). Neither has completed a full pass yet, so
-`results/cv_ablation_metrics.csv` and `results/genbio_baseline/
-genbio_summary.csv` don't exist yet as of this entry -- see the Run log
-above/this file's future entries for real numbers once available.
+### MILESTONE: job 84733 completed end to end -- first real Steps 8-12 results (2026-08-30, ~20:27)
+
+**Job 84733 finished cleanly** (`sacct`: COMPLETED, exit 0:0, 39:45
+elapsed) -- Steps 8/9b skipped instantly (already cached), Step 10 ran
+the full 9-ablation grid (see A1 bug below) across all 3 cancers with no
+crash, Step 12 ran and wrote both `primary_hypothesis_test.json` and
+`secondary_hypothesis_tests.json`. This is the first fully clean
+end-to-end pass this project has ever completed against the real 3-cancer
+dataset. Snapshotted to `experimental_runs/
+2026-08-30_job84733_hest_downstream_full_3cancer/` (the auto-snapshot
+step's stdout said "snapshot failed -- non-fatal", but the actual files
+were written correctly regardless -- worth checking why that step's own
+success/failure detection is wrong, not investigated further here).
+
+**Fifth bug found from these real results, not a crash this time**:
+`A1_imagenet_patch` and `A2_distilled_patch` produced BYTE-IDENTICAL
+metrics across all 3 cancers. Root cause: `scripts/10_run_patient_cv.py`'s
+`main()` loads features exactly once (`feat_dir = paths[
+"student_embeddings"] / "distilled"`), before the ablation loop, and
+`run_ablation`'s `graph_source == "none"` branch (which handles both A1
+and A2) just forward-passes the shared `patch_head` on that same
+distilled `x_test` -- A1's declared `"imagenet"` encoder field was never
+actually consulted, even though Step 9b DOES separately cache ImageNet
+features. Confirmed every OTHER ablation (A0, A3-A9) already specs
+`"distilled"` or `"none"` as its encoder, matching what actually gets
+loaded, so only A1's own row and Gate 1 (`A2 > A1`, "distillation
+helped") were affected -- Gate 2/3 and every other ablation are
+trustworthy as-is.
+
+**Per explicit user decision**: rather than fix the feature-loading and
+rerun, removed `A1_imagenet_patch` from `sts.ablations.ABLATION_GRID`
+entirely, and `gate1_distillation` from `configs/base.yaml`'s
+`primary_gates` (also updated `scripts/12_primary_hypothesis_test.py`'s
+docstring/gate_names and `scripts/17_make_results_tables_and_figures.py`'s
+`MODEL_ORDER` for consistency). **Important gotcha caught while doing
+this**: `sts.utils.load_config` prefers a sibling `.json` over `.yaml`
+when both exist, and `configs/base.json` DOES exist -- editing only
+`base.yaml` would have silently had NO effect on any future run, since
+every job actually reads `base.json`. Regenerated `base.json` fresh from
+the edited `base.yaml` (via `yaml.safe_load` + `json.dump`) to keep them
+in sync; diffed clean (only the intended `gate1_distillation` key
+removed). **Grid is now 9 ablations, not 10** (A0, A2-A9).
+
+**Real headline numbers from this run** (`results/cv_ablation_metrics.csv`,
+`hvg1000_fisher_z_mean_patient_R`, single fold/seed -- these are noisy,
+provisional numbers from the FIRST completed run, not a converged final
+result):
+
+| | A2 (patch-only, distilled) | A3 (matched MLP) | A5 (shuffled, negative control) | A8 (scale-aware PNA, proposed) |
+|---|---|---|---|---|
+| IDC | 0.0704 | 0.0867 | 0.0043 | 0.0075 |
+| COAD | 0.1159 | 0.1071 | 0.0282 | 0.0314 |
+| CCRCC | 0.0587 | 0.0656 | -0.0023 | -0.0017 |
+
+**Gate 2 (spatial context, A8 > A2): NOT SUPPORTED** -- the GNN-corrected
+prediction is currently much WORSE than the plain patch-only anchor in
+every cancer, not better. **Gate 3 (true topology, A8 > A5, the decisive
+test): SUPPORTED** -- A8 does beat the shuffled-graph negative control,
+but both are extremely small numbers close to each other and close to
+zero, so "supported" here is a weak signal, not a strong one. Overall
+reading: the patch-only heads (A2/A3) currently carry essentially all of
+the (still modest, r~0.06-0.12) predictive signal; the GNN correction
+layer isn't adding value yet in this quick 1-fold/1-seed run -- worth
+investigating (more folds/seeds? more GNN training epochs given the
+time-budgeted run? a real bug in the graph correction path?) before
+treating this as a real negative result.
+
+**GenBio baseline (separate job) also hit two more real bugs after
+84733 finished**, both now fixed and pushed:
+- **Bug 5 (job 84735)**: `build_targets` hard-crashed on `AssertionError:
+  IDC: NaN/Inf in standardized targets` -- but this was never a real
+  bug: `sts.pathways.compute_progeny_scores` documents that
+  decoupler-dropped degenerate spots come back NaN by design ("handled
+  by the same missingness-aware QC as any other target"), confirmed live
+  (decoupler dropped 1/306 and 1/292 spots as degenerate on this run),
+  and the shared `patch_head_loss` (same one `scripts/10_run_patient_cv.py`
+  uses, which has no equivalent assertion) already masks NaN correctly
+  via `gene_mask`/`path_mask`. Narrowed the assertion to only catch real
+  `Inf` values.
+- **Bug 6 (job 84736)**: OOM-killed on COAD after successfully finishing
+  IDC's training (confirming the NaN fix held) -- this script's own
+  `--mem` was never bumped to 160G when the main pipeline's was, despite
+  sharing the exact same `load_fold_expression` memory footprint. Fixed
+  (`slurm/run_genbio_hest_baseline.slurm`, 44G -> 160G).
+- **Operational hiccup, not a code bug**: while resubmitting after the
+  memory fix, `sbatch` returned `error: Unexpected message received`
+  (a transient SLURM controller communication glitch) on two consecutive
+  attempts -- but both submissions actually succeeded server-side despite
+  the client-side error, and a third retry produced a THIRD job. Ended up
+  with 3 concurrent `genbio_hest_baseline` jobs (84737, 84739, 84743)
+  racing against the same shared embedding-cache/output paths for ~10
+  minutes before caught via `squeue`. Cancelled the two extras,
+  verified no corrupted `.h5` embedding shards resulted (checked every
+  cached file opens cleanly with `h5py`), then cancelled the
+  survivor too and did one single clean resubmit (**84744**) rather than
+  trust a run that spent part of its life racing another process --
+  cheap to redo since extraction is ~fully cached. **Lesson: an `sbatch`
+  client-side error does NOT reliably mean the submission failed on this
+  cluster -- always `squeue` and check for a duplicate before retrying.**
+
+**As of this entry**: main pipeline (84733) is DONE with real results
+above. GenBio baseline running clean as **84744** with all 6 fixes live
+(manifest-wait, targeted-panel-exclusion, gene-symbol mapping, var_names
+dedup, NaN-assertion relaxation, memory bump) -- extraction should be
+near-instant (200/202 samples already cached), so this should reach
+real per-cancer `HVG50_r`/`HVG1000_r`/`PROGENy14_r` (+ mse/mae) results
+soon. Check `results/genbio_baseline/genbio_summary.csv` for whether it
+exists yet.
 
 ## Recovery checklist (read this first after any interruption)
 
