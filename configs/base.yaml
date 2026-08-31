@@ -200,13 +200,22 @@ pna:
   n_layers: 2                     # V2 Phase 10: two layers per branch, do NOT add APPNP
   aggregators: [mean, max, min, std]
   scalers: [identity, amplification, attenuation]
-  dropout: 0.1
+  dropout: 0.3                    # bumped 0.1->0.3, 2026-08-30: real train/val loss curves (job 84733,
+                                   # A8_scale_aware_pna/CCRCC) showed classic overfitting -- train_loss
+                                   # -18% (0.82->0.68) over 59 epochs while val_loss barely moved (-5%,
+                                   # 1.23->1.17) and got noisy late. Root cause is likely too few distinct
+                                   # training PATIENTS (16-96 depending on cancer) relative to this model's
+                                   # capacity (3 PNA branches + learned gate for A8) on a single fold with
+                                   # no cross-fold averaging -- stronger regularization here is a mitigation,
+                                   # not a fix for that underlying small-n-patients ceiling.
   molecular_latent_dim: 64
   optimizer: adamw
   lr: 3.0e-4
-  weight_decay: 1.0e-4
+  weight_decay: 1.0e-3             # bumped 1.0e-4->1.0e-3, same reason as dropout above
   max_epochs: 100
-  early_stop_patience: 15
+  early_stop_patience: 8           # bumped down from 15 -- the real curve's val_loss plateaued by
+                                   # ~epoch 20-30 and never meaningfully improved after, so patience=15
+                                   # let it run needlessly long past the point where it stopped generalizing
   residual_zero_init: true        # Section 20 / V2 Phase 11: final correction layer init near zero
 
 # V2 Phase 15 (A9 architecture control): GATv2 backend, matched depth/
