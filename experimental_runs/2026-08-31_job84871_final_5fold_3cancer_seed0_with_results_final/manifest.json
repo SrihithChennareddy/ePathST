@@ -4,7 +4,7 @@
   "job_id": "84871",
   "partition": "b40x4-long",
   "gpu": "1x RTX PRO 6000 Blackwell",
-  "stage": "post-hoc results/final/ aggregation (script 20) added on top of the completed job 84871 run",
+  "stage": "add RESULTS_SUMMARY.md (script 21) on top of results/final/",
   "source_work_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_genbio_distill_hest_pna_work",
   "source_persist_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith",
   "files_captured": {
