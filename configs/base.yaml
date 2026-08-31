@@ -263,7 +263,8 @@ genbio_fair_comparison:
 # test). Gate 3 is the same "real vs shuffled" test as V1's Section 25,
 # now explicitly run against A8 (scale-aware) rather than A7 (union
 # multiscale), since A8 is the proposed final model.
+# gate1_distillation REMOVED 2026-08-30 along with A1_imagenet_patch (see sts/ablations.py) --
+# it compared A2 against A1, which was silently identical to A2 due to a feature-loading bug.
 primary_gates:
-  gate1_distillation: {better: A2_distilled_patch, worse: A1_imagenet_patch}
   gate2_spatial_context: {better: A8_scale_aware_pna, worse: A2_distilled_patch}
   gate3_true_topology: {better: A8_scale_aware_pna, worse: A5_shuffled_graph}

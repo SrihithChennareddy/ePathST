@@ -262,10 +262,6 @@
     "ridge_alpha": 1.0
   },
   "primary_gates": {
-    "gate1_distillation": {
-      "better": "A2_distilled_patch",
-      "worse": "A1_imagenet_patch"
-    },
     "gate2_spatial_context": {
       "better": "A8_scale_aware_pna",
       "worse": "A2_distilled_patch"

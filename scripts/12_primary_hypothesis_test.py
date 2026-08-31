@@ -1,12 +1,17 @@
 #!/usr/bin/env python
 """Steps 20-21 (Sections 24-25), revised per Final_Project_V2.txt Phase 22:
 aggregate results/cv_ablation_metrics.csv, verify completeness (V2 Phase 3
-/ S9), then run the THREE PRIMARY STATISTICAL GATES (replacing V1's single
+/ S9), then run the PRIMARY STATISTICAL GATES (replacing V1's single
 primary-hypothesis test):
 
-    Gate 1 (distillation):    R_A2_distilled_patch  > R_A1_imagenet_patch
     Gate 2 (spatial context): R_A8_scale_aware_pna   > R_A2_distilled_patch
     Gate 3 (true topology):   R_A8_scale_aware_pna   > R_A5_shuffled_graph
+
+(Gate 1 -- distillation, A2 vs A1_imagenet_patch -- REMOVED 2026-08-30
+along with A1_imagenet_patch itself, see sts/ablations.py: A1's
+"imagenet" encoder was never actually consulted by scripts/
+10_run_patient_cv.py's feature-loading, so its results were silently
+identical to A2's, making the comparison meaningless.)
 
 Gate 3 is the same "real vs. shuffled" test as V1's Section 25, now run
 against A8 (scale-aware, the proposed final model) instead of A7 (union
@@ -88,8 +93,7 @@ def main():
                 "sign_flip_test": sign_flip, "supported_ci_above_zero": bool(bootstrap["ci_low"] > 0.0)}
 
     gates_cfg = cfg["primary_gates"]
-    gate_names = {"gate1_distillation": "Gate 1: Distillation (A2 > A1)",
-                  "gate2_spatial_context": "Gate 2: Spatial context (A8 > A2)",
+    gate_names = {"gate2_spatial_context": "Gate 2: Spatial context (A8 > A2)",
                   "gate3_true_topology": "Gate 3: True topology (A8 > A5, THE decisive test)"}
 
     results = {"pooled": {}, "per_cancer": {}}
