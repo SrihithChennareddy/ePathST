@@ -646,14 +646,49 @@ treating this as a real negative result.
   client-side error does NOT reliably mean the submission failed on this
   cluster -- always `squeue` and check for a duplicate before retrying.**
 
-**As of this entry**: main pipeline (84733) is DONE with real results
-above. GenBio baseline running clean as **84744** with all 6 fixes live
-(manifest-wait, targeted-panel-exclusion, gene-symbol mapping, var_names
-dedup, NaN-assertion relaxation, memory bump) -- extraction should be
-near-instant (200/202 samples already cached), so this should reach
-real per-cancer `HVG50_r`/`HVG1000_r`/`PROGENy14_r` (+ mse/mae) results
-soon. Check `results/genbio_baseline/genbio_summary.csv` for whether it
-exists yet.
+### MILESTONE 2: job 84744 completed -- first real GenBio-PathFM baseline results (2026-08-30, ~20:46)
+
+**Job 84744 finished cleanly** (`sacct`: COMPLETED, exit 0:0, 7:20
+elapsed -- fast since extraction was ~fully cached). All 6 accumulated
+fixes held under the real full-3-cancer run: manifest-wait, targeted-
+panel-exclusion, gene-symbol mapping, var_names dedup, NaN-assertion
+relaxation, memory bump. Snapshotted to `experimental_runs/
+2026-08-30_job84744_genbio_baseline_3cancer/` (copied directly, since
+this script doesn't call `snapshot_experiment.py` the way the main
+pipeline's slurm script does).
+
+**Real results** (`results/genbio_baseline/genbio_summary.csv`, single
+fold/seed, frozen GenBio-PathFM patch-only, no GNN):
+
+| Cancer | HVG50 r | HVG1000 r | PROGENy14 r | HVG1000 MSE | HVG1000 MAE |
+|---|---|---|---|---|---|
+| IDC | 0.1478 | 0.1053 | -0.0157 | 0.998 | 0.833 |
+| COAD | 0.3357 | 0.1941 | -0.0023 | 0.661 | 0.631 |
+| CCRCC | 0.2058 | 0.1227 | 0.0240 | 1.076 | 0.836 |
+| **MEAN** | **0.2297** | **0.1407** | **0.0020** | -- | -- |
+
+Interesting comparison point against the main pipeline's A2 (distilled
+CNN, patch-only, same architecture role): GenBio-PathFM's HVG1000 r is
+meaningfully HIGHER in every cancer (IDC 0.105 vs 0.070, COAD 0.194 vs
+0.116, CCRCC 0.123 vs 0.059) -- the frozen 1.1B-param foundation model's
+patch embeddings currently carry more gene-expression signal than the
+project's own distilled 3.4M-param CNN encoder, at least for this
+one-fold/one-seed run. PROGENy14 r is near-zero-to-slightly-negative for
+both approaches in IDC/COAD, essentially no pathway-level signal yet.
+
+**As of this entry**: both pipelines have now completed at least one
+full clean pass. Main pipeline (84733) and GenBio baseline (84744) real
+results are both above. Nothing currently running (`squeue -u
+schennareddy` shows only an unrelated `interactive` session, 84713).
+Six total real bugs found and fixed across both pipelines this session
+(gene-symbol mapping, OOM x2, targeted-panel exclusion, duplicate
+var_names, NaN-assertion) plus the A1/Gate1 removal and one operational
+sbatch-reliability incident -- see above for details on each. Next
+steps (not started): more folds/seeds for a less noisy result (this was
+all `--max-folds-per-cancer 1 --seeds 0`, not the full V2 Phase 3
+5-fold x 3-seed design), and investigating why the GNN correction layer
+(A8) currently underperforms the patch-only anchor (A2) rather than
+improving on it.
 
 ## Recovery checklist (read this first after any interruption)
 
