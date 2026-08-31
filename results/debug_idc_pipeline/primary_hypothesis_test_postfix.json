@@ -1,0 +1,122 @@
+{
+  "pooled": {
+    "gate1_distillation": {
+      "better": "A2_distilled_patch",
+      "worse": "A1_imagenet_patch",
+      "units": [
+        "IDC_f0_s0"
+      ],
+      "bootstrap": {
+        "mean_delta": 0.014991869507276906,
+        "ci_low": 0.014991869507276906,
+        "ci_high": 0.014991869507276906,
+        "n_patients": 1,
+        "effect_size_cohens_d": NaN
+      },
+      "sign_flip_test": {
+        "observed_mean": 0.014991869507276906,
+        "p_value_one_sided": 0.5085491450854914
+      },
+      "supported_ci_above_zero": true
+    },
+    "gate2_spatial_context": {
+      "better": "A8_scale_aware_pna",
+      "worse": "A2_distilled_patch",
+      "units": [
+        "IDC_f0_s0"
+      ],
+      "bootstrap": {
+        "mean_delta": 0.0310150347970925,
+        "ci_low": 0.0310150347970925,
+        "ci_high": 0.0310150347970925,
+        "n_patients": 1,
+        "effect_size_cohens_d": NaN
+      },
+      "sign_flip_test": {
+        "observed_mean": 0.0310150347970925,
+        "p_value_one_sided": 0.5085491450854914
+      },
+      "supported_ci_above_zero": true
+    },
+    "gate3_true_topology": {
+      "better": "A8_scale_aware_pna",
+      "worse": "A5_shuffled_graph",
+      "units": [
+        "IDC_f0_s0"
+      ],
+      "bootstrap": {
+        "mean_delta": -0.00449254370078539,
+        "ci_low": -0.00449254370078539,
+        "ci_high": -0.00449254370078539,
+        "n_patients": 1,
+        "effect_size_cohens_d": NaN
+      },
+      "sign_flip_test": {
+        "observed_mean": -0.00449254370078539,
+        "p_value_one_sided": 1.0
+      },
+      "supported_ci_above_zero": false
+    }
+  },
+  "per_cancer": {
+    "IDC": {
+      "gate1_distillation": {
+        "better": "A2_distilled_patch",
+        "worse": "A1_imagenet_patch",
+        "units": [
+          "IDC_f0_s0"
+        ],
+        "bootstrap": {
+          "mean_delta": 0.014991869507276906,
+          "ci_low": 0.014991869507276906,
+          "ci_high": 0.014991869507276906,
+          "n_patients": 1,
+          "effect_size_cohens_d": NaN
+        },
+        "sign_flip_test": {
+          "observed_mean": 0.014991869507276906,
+          "p_value_one_sided": 0.5085491450854914
+        },
+        "supported_ci_above_zero": true
+      },
+      "gate2_spatial_context": {
+        "better": "A8_scale_aware_pna",
+        "worse": "A2_distilled_patch",
+        "units": [
+          "IDC_f0_s0"
+        ],
+        "bootstrap": {
+          "mean_delta": 0.0310150347970925,
+          "ci_low": 0.0310150347970925,
+          "ci_high": 0.0310150347970925,
+          "n_patients": 1,
+          "effect_size_cohens_d": NaN
+        },
+        "sign_flip_test": {
+          "observed_mean": 0.0310150347970925,
+          "p_value_one_sided": 0.5085491450854914
+        },
+        "supported_ci_above_zero": true
+      },
+      "gate3_true_topology": {
+        "better": "A8_scale_aware_pna",
+        "worse": "A5_shuffled_graph",
+        "units": [
+          "IDC_f0_s0"
+        ],
+        "bootstrap": {
+          "mean_delta": -0.00449254370078539,
+          "ci_low": -0.00449254370078539,
+          "ci_high": -0.00449254370078539,
+          "n_patients": 1,
+          "effect_size_cohens_d": NaN
+        },
+        "sign_flip_test": {
+          "observed_mean": -0.00449254370078539,
+          "p_value_one_sided": 1.0
+        },
+        "supported_ci_above_zero": false
+      }
+    }
+  }
+}

@@ -18,9 +18,9 @@ from sts import figures
 from sts.stats_tests import patient_bootstrap_ci
 from sts.utils import load_config, resolve_run_paths, save_json
 
-MODEL_ORDER = ["A0_mean_expression", "A2_distilled_patch", "A5_shuffled_graph",
+MODEL_ORDER = ["A0_mean_expression", "A1_imagenet_patch", "A2_distilled_patch", "A5_shuffled_graph",
                "A6_local_pna", "A7_multiscale_pna", "A8_scale_aware_pna", "A3_matched_mlp",
-               "A4_random_graph", "A9_gatv2_multiscale"]  # A1_imagenet_patch removed 2026-08-30, see sts/ablations.py
+               "A4_random_graph", "A9_gatv2_multiscale"]
 
 
 def main():

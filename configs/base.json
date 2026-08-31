@@ -167,7 +167,7 @@
     "gene_head_dim": 1000,
     "pathway_head_dim": 14,
     "dropout": 0.1,
-    "pathway_loss_weight": 0.0,
+    "pathway_loss_weight": 0.2,
     "pathway_loss_sweep": [
       0.0,
       0.05,
@@ -262,6 +262,10 @@
     "ridge_alpha": 1.0
   },
   "primary_gates": {
+    "gate1_distillation": {
+      "better": "A2_distilled_patch",
+      "worse": "A1_imagenet_patch"
+    },
     "gate2_spatial_context": {
       "better": "A8_scale_aware_pna",
       "worse": "A2_distilled_patch"

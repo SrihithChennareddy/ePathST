@@ -98,6 +98,44 @@ def build_graph_data(feat_dict, coords, spot_ids, gene_target, pathway_target, p
     return make_pyg_data(feat_dict, edges["edge_index"], edge_attr, gene_target, pathway_target, patient_id)
 
 
+def train_patch_head(x_train, x_val, y_gene_train, y_path_train, y_gene_val, y_path_val, cfg, device):
+    """Trains one MolecularBottleneckHead (Step 14) to convergence with the
+    locked optimizer/loss/early-stopping recipe. Factored out so A1
+    (imagenet features) and A2 (distilled features) each get their OWN
+    patch_head, trained identically except for which frozen encoder's
+    features they see -- the only difference the final-experiment Gate 1
+    (distillation) comparison is supposed to isolate."""
+    patch_head = build_patch_head(cfg, x_train.shape[1], y_gene_train.shape[1], y_path_train.shape[1]).to(device)
+    opt = torch.optim.AdamW(patch_head.parameters(), lr=cfg["patch_head"]["lr"],
+                             weight_decay=cfg["patch_head"]["weight_decay"])
+    best_val, patience_ctr, best_state = float("inf"), 0, None
+    for epoch in range(cfg["patch_head"]["max_epochs"]):
+        patch_head.train()
+        xb = torch.tensor(x_train, dtype=torch.float32, device=device)
+        gb = torch.tensor(y_gene_train, dtype=torch.float32, device=device)
+        pb = torch.tensor(y_path_train, dtype=torch.float32, device=device)
+        opt.zero_grad()
+        out = patch_head(xb)
+        loss = patch_head_loss(out, gb, pb, cfg["patch_head"]["pathway_loss_weight"])
+        loss["loss"].backward()
+        opt.step()
+
+        patch_head.eval()
+        with torch.no_grad():
+            xv = torch.tensor(x_val, dtype=torch.float32, device=device)
+            gv = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
+            pv = torch.tensor(y_path_val, dtype=torch.float32, device=device)
+            val_loss = patch_head_loss(patch_head(xv), gv, pv, cfg["patch_head"]["pathway_loss_weight"])["loss"].item()
+        if val_loss < best_val:
+            best_val, patience_ctr, best_state = val_loss, 0, {k: v.clone() for k, v in patch_head.state_dict().items()}
+        else:
+            patience_ctr += 1
+        if patience_ctr >= cfg["patch_head"]["early_stop_patience"]:
+            break
+    patch_head.load_state_dict(best_state)
+    return patch_head
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/base.yaml")
@@ -120,7 +158,13 @@ def main():
     hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
     hest_samples = exclude_targeted_panel_samples(hest_samples)
     spot_manifest = pd.read_csv(paths["manifests"] / "hest_spot_manifest.csv")
-    feat_dir = paths["student_embeddings"] / "distilled"
+    # Bug fix (2026-08-30, final-experiment diagnostic): this used to be a single
+    # `feat_dir = .../"distilled"`, so A1 ("imagenet") silently got distilled features
+    # too (see sts/ablations.py). Both encoders' caches are now loaded, each asserted
+    # via load_cached_features(expected_encoder_name=...) to only ever serve its own
+    # encoder's features -- see FEATURE_SOURCES below and load_feats().
+    FEATURE_SOURCES = ("distilled", "imagenet")
+    feat_dirs = {src: paths["student_embeddings"] / src for src in FEATURE_SOURCES}
 
     patients_by_cancer = {c: hest_samples[hest_samples["cancer"] == c]["patient_id"].unique().tolist()
                            for c in cfg["cancers"]["hest"]}
@@ -167,64 +211,56 @@ def main():
                     y_gene_test, y_path_test, ids_test = build_targets(test_p)
 
                     spot_by_uid = spot_manifest.set_index("spot_uid")
-                    feat_cache_by_sample = {}
+                    feat_cache_by_source = {src: {} for src in FEATURE_SOURCES}
 
-                    def load_feats(spot_uids):
+                    def load_feats(spot_uids, source):
+                        cache_by_sample = feat_cache_by_source[source]
                         out = []
                         for uid in spot_uids:
                             sample_id, bare_spot_id = spot_by_uid.loc[uid, ["sample_id", "spot_id"]]
-                            if sample_id not in feat_cache_by_sample:
-                                feat_cache_by_sample[sample_id] = load_cached_features(feat_dir / f"{sample_id}.h5")
-                            cache = feat_cache_by_sample[sample_id]
+                            if sample_id not in cache_by_sample:
+                                cache_by_sample[sample_id] = load_cached_features(
+                                    feat_dirs[source] / f"{sample_id}.h5", expected_encoder_name=source)
+                            cache = cache_by_sample[sample_id]
                             pos = list(cache["spot_id"]).index(bare_spot_id)
                             out.append(cache["embedding"][pos])
                         return np.stack(out)
 
-                    x_train, x_val, x_test = load_feats(ids_train), load_feats(ids_val), load_feats(ids_test)
-
-                    patch_head = build_patch_head(cfg, x_train.shape[1], len(hvg["hvg1000"]), 14).to(args.device)
-                    opt = torch.optim.AdamW(patch_head.parameters(), lr=cfg["patch_head"]["lr"],
-                                             weight_decay=cfg["patch_head"]["weight_decay"])
-                    best_val, patience_ctr, best_state = float("inf"), 0, None
-                    for epoch in range(cfg["patch_head"]["max_epochs"]):
-                        patch_head.train()
-                        xb = torch.tensor(x_train, dtype=torch.float32, device=args.device)
-                        gb = torch.tensor(y_gene_train, dtype=torch.float32, device=args.device)
-                        pb = torch.tensor(y_path_train, dtype=torch.float32, device=args.device)
-                        opt.zero_grad()
-                        out = patch_head(xb)
-                        loss = patch_head_loss(out, gb, pb, cfg["patch_head"]["pathway_loss_weight"])
-                        loss["loss"].backward()
-                        opt.step()
-
-                        patch_head.eval()
-                        with torch.no_grad():
-                            xv = torch.tensor(x_val, dtype=torch.float32, device=args.device)
-                            gv = torch.tensor(y_gene_val, dtype=torch.float32, device=args.device)
-                            pv = torch.tensor(y_path_val, dtype=torch.float32, device=args.device)
-                            val_loss = patch_head_loss(patch_head(xv), gv, pv, cfg["patch_head"]["pathway_loss_weight"])["loss"].item()
-                        if val_loss < best_val:
-                            best_val, patience_ctr, best_state = val_loss, 0, {k: v.clone() for k, v in patch_head.state_dict().items()}
-                        else:
-                            patience_ctr += 1
-                        if patience_ctr >= cfg["patch_head"]["early_stop_patience"]:
-                            break
-                    patch_head.load_state_dict(best_state)
+                    # A1 and A2 each get their OWN features AND their own patch_head
+                    # (trained identically otherwise) -- see train_patch_head's docstring.
+                    x_by_source = {src: {"train": load_feats(ids_train, src), "val": load_feats(ids_val, src),
+                                          "test": load_feats(ids_test, src)} for src in FEATURE_SOURCES}
+                    patch_heads = {src: train_patch_head(x_by_source[src]["train"], x_by_source[src]["val"],
+                                                          y_gene_train, y_path_train, y_gene_val, y_path_val,
+                                                          cfg, args.device)
+                                   for src in FEATURE_SOURCES}
+                    x_train, x_val, x_test = x_by_source["distilled"]["train"], x_by_source["distilled"]["val"], \
+                        x_by_source["distilled"]["test"]
+                    patch_head = patch_heads["distilled"]  # the anchor y_patch,i (A2) / graph-ablation base
 
                     ckpt_dir = paths["student_checkpoints"] / "patch_head" / cancer / f"fold{fold['fold']}"
                     ckpt_dir.mkdir(parents=True, exist_ok=True)
-                    torch.save(patch_head.state_dict(), ckpt_dir / f"seed{seed}.pt")
+                    for src, ph in patch_heads.items():
+                        suffix = "" if src == "distilled" else f"_{src}"  # keep the historical "distilled" filename
+                        torch.save(ph.state_dict(), ckpt_dir / f"seed{seed}{suffix}.pt")
 
                     # V2 Phase 14/18: ABLATION_GRID is already ordered primary-block-first
                     # (A1/A2/A5/A6/A7/A8), secondary-block second (A0/A3/A4/A9).
                     for spec in ABLATION_GRID:
-                        preds, r_metrics = run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test,
-                                                         y_gene_train, y_path_train, y_gene_val, y_path_val,
-                                                         y_gene_test, y_path_test, patch_head, spot_manifest, cfg,
-                                                         seed, args.device, n_hvg50=len(hvg["hvg50"]),
-                                                         pathway_names=list(net["source"].unique()))
-                        for pid, g_pred, p_pred, g_true, p_true in zip(ids_test, preds["gene"], preds["pathway"],
-                                                                        y_gene_test, y_path_test):
+                        src = spec.feature_source if spec.feature_source in x_by_source else "distilled"
+                        spec_x_train, spec_x_val, spec_x_test = x_by_source[src]["train"], x_by_source[src]["val"], \
+                            x_by_source[src]["test"]
+                        spec_patch_head = patch_heads[src]
+                        preds, r_metrics, eval_ids_test = run_ablation(
+                            spec, spec_x_train, spec_x_val, spec_x_test, ids_train, ids_val, ids_test, y_gene_train,
+                            y_path_train, y_gene_val, y_path_val, y_gene_test, y_path_test, spec_patch_head,
+                            spot_manifest, cfg, seed, args.device, n_hvg50=len(hvg["hvg50"]),
+                            pathway_names=list(net["source"].unique()))
+                        # `eval_ids_test` is `ids_test` in the SAME order run_ablation actually scored
+                        # `preds` against (identity for A0-A3; per-patient-grouped for graph ablations,
+                        # see run_ablation's alignment-fix comment below) -- zipping the original
+                        # (unreordered) `ids_test` here would reintroduce the same misalignment bug.
+                        for pid, g_pred, p_pred in zip(eval_ids_test, preds["gene"], preds["pathway"]):
                             all_predictions.append({"cancer": cancer, "fold": fold["fold"], "seed": seed,
                                                      "ablation": spec.name, "spot_uid": pid,
                                                      "patient_id": spot_by_uid.loc[pid, "patient_id"]})
@@ -248,7 +284,9 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
                   y_gene_val, y_path_val, y_gene_test, y_path_test, patch_head, spot_manifest, cfg, seed, device,
                   n_hvg50, pathway_names):
     """Trains/evaluates one ablation from sts.ablations.ABLATION_GRID and
-    returns (test predictions, headline metrics). Dispatches on
+    returns (test predictions, headline metrics, eval_ids_test -- the spot_uid
+    order `preds`/`metrics` were actually scored against, identity order for
+    A0-A3, per-patient-grouped for graph ablations). Dispatches on
     (spec.graph_source, spec.backend):
       A0 (graph_source='none', feature_source='none'): training-mean baseline, no model at all.
       A1/A2 (graph_source='none'): frozen patch_head forward pass -- y_patch,i itself.
@@ -337,11 +375,20 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
         model = ResidualGraphPredictor(patch_head, graph_corr).to(device)
         preds = predict_graph_model(model, graphs_test, device, backend=backend)
         gene_pred, path_pred = preds["gene_pred"], preds["pathway_pred"]
-        # NOTE: predict_graph_model concatenates node predictions in the same
-        # per-patient grouping order used to build graphs_test above, so
-        # `ids_test` must be reordered identically before being used to index
-        # spot-level metadata downstream (e.g. via a per-patient stable sort).
-        ids_test = np.concatenate([ids_test[patient_for(ids_test) == p] for p in np.unique(patient_for(ids_test))])
+        # BUG (found 2026-08-30, diagnostic T1): predict_graph_model concatenates node
+        # predictions in the same per-patient grouping order used to build graphs_test
+        # above, so `ids_test` must be reordered identically before being used to index
+        # spot-level metadata downstream. The previous version of this line reordered
+        # ONLY `ids_test`, leaving `y_gene_test`/`y_path_test` (the ground-truth arrays
+        # used below in `_eval(y_gene_test, gene_pred, ...)`) in the ORIGINAL order --
+        # silently misaligning target vs. prediction for every graph ablation (A4-A9).
+        # Confirmed via scripts/debug_idc_pipeline.py: this alone can turn a
+        # near-perfect predictor (r~1.0) into r~0.08. `y_gene_test`/`y_path_test` are
+        # reassigned here too, using the exact same per-patient-grouped order.
+        order = np.concatenate([np.where(patient_for(ids_test) == p)[0] for p in np.unique(patient_for(ids_test))])
+        ids_test = ids_test[order]
+        y_gene_test = y_gene_test[order]
+        y_path_test = y_path_test[order]
 
     # Section 30/31's required MODEL x {HVG50, HVG1000, PATHWAY} results table needs all three
     # evaluated separately, not one pooled HVG1000 number relabeled after the fact -- HVG50 is exactly
@@ -360,7 +407,7 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
     # back-compat: the primary hypothesis test / completeness gate key off this exact name for the
     # decisive HVG1000 comparison (Gate 1-3, sts.cv_folds); keep it unprefixed too.
     metrics["fisher_z_mean_patient_R"] = m_hvg1000.get("fisher_z_mean_patient_R")
-    return {"gene": gene_pred, "pathway": path_pred}, metrics
+    return {"gene": gene_pred, "pathway": path_pred}, metrics, ids_test
 
 
 if __name__ == "__main__":

@@ -33,22 +33,43 @@ def extract_student_features(encoder, patches_uint8: np.ndarray, device: str, ba
     return np.concatenate(outs, axis=0)
 
 
-def cache_features(out_path: str | Path, spot_ids: list[str], features: np.ndarray, coords_um: np.ndarray) -> None:
+def cache_features(out_path: str | Path, spot_ids: list[str], features: np.ndarray, coords_um: np.ndarray,
+                    encoder_name: str | None = None, checkpoint_source: str | None = None,
+                    sample_id: str | None = None) -> None:
+    """`encoder_name`/`checkpoint_source`/`sample_id` are stored as h5 attrs
+    (final-experiment diagnostic, 2026-08-30): lets `load_cached_features`
+    assert a cache actually belongs to the encoder callers think it does --
+    this is what makes A1 (imagenet) vs A2 (distilled) a real comparison
+    rather than a silent feature-loading mixup (see sts/ablations.py)."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(out_path, "w") as f:
         f.create_dataset("spot_id", data=np.array(spot_ids, dtype="S"))
         f.create_dataset("embedding", data=features.astype(np.float32))
         f.create_dataset("coords_um", data=coords_um.astype(np.float32))
+        f.attrs["encoder_name"] = encoder_name or "unknown"
+        f.attrs["checkpoint_source"] = checkpoint_source or "unknown"
+        f.attrs["feature_dim"] = int(features.shape[1])
+        f.attrs["sample_id"] = sample_id or "unknown"
 
 
-def load_cached_features(path: str | Path) -> dict:
+def load_cached_features(path: str | Path, expected_encoder_name: str | None = None) -> dict:
     with h5py.File(path, "r") as f:
-        return {
+        out = {
             "spot_id": f["spot_id"][:].astype(str),
             "embedding": f["embedding"][:],
             "coords_um": f["coords_um"][:],
+            "encoder_name": f.attrs.get("encoder_name", "unknown"),
+            "checkpoint_source": f.attrs.get("checkpoint_source", "unknown"),
+            "feature_dim": f.attrs.get("feature_dim", f["embedding"].shape[1]),
+            "sample_id": f.attrs.get("sample_id", "unknown"),
         }
+    if expected_encoder_name is not None:
+        assert out["encoder_name"] == expected_encoder_name, (
+            f"cache routing error: {path} was cached by encoder "
+            f"'{out['encoder_name']}', but the caller required '{expected_encoder_name}' -- "
+            f"this is exactly the A1/A2 feature-mixup bug fixed 2026-08-30, see sts/ablations.py")
+    return out
 
 
 def assert_full_alignment(spot_ids: list[str], embedding: np.ndarray, coords_um: np.ndarray,

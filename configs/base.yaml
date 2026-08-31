@@ -164,12 +164,16 @@ patch_head:
   gene_head_dim: 1000
   pathway_head_dim: 14
   dropout: 0.1
-  # V2 Phase 7: primary loss is gene-only (V1's mandatory 0.2 pathway
-  # weight showed no consistent benefit in PoC_5). pathway_loss_weight is
-  # now the DEFAULT for the primary run; the post-lock ablation sweep
-  # (V2 Phase 19) iterates pathway_loss_sweep instead, on validation
-  # patients only, after the architecture is frozen.
-  pathway_loss_weight: 0.0
+  # pathway_loss_weight RESTORED to V1's 0.2 2026-08-30 (final-experiment diagnostic):
+  # V2 Phase 7's gene-only default (0.0) turned out to mean pathway_delta_head (and the
+  # patch_head's own pathway_head) receive EXACTLY zero gradient every step -- confirmed
+  # live via a real IDC rerun (job 84818): every graph ablation's pathway_fisher_z_mean_
+  # patient_R was byte-identical to A2's (0.032320), because with pathway_weight=0 the
+  # pathway branch never leaves its init state, for ANY topology. This structurally
+  # violates the final-experiment requirement that graph-corrected pathway predictions
+  # must differ across real/shuffled/local models. pathway_loss_sweep is kept for a
+  # possible post-lock re-sweep, but is no longer the primary-run source of truth.
+  pathway_loss_weight: 0.2
   pathway_loss_sweep: [0.0, 0.05, 0.10, 0.20]
   optimizer: adamw
   lr: 3.0e-4
@@ -272,8 +276,10 @@ genbio_fair_comparison:
 # test). Gate 3 is the same "real vs shuffled" test as V1's Section 25,
 # now explicitly run against A8 (scale-aware) rather than A7 (union
 # multiscale), since A8 is the proposed final model.
-# gate1_distillation REMOVED 2026-08-30 along with A1_imagenet_patch (see sts/ablations.py) --
-# it compared A2 against A1, which was silently identical to A2 due to a feature-loading bug.
+# gate1_distillation RESTORED 2026-08-30 -- see sts/ablations.py for the real fix
+# (A1 now loads its own imagenet feature cache + its own patch_head, no longer
+# silently reusing A2's distilled features).
 primary_gates:
+  gate1_distillation: {better: A2_distilled_patch, worse: A1_imagenet_patch}
   gate2_spatial_context: {better: A8_scale_aware_pna, worse: A2_distilled_patch}
   gate3_true_topology: {better: A8_scale_aware_pna, worse: A5_shuffled_graph}

@@ -1,0 +1,7 @@
+{
+  "description": "y_pred is a near-exact (0.01-noise) copy of y_true's per-patient rows, just permuted into per-patient-grouped order -- a correct pipeline must recover fisher_z_mean_patient_R close to 1.0.",
+  "before_fix_fisher_z_mean_patient_R": 0.08444735577217534,
+  "after_fix_fisher_z_mean_patient_R": 0.9999565489717247,
+  "expected_after_fix": "close to 1.0 (near-perfect self-recovery)",
+  "bug_confirmed": true
+}

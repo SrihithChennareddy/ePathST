@@ -51,15 +51,19 @@ class AblationSpec:
 
 ABLATION_GRID = [
     # --- primary block (V2 Phase 14/18: run these first) ---
-    # A1_imagenet_patch REMOVED 2026-08-30, per explicit user decision: scripts/10_run_patient_cv.py's
-    # main() only ever loads the DISTILLED feature cache (paths["student_embeddings"] / "distilled")
-    # once, before the ablation loop, and reuses that same patch_head for every graph_source="none"
-    # ablation -- A1's declared "imagenet" encoder was never actually consulted, so it silently produced
-    # results byte-identical to A2 (confirmed live on real data, all 3 cancers) rather than a real
-    # ImageNet-vs-distilled comparison. Removed rather than fixed for now -- Gate 1 (which compared
-    # A2 vs A1) removed from configs/base.yaml's primary_gates for the same reason. If this comparison
-    # is wanted later, load_feats needs cancer-specific ImageNet AND distilled caches and a second
-    # patch_head trained on the ImageNet features.
+    # A1_imagenet_patch RESTORED 2026-08-30 (final-experiment diagnostic): the 2026-08-30
+    # removal (commit 96005f2) was because scripts/10_run_patient_cv.py's main() only ever
+    # loaded the DISTILLED feature cache and reused ONE patch_head for every
+    # graph_source="none" ablation, so A1's declared "imagenet" encoder was never actually
+    # consulted (silently byte-identical to A2). Fixed properly this time: script 10 now
+    # loads BOTH the "imagenet" and "distilled" caches (each asserted via
+    # sts.feature_cache.load_cached_features(expected_encoder_name=...) to only ever load
+    # its own encoder's features) and trains a SEPARATE patch_head on each, so A1 and A2
+    # now differ only in which frozen encoder produced their input features -- everything
+    # else (patient split, HVG1000/HVG50/PROGENy14 targets, head architecture, optimizer,
+    # epochs/early stopping, evaluation) is identical between them.
+    AblationSpec("A1_imagenet_patch", "imagenet", "none", "none", "primary",
+                 "ImageNet ConvNeXt, no distillation, patch-only"),
     AblationSpec("A2_distilled_patch", "distilled", "none", "none", "primary",
                  "GenBio-distilled ConvNeXt, patch-only (=y_patch, the anchor)"),
     AblationSpec("A5_shuffled_graph", "distilled", "shuffled", "pna_union", "primary",

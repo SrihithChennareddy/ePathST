@@ -42,11 +42,15 @@ def main():
     hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
     patch_shard_dir = paths["work_dir"] / "hest_patches"
 
+    distilled_checkpoint = paths["student_checkpoints"] / f"locked_encoder_seed{args.seed}.pt"
     encoders = {
         "distilled": load_locked_encoder(
-            torch.load(paths["student_checkpoints"] / f"locked_encoder_seed{args.seed}.pt",
-                       map_location=args.device)["encoder_state_dict"], args.device),
+            torch.load(distilled_checkpoint, map_location=args.device)["encoder_state_dict"], args.device),
         "imagenet": ConvNeXtV2AttoStudent(pretrained="imagenet").to(args.device).eval(),
+    }
+    checkpoint_sources = {
+        "distilled": str(distilled_checkpoint),
+        "imagenet": "timm:convnextv2_atto:imagenet-pretrained",
     }
 
     with RunEnvironment("09_extract_student_features_hest", paths["logs"] / "09_extract_student_features_hest_env.json"):
@@ -64,7 +68,8 @@ def main():
 
                 feats = extract_student_features(encoder, shard_patches, args.device)
                 coords = group[["x_um", "y_um"]].values
-                cache_features(out_path, shard_pids.tolist(), feats, coords)
+                cache_features(out_path, shard_pids.tolist(), feats, coords, encoder_name=feat_name,
+                                checkpoint_source=checkpoint_sources[feat_name], sample_id=sample_id)
 
                 expr_idx = load_expression_index(sample_id, Path(cfg["paths"]["hest_root"]), hest_samples)
                 import pandas as _pd
