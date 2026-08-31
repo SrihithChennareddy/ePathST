@@ -1,4 +1,4 @@
-# Results Summary
+# HEST Final 5-Fold Experiment -- Results
 
 Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x 3-cancer x seed-0 experiment (SLURM job 84871, completed 2026-08-31, 03:15:54 elapsed). Metric: patient-level Fisher-z mean Pearson R (`sts.metrics.patient_macro_fisher_z`). All CIs are bootstrap 95% intervals, n_bootstrap=10000, resampled over (cancer, fold, seed) cells -- see the Limitations section for what that does and does not mean. Every number below is read directly from `results/final/tables/`; nothing is re-derived or estimated in this document.
 

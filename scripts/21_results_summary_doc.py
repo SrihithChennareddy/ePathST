@@ -53,7 +53,7 @@ def main():
     efficiency = pd.read_csv(tables / "efficiency.csv")
 
     L = []  # lines
-    L += ["# Results Summary\n",
+    L += ["# HEST Final 5-Fold Experiment -- Results\n",
           "Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x "
           "3-cancer x seed-0 experiment (SLURM job 84871, completed 2026-08-31, 03:15:54 elapsed). "
           "Metric: patient-level Fisher-z mean Pearson R (`sts.metrics.patient_macro_fisher_z`). "
@@ -239,11 +239,11 @@ def main():
               "config_used.json`.\n")
 
     text = "\n".join(L)
-    out_path = final_dir / "RESULTS_SUMMARY.md"
+    out_path = final_dir / "HEST_FINAL_5FOLD_RESULTS.md"
     out_path.write_text(text)
     print(f"[21_results_summary_doc] wrote {out_path}")
 
-    docs_path = Path(__file__).resolve().parents[1] / "docs" / "RESULTS_SUMMARY.md"
+    docs_path = Path(__file__).resolve().parents[1] / "docs" / "HEST_FINAL_5FOLD_RESULTS.md"
     docs_path.write_text(text)
     print(f"[21_results_summary_doc] wrote {docs_path}")
 
