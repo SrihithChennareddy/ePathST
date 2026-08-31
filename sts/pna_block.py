@@ -1,8 +1,8 @@
-"""Edge-aware Principal Neighbourhood Aggregation block (Final_Project.txt
-Section 19 / Step 16): edge-conditioned PNAConv -> LayerNorm -> GELU ->
-Dropout -> residual addition, two blocks stacked. Adapted from
-STS_PoC/PoC_5/crcspatial/pna.py (identical hyperparameters: hidden=128,
-aggregators mean/max/min/std, scalers identity/amplification/attenuation)."""
+"""Edge-aware Principal Neighbourhood Aggregation block: edge-conditioned
+PNAConv -> LayerNorm -> GELU -> Dropout -> residual addition, two blocks
+stacked. Adapted from STS_PoC/PoC_5/crcspatial/pna.py (identical
+hyperparameters: hidden=128, aggregators mean/max/min/std, scalers
+identity/amplification/attenuation)."""
 from __future__ import annotations
 
 import torch
@@ -51,7 +51,7 @@ class PNABlock(nn.Module):
 
 
 class MultiLayerPNA(nn.Module):
-    """Section 19: 'Two PNA blocks.' Do not start with more layers."""
+    """Two PNA blocks by default -- do not start with more layers."""
 
     def __init__(self, hidden_dim: int, n_layers: int, aggregators: list[str], scalers: list[str],
                  deg: torch.Tensor, edge_dim: int, dropout: float = 0.1):

@@ -1,8 +1,7 @@
-"""Step 6 (Section 9): distillation objective.
-
-L = L_cos + lambda * L_feature, with L_cos the primary term and a small
-normalized feature-regression term as a secondary signal. Never uses
-unnormalized raw 4608-D MSE as the sole objective (explicitly forbidden)."""
+"""Distillation objective: L = L_cos + lambda * L_feature, with cosine
+similarity as the primary term and a normalized feature-regression term as
+a secondary signal. Deliberately never uses raw unnormalized 4608-D MSE as
+the sole objective -- embedding magnitude is not meaningful, only direction."""
 from __future__ import annotations
 
 import torch

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""Step 22 (Section 26): multiscale contribution, Moran's I vs graph
-improvement, per-pathway analysis, per-cancer consistency. Reads the
-per-ablation, per-fold metrics already written by scripts 10/12."""
+"""Secondary analyses: multiscale-vs-local contribution and per-cancer
+consistency, computed from the per-ablation/per-fold metrics scripts 10/12
+already wrote to disk."""
 from __future__ import annotations
 
 import argparse
@@ -36,17 +36,15 @@ def main():
     consistency_df.to_csv(paths["results"] / "per_cancer_consistency.csv", index=False)
     print(f"[13_additional_analyses] per-cancer consistency:\n{consistency_df}")
 
-    # Section 26.A: local vs multiscale delta, pooled across cancers
+    # local vs multiscale delta, pooled across cancers
     local_mean = df[df["ablation"] == "A6_local_pna"]["fisher_z_mean_patient_R"].mean()
     multi_mean = df[df["ablation"] == "A7_multiscale_pna"]["fisher_z_mean_patient_R"].mean()
     summary = {
         "multiscale_minus_local": float(multi_mean - local_mean) if pd.notna(local_mean) and pd.notna(multi_mean) else None,
-        "note": ("Per-gene Moran's I vs delta_r correlation (Section 26.B) and per-pathway "
-                 "delta ranking (Section 26.C) require the full per-gene/per-pathway "
-                 "per-patient r tables produced by sts.metrics.per_patient_per_column_pearson "
-                 "during script 10's run -- wire those DataFrames to sts.analysis."
-                 "ground_truth_morans_i_per_gene / spatial_benefit_vs_autocorrelation / "
-                 "per_pathway_delta once the full HEST run's per-gene outputs are on disk."),
+        "note": ("Moran's I vs delta_r correlation and per-pathway delta ranking need the full "
+                 "per-gene/per-pathway per-patient r tables from sts.metrics.per_patient_per_column_pearson "
+                 "during script 10's run -- not yet wired to sts.analysis.ground_truth_morans_i_per_gene / "
+                 "spatial_benefit_vs_autocorrelation / per_pathway_delta."),
     }
     save_json(summary, paths["results"] / "additional_analyses_summary.json")
     print(f"[13_additional_analyses] {summary}")

@@ -48,7 +48,7 @@ def main():
     gates = pd.read_csv(tables / "gate_summary.csv")
     secondary = pd.read_csv(tables / "secondary_comparisons.csv")
     pathway = pd.read_csv(tables / "pathway_progeny_results.csv")
-    genbio_b1 = pd.read_csv(tables / "genbio_ridge_baseline_B1.csv")
+    genbio_b1 = pd.read_csv(tables / "genbio_embedding_mlp_baseline_B1.csv")
     official = pd.read_csv(tables / "official_hest_benchmark.csv")
     efficiency = pd.read_csv(tables / "efficiency.csv")
 
@@ -167,11 +167,13 @@ def main():
         gap = g.pearson_mean - d.pearson_mean
         L.append(f"| {cancer} | {int(d.n_folds)} | {fmt(d.pearson_mean)} ({fmt(d.pearson_std)}) | "
                   f"{fmt(g.pearson_mean)} ({fmt(g.pearson_std)}) | {gap:+.4f} |")
-    L.append("\n### 7b. Custom-pipeline GenBio-PCA256-Ridge baseline (B1) -- PARTIAL\n")
-    L.append("Train-fold-only PCA(256) -> Ridge, on the SAME HVG1000/HVG50/PROGENy14 targets and "
-             "fold structure as the A0-A9 table -- but **fold0/seed0 only, not the full 5-fold "
-             "design**. Treat as preliminary; do not compare CI-to-CI against the bootstrapped A0-A9 "
-             "numbers above (no CI is computable from a single fold).\n")
+    L.append("\n### 7b. Custom-pipeline GenBio embedding -> trained MLP baseline (B1) -- PARTIAL\n")
+    L.append("Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no "
+             "PCA, no Ridge -- `scripts/run_genbio_hest_baseline.py --head ridge` is an available "
+             "but unused alternative), on the SAME HVG1000/HVG50/PROGENy14 targets and fold "
+             "structure as the A0-A9 table -- but **fold0/seed0 only, not the full 5-fold design**. "
+             "Treat as preliminary; do not compare CI-to-CI against the bootstrapped A0-A9 numbers "
+             "above (no CI is computable from a single fold).\n")
     L.append("| Cancer | n train / test patients | HVG1000 R | HVG50 R | PROGENy14 R | Feature extract (s) | Head train (s) | Peak VRAM (GB) |")
     L.append("|---|---|---|---|---|---|---|---|")
     for _, r in genbio_b1.iterrows():
@@ -225,7 +227,7 @@ def main():
           "per-patient predictions to disk. A stricter implementation would bootstrap over patients "
           "directly.",
           "2. **Seeds 1/2** were not run for the major models -- seed 0 only.",
-          "3. **B1 (GenBio Ridge baseline)** is fold0/seed0 only per cancer, not the full 5-fold "
+          "3. **B1 (GenBio embedding -> MLP baseline)** is fold0/seed0 only per cancer, not the full 5-fold "
           "design the rest of this document uses.",
           "4. **Efficiency**: only parameter counts and the derived compression ratio were "
           "measured; inference VRAM, throughput, and GNN wall-clock were not.",

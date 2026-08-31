@@ -1,29 +1,26 @@
 #!/usr/bin/env python
-"""Steps 11, 14, 15, 17, 19 (Sections 14, 17-19, 21, 23), revised per
-Final_Project_V2.txt -- the main downstream experiment loop.
+"""The main downstream experiment loop: patient-level cross-validation
+over the A0-A9 ablation grid.
 
 For every cancer's patient-level CV folds x every seed:
   1. select HVG1000/HVG50 from TRAIN patients only, compute PROGENy14 on
      the full normalized expression, standardize using train-fold stats
-     (Step 11 / Section 14, leakage-free);
-  2. train the patch-only molecular bottleneck head (Step 14) -- this
-     defines y_patch,i, gene-only loss by default (V2 Phase 7);
-  3. build the physical multiscale graph per section (Step 15);
-  4. for every ablation in sts.ablations.ABLATION_GRID (PRIMARY block
-     first -- A1/A2/A5/A6/A7/A8 -- then SECONDARY -- A0/A3/A4/A9 -- per V2
-     Phase 14/18's run-order), train/evaluate with the SAME folds,
-     features, targets, and procedure (Step 17), saving predictions for
-     every test spot (Section 21). A8 (scale-aware PNA) and A9 (GATv2)
-     are new backends (sts.graph_model/graph_training); A5 (shuffled) is
-     the critical negative control.
+     (leakage-free);
+  2. train the patch-only molecular bottleneck head -- this defines
+     y_patch,i (gene-only loss by default);
+  3. build the physical multiscale graph;
+  4. for every ablation in sts.ablations.ABLATION_GRID (primary block
+     first -- A1/A2/A5/A6/A7/A8 -- then secondary -- A0/A3/A4/A9), train/
+     evaluate with the same folds, features, targets, and procedure,
+     saving predictions for every test spot. A8 (scale-aware PNA) and A9
+     (GATv2) are graph backends; A5 (shuffled) is the critical negative
+     control.
   5. before returning, assert every expected (cancer, fold, seed,
-     ablation) run actually completed (V2 Phase 3 -- the exact PoC_5
-     aggregation-completeness bug this project already hit once, see
-     docs/POC5_RESULTS.md).
+     ablation) run actually completed -- see docs/POC5_RESULTS.md for the
+     aggregation-completeness bug this guards against.
 
-The GenBio-teacher PCA256 fair comparison (V2 Phase 21) and the
-destruction dose-response (Step 18) are separate scripts that reuse the
-exact fold/target artifacts written here.
+The GenBio-teacher PCA256 baseline and the destruction dose-response are
+separate scripts that reuse the exact fold/target artifacts written here.
 """
 from __future__ import annotations
 
@@ -59,14 +56,12 @@ def load_fold_expression(hest_samples, spot_manifest, hest_root, patients, cfg):
 
     Indexed by `spot_uid` (`{sample_id}::{spot_id}`), NOT bare `spot_id` --
     HEST spot ids are Visium array-grid coordinates (e.g. "010x016"), not
-    global barcodes, and collide heavily across different samples/slides
-    (confirmed live, 2026-08-29: two real breast samples shared 144/176
-    spot_ids). Since a fold's train/val/test patient sets always span
-    multiple samples, `pd.concat`-ing frames indexed by bare spot_id would
-    silently produce a duplicate-keyed index and every downstream `.loc[]`
-    lookup (coords_for/patient_for/load_feats below) would then be
-    ambiguous across patients -- see scripts/08_prepare_hest_metadata.py's
-    `spot_uid` column, the source of truth for this join key."""
+    global barcodes, and collide heavily across samples (two real breast
+    samples were found sharing 144/176 spot_ids). Since a fold's train/val/
+    test patients always span multiple samples, concatenating frames
+    indexed by bare spot_id would produce a duplicate-keyed index and every
+    downstream `.loc[]` lookup would become ambiguous across patients --
+    see scripts/08_prepare_hest_metadata.py's `spot_uid` column."""
     frames, progeny_frames, genes_by_sample = [], [], {}
     net = fetch_and_cache_progeny_net(Path(cfg["paths"]["work_dir"]) / "progeny_net.csv",
                                        cfg["molecular_targets"]["pathway_top_genes"])
@@ -99,12 +94,12 @@ def build_graph_data(feat_dict, coords, spot_ids, gene_target, pathway_target, p
 
 
 def train_patch_head(x_train, x_val, y_gene_train, y_path_train, y_gene_val, y_path_val, cfg, device):
-    """Trains one MolecularBottleneckHead (Step 14) to convergence with the
-    locked optimizer/loss/early-stopping recipe. Factored out so A1
-    (imagenet features) and A2 (distilled features) each get their OWN
-    patch_head, trained identically except for which frozen encoder's
-    features they see -- the only difference the final-experiment Gate 1
-    (distillation) comparison is supposed to isolate."""
+    """Trains one MolecularBottleneckHead to convergence with the locked
+    optimizer/loss/early-stopping recipe. Factored out so A1 (ImageNet
+    features) and A2 (distilled features) each get their own patch_head,
+    trained identically except for which frozen encoder's features they
+    see -- the only difference the Gate 1 (distillation) comparison is
+    supposed to isolate."""
     patch_head = build_patch_head(cfg, x_train.shape[1], y_gene_train.shape[1], y_path_train.shape[1]).to(device)
     opt = torch.optim.AdamW(patch_head.parameters(), lr=cfg["patch_head"]["lr"],
                              weight_decay=cfg["patch_head"]["weight_decay"])
@@ -144,8 +139,8 @@ def main():
     ap.add_argument("--max-folds-per-cancer", type=int, default=None,
                      help="run only the first N of build_cv_grid's folds per cancer (default: all n_outer_folds). "
                           "With the default n_outer_folds=5 (an 80/20 GroupKFold split per fold), "
-                          "--max-folds-per-cancer 1 runs a single real 80/20 patient-level split instead of "
-                          "the full V2 Phase 3 5-fold design -- for time-budgeted runs; NOT the primary design.")
+                          "--max-folds-per-cancer 1 runs a single 80/20 patient-level split instead of the full "
+                          "5-fold design -- for time-budgeted runs; not the primary design.")
     ap.add_argument("--seeds", type=int, nargs="+", default=None,
                      help="override cfg.cross_validation.seeds (default: all configured seeds)")
     args = ap.parse_args()
@@ -158,11 +153,10 @@ def main():
     hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
     hest_samples = exclude_targeted_panel_samples(hest_samples)
     spot_manifest = pd.read_csv(paths["manifests"] / "hest_spot_manifest.csv")
-    # Bug fix (2026-08-30, final-experiment diagnostic): this used to be a single
-    # `feat_dir = .../"distilled"`, so A1 ("imagenet") silently got distilled features
-    # too (see sts/ablations.py). Both encoders' caches are now loaded, each asserted
-    # via load_cached_features(expected_encoder_name=...) to only ever serve its own
-    # encoder's features -- see FEATURE_SOURCES below and load_feats().
+    # Both encoders' caches must be loaded here (not just "distilled"), each asserted via
+    # load_cached_features(expected_encoder_name=...) to only ever serve its own encoder's
+    # features -- otherwise A1 ("imagenet") silently gets distilled features too. See
+    # sts/ablations.py and load_feats() below.
     FEATURE_SOURCES = ("distilled", "imagenet")
     feat_dirs = {src: paths["student_embeddings"] / src for src in FEATURE_SOURCES}
 
@@ -174,13 +168,13 @@ def main():
             info["folds"] = info["folds"][:args.max_folds_per_cancer]
         cv_grid["pooled"]["folds"] = cv_grid["pooled"]["folds"][:args.max_folds_per_cancer]
         print(f"[10_run_patient_cv] --max-folds-per-cancer {args.max_folds_per_cancer}: trimmed cv_grid "
-              f"(this run's expected_run_keys below must be computed from the TRIMMED grid, not the full V2 design)")
+              f"(expected_run_keys below must be computed from this trimmed grid, not the full design)")
     save_json(cv_grid, paths["manifests"] / "hest_cv_folds.json")
 
     mt = cfg["molecular_targets"]
     all_predictions = []
     all_metrics = []
-    completed_keys = set()  # V2 Phase 3 completeness gate -- populated as ablations finish, checked at the end
+    completed_keys = set()  # completeness gate -- populated as ablations finish, checked at the end
 
     for cancer, cv in cv_grid["per_cancer"].items():
         for fold in cv["folds"]:
@@ -244,8 +238,8 @@ def main():
                         suffix = "" if src == "distilled" else f"_{src}"  # keep the historical "distilled" filename
                         torch.save(ph.state_dict(), ckpt_dir / f"seed{seed}{suffix}.pt")
 
-                    # V2 Phase 14/18: ABLATION_GRID is already ordered primary-block-first
-                    # (A1/A2/A5/A6/A7/A8), secondary-block second (A0/A3/A4/A9).
+                    # ABLATION_GRID is already ordered primary block first (A1/A2/A5/A6/A7/A8),
+                    # secondary block second (A0/A3/A4/A9).
                     for spec in ABLATION_GRID:
                         src = spec.feature_source if spec.feature_source in x_by_source else "distilled"
                         spec_x_train, spec_x_val, spec_x_test = x_by_source[src]["train"], x_by_source[src]["val"], \
@@ -271,10 +265,9 @@ def main():
     pd.DataFrame(all_metrics).to_csv(paths["results"] / "cv_ablation_metrics.csv", index=False)
     print(f"[10_run_patient_cv] wrote {paths['results'] / 'cv_ablation_metrics.csv'}")
 
-    # V2 Phase 3 / S9: hard completeness gate before this run is trusted for
-    # any downstream aggregation -- see docs/POC5_RESULTS.md for the exact
-    # failure this prevents (a cross-fold aggregate silently pooling only
-    # 3 of 4 completed folds).
+    # Hard completeness gate before this run is trusted for any downstream aggregation --
+    # see docs/POC5_RESULTS.md for the exact failure this prevents (a cross-fold aggregate
+    # silently pooling only 3 of 4 completed folds).
     expected_keys = expected_run_keys(cv_grid, [a.name for a in ABLATION_GRID], unit="per_cancer")
     assert_run_completeness(expected_keys, completed_keys, context="10_run_patient_cv final gate")
     print("[10_run_patient_cv] completeness gate PASSED -- every expected (cancer, fold, seed, ablation) run present")
@@ -283,19 +276,18 @@ def main():
 def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_gene_train, y_path_train,
                   y_gene_val, y_path_val, y_gene_test, y_path_test, patch_head, spot_manifest, cfg, seed, device,
                   n_hvg50, pathway_names):
-    """Trains/evaluates one ablation from sts.ablations.ABLATION_GRID and
-    returns (test predictions, headline metrics, eval_ids_test -- the spot_uid
-    order `preds`/`metrics` were actually scored against, identity order for
-    A0-A3, per-patient-grouped for graph ablations). Dispatches on
-    (spec.graph_source, spec.backend):
+    """Trains/evaluates one ablation from sts.ablations.ABLATION_GRID.
+    Returns (test predictions, headline metrics, eval_ids_test), where
+    eval_ids_test is the spot_uid order `preds`/`metrics` were actually
+    scored against -- identity order for A0-A3, per-patient-grouped for
+    graph ablations. Dispatches on (spec.graph_source, spec.backend):
       A0 (graph_source='none', feature_source='none'): training-mean baseline, no model at all.
       A1/A2 (graph_source='none'): frozen patch_head forward pass -- y_patch,i itself.
       A3 (graph_source='none', but NOT reusing patch_head): parameter-matched MLP, no neighbors.
       A4/A5/A6/A7 (backend='pna_union'), A9 (backend='gatv2'): residual graph correction, union edge features.
       A8 (backend='scale_aware'): residual graph correction, per-scale edge features + edge_scale tags."""
-    # Joined on `spot_uid` (`{sample_id}::{spot_id}`), never bare `spot_id` -- HEST spot ids are
-    # Visium array-grid coordinates that collide across different samples, and `ids_train/val/test`
-    # here always span multiple patients (see load_fold_expression's docstring / scripts/08's spot_uid).
+    # Joined on `spot_uid`, never bare `spot_id` -- see load_fold_expression's docstring
+    # for why (spot_id collides across samples, and ids_train/val/test span multiple patients).
     spot_by_uid = spot_manifest.set_index("spot_uid")
 
     def coords_for(spot_uids):
@@ -310,8 +302,8 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
         gene_pred = np.repeat(gene_mean, len(ids_test), axis=0)
         path_pred = np.repeat(path_mean, len(ids_test), axis=0)
     elif spec.name == "A3_matched_mlp":
-        # V2 Phase 14: parameter-matched MLP, same distilled features, no neighbors -- tests
-        # whether extra capacity ALONE (without any graph structure) explains a would-be gain.
+        # parameter-matched MLP, same distilled features, no neighbors -- tests whether extra
+        # capacity alone (without any graph structure) explains a would-be gain.
         pna_param_count = sum(p.numel() for p in patch_head.parameters())
         h = matched_mlp_hidden_dim(pna_param_count, x_train.shape[1], y_gene_train.shape[1] + y_path_train.shape[1])
         mlp = MolecularBottleneckHead(x_train.shape[1], [x_train.shape[1], h, h], y_gene_train.shape[1],
@@ -375,37 +367,34 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
         model = ResidualGraphPredictor(patch_head, graph_corr).to(device)
         preds = predict_graph_model(model, graphs_test, device, backend=backend)
         gene_pred, path_pred = preds["gene_pred"], preds["pathway_pred"]
-        # BUG (found 2026-08-30, diagnostic T1): predict_graph_model concatenates node
-        # predictions in the same per-patient grouping order used to build graphs_test
-        # above, so `ids_test` must be reordered identically before being used to index
-        # spot-level metadata downstream. The previous version of this line reordered
-        # ONLY `ids_test`, leaving `y_gene_test`/`y_path_test` (the ground-truth arrays
-        # used below in `_eval(y_gene_test, gene_pred, ...)`) in the ORIGINAL order --
-        # silently misaligning target vs. prediction for every graph ablation (A4-A9).
-        # Confirmed via scripts/debug_idc_pipeline.py: this alone can turn a
-        # near-perfect predictor (r~1.0) into r~0.08. `y_gene_test`/`y_path_test` are
-        # reassigned here too, using the exact same per-patient-grouped order.
+        # predict_graph_model concatenates node predictions in the same per-patient grouping
+        # order used to build graphs_test above, so ids_test (AND the ground-truth arrays
+        # y_gene_test/y_path_test used in evaluate_predictions below) must be reordered before
+        # indexing spot-level metadata downstream. Reordering only ids_test while leaving the
+        # targets in original order silently misaligns target vs. prediction for every graph
+        # ablation (A4-A9) -- verified via scripts/debug_idc_pipeline.py to turn a near-perfect
+        # predictor (r~1.0) into r~0.08. This is the single most important correctness
+        # invariant in this function; do not "simplify" it away.
         order = np.concatenate([np.where(patient_for(ids_test) == p)[0] for p in np.unique(patient_for(ids_test))])
         ids_test = ids_test[order]
         y_gene_test = y_gene_test[order]
         y_path_test = y_path_test[order]
 
-    # Section 30/31's required MODEL x {HVG50, HVG1000, PATHWAY} results table needs all three
-    # evaluated separately, not one pooled HVG1000 number relabeled after the fact -- HVG50 is exactly
-    # the first n_hvg50 columns of the HVG1000 target (nested by construction, see
-    # sts.expression.select_hvg_for_fold), so no separate model/prediction is needed, just a column slice.
-    from sts.metrics import evaluate_predictions as _eval
+    # The results table needs HVG50/HVG1000/pathway evaluated separately, not one pooled
+    # number relabeled after the fact -- HVG50 is exactly the first n_hvg50 columns of the
+    # HVG1000 target (nested by construction, see sts.expression.select_hvg_for_fold), so no
+    # separate model/prediction is needed, just a column slice.
     pids, cancer_placeholder = patient_for(ids_test), np.array(["cancer"] * len(ids_test))
-    m_hvg1000 = _eval(y_gene_test, gene_pred, pids, cancer_placeholder,
-                       [str(i) for i in range(y_gene_test.shape[1])], cfg).get("overall", {})
-    m_hvg50 = _eval(y_gene_test[:, :n_hvg50], gene_pred[:, :n_hvg50], pids, cancer_placeholder,
-                     [str(i) for i in range(n_hvg50)], cfg).get("overall", {})
-    m_pathway = _eval(y_path_test, path_pred, pids, cancer_placeholder, pathway_names, cfg).get("overall", {})
+    m_hvg1000 = evaluate_predictions(y_gene_test, gene_pred, pids, cancer_placeholder,
+                                      [str(i) for i in range(y_gene_test.shape[1])], cfg).get("overall", {})
+    m_hvg50 = evaluate_predictions(y_gene_test[:, :n_hvg50], gene_pred[:, :n_hvg50], pids, cancer_placeholder,
+                                    [str(i) for i in range(n_hvg50)], cfg).get("overall", {})
+    m_pathway = evaluate_predictions(y_path_test, path_pred, pids, cancer_placeholder,
+                                      pathway_names, cfg).get("overall", {})
     metrics = {f"hvg1000_{k}": v for k, v in m_hvg1000.items()}
     metrics.update({f"hvg50_{k}": v for k, v in m_hvg50.items()})
     metrics.update({f"pathway_{k}": v for k, v in m_pathway.items()})
-    # back-compat: the primary hypothesis test / completeness gate key off this exact name for the
-    # decisive HVG1000 comparison (Gate 1-3, sts.cv_folds); keep it unprefixed too.
+    # sts.cv_folds' completeness gate and the Gate 1-3 tests key off this exact unprefixed name.
     metrics["fisher_z_mean_patient_R"] = m_hvg1000.get("fisher_z_mean_patient_R")
     return {"gene": gene_pred, "pathway": path_pred}, metrics, ids_test
 

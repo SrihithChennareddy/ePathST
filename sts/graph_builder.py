@@ -1,22 +1,16 @@
-"""Physical multiscale graph construction (Final_Project.txt Section 18 /
-Step 15, revised per Final_Project_V2.txt Phase 9). One graph per tissue
-section (never edges across WSIs). Nodes are ST spots with the
-GenBio-distilled ConvNeXt embedding as their only feature. Edges are
-physical-distance buckets (local/meso/macro), each capped at its own
-max-neighbor count. Two edge-feature variants (see V2 Phase 9, a
-correction to this project's original V1 implementation which used a
-single 19-D feature everywhere):
+"""Physical multiscale graph construction. One graph per tissue section
+(never edges across WSIs). Nodes are ST spots with the GenBio-distilled
+ConvNeXt embedding as their only feature. Edges are physical-distance
+buckets (local/meso/macro), each capped at its own max-neighbor count.
+Raw absolute (x, y) node coordinates are never used as a feature.
+
+Two edge-feature variants:
   - `union_edge_features` (20-D: 1 normalized distance + 16 RBF + 3-D
     one-hot scale) for any model where one PNA sees edges from all three
     scales at once (A4/A5/A6/A7).
   - `per_scale_edge_features` (17-D: 1 normalized distance + 16 RBF, no
-    one-hot) for the Scale-Aware model (A8), where branch identity
-    already encodes scale.
-Raw absolute (x, y) node coordinates are never used as a feature.
-
-Adapted from the identical, already-validated implementation in
-STS_PoC/PoC_5/crcspatial/graph_builder.py -- the spec's radii/caps/RBF
-count are numerically identical (150/300/600 um, 8/12/16, 16 RBFs)."""
+    one-hot) for the scale-aware model (A8), where branch identity
+    already encodes scale."""
 from __future__ import annotations
 
 import numpy as np
@@ -92,16 +86,12 @@ def _rbf_basis(distance_um: np.ndarray, macro_radius_um: float, n_rbf: int, gamm
 
 def union_edge_features(distance_um: np.ndarray, scale: np.ndarray, macro_radius_um: float,
                          n_rbf: int = 16, gamma: float = 10.0) -> np.ndarray:
-    """V2 Phase 9: for the UNION multiscale graph (all three scales' edges
-    in one graph, one PNA sees all of them), the edge feature must include
-    the explicit normalized-distance scalar in addition to the RBF
-    encoding, since a single message-passing layer sees edges from all
-    three scales at once and needs the raw distance signal RBFs alone
-    under-determine at the bucket boundaries -- 1 normalized distance + 16
-    RBF + 3-D one-hot scale code = 20-D (NOT 19-D, a dimensionality this
-    project's V1 implementation got wrong: it omitted the explicit
-    distance scalar). Used by A7 (union multiscale) and the random/
-    shuffled/local-only ablations, which all still route through one PNA."""
+    """Edge feature for the UNION multiscale graph, where one PNA layer
+    sees edges from all three scales at once: 1 normalized distance + 16
+    RBF + 3-D one-hot scale code = 20-D. The explicit distance scalar
+    matters here because RBFs alone under-determine distance near bucket
+    boundaries. Used by A7 (union multiscale) and the random/shuffled/
+    local-only ablations."""
     d_norm, rbf = _rbf_basis(distance_um, macro_radius_um, n_rbf, gamma)
     onehot = np.zeros((len(distance_um), len(SCALE_NAMES)), dtype=np.float32)
     for s_idx, s_name in enumerate(SCALE_NAMES):
@@ -111,19 +101,18 @@ def union_edge_features(distance_um: np.ndarray, scale: np.ndarray, macro_radius
 
 def per_scale_edge_features(distance_um: np.ndarray, macro_radius_um: float,
                              n_rbf: int = 16, gamma: float = 10.0) -> np.ndarray:
-    """V2 Phase 9: for the Scale-Aware model (Phase 12), each of the three
-    PNA branches only ever sees edges of ITS OWN scale -- branch identity
-    already encodes the scale, so the one-hot is redundant. Edge feature
-    here is 1 normalized distance + 16 RBF = 17-D (not 20-D)."""
+    """Edge feature for the scale-aware model: each of the three PNA
+    branches only ever sees edges of its own scale, so branch identity
+    already encodes scale and the one-hot is redundant. 1 normalized
+    distance + 16 RBF = 17-D."""
     d_norm, rbf = _rbf_basis(distance_um, macro_radius_um, n_rbf, gamma)
     return np.concatenate([d_norm[:, None], rbf], axis=1)
 
 
-# Back-compat alias: this project's V1 implementation named the union
-# feature function `rbf_edge_features` and omitted the explicit distance
-# scalar (19-D, not 20-D) -- kept importable under the old name so nothing
-# calling it directly breaks, but it now produces the corrected 20-D
-# feature. New code should call `union_edge_features` explicitly.
+# Back-compat alias for the old name (an earlier version of this function
+# was 19-D, omitting the explicit distance scalar); kept importable so
+# nothing calling it directly breaks. New code should call
+# `union_edge_features` explicitly.
 def rbf_edge_features(distance_um: np.ndarray, scale: np.ndarray, macro_radius_um: float,
                        n_rbf: int = 16, gamma: float = 10.0) -> np.ndarray:
     return union_edge_features(distance_um, scale, macro_radius_um, n_rbf, gamma)
@@ -131,18 +120,16 @@ def rbf_edge_features(distance_um: np.ndarray, scale: np.ndarray, macro_radius_u
 
 def build_local_only_edges(coords_um: np.ndarray, local_radius_um: float, max_local: int) -> dict:
     """A6/local-only ablation: identical to build_multiscale_edges but with
-    meso/macro radii collapsed to local_radius_um (so only local edges
-    exist) -- used for the local-vs-multiscale PNA comparison (Section 22.A)."""
+    meso/macro radii collapsed to local_radius_um, so only local edges
+    exist."""
     return build_multiscale_edges(coords_um, local_radius_um, local_radius_um, local_radius_um,
                                    max_local, max_local, max_local)
 
 
 def split_edges_by_scale(edges: dict) -> dict[str, dict]:
-    """V2 Phase 12 (Scale-Aware Residual Multiscale PNA): splits one
-    `build_multiscale_edges` output into three separate per-scale edge
-    dicts (local/meso/macro), each with the SAME node index space (so all
-    three branches run over the same N nodes, just different edge sets) --
-    used to build the three independent PNA branches E_L, E_M, E_G."""
+    """Splits one `build_multiscale_edges` output into three per-scale
+    edge dicts (local/meso/macro), sharing the same node index space, for
+    the scale-aware model's three independent PNA branches."""
     out = {}
     for s in SCALE_NAMES:
         mask = edges["scale"] == s

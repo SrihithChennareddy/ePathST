@@ -1,32 +1,25 @@
-"""Step 4 (Section 7): frozen GenBio-PathFM teacher, run once and cached.
-
-GenBio-PathFM (https://huggingface.co/genbio-ai/genbio-pathfm) is loaded
-strictly for inference -- gradients are never computed through it, and its
-1.1B parameters are never updated. Every CPTAC patch is embedded exactly
-once; embeddings are cached to disk (FP16) and reused for every subsequent
-distillation epoch (CRITICAL: 'Do not repeatedly run the 1.1B teacher every
-training epoch.')."""
+"""Frozen GenBio-PathFM teacher (https://huggingface.co/genbio-ai/genbio-pathfm),
+run once and cached. Inference only -- no gradients, 1.1B parameters never
+updated. Every CPTAC patch is embedded exactly once; embeddings are
+cached to disk (FP16) and reused across every distillation epoch, since
+re-running the teacher per epoch would be prohibitively expensive."""
 from __future__ import annotations
 
 from pathlib import Path
 
+import h5py
 import numpy as np
 
 
 class GenBioPathFMTeacher:
-    """Loading/inference exactly follows the model card's documented usage
-    (confirmed live against the real, public, non-gated
-    genbio-ai/genbio-pathfm repo on 2026-08-28) -- NOT the generic
-    HF-AutoModel-with-AutoImageProcessor pattern this module originally
-    assumed:
-
-      - There is no `preprocessor_config.json` in the repo, so
-        `AutoImageProcessor.from_pretrained` fails; the model card instead
-        specifies a plain torchvision `Resize(224,224) -> ToTensor ->
-        Normalize` with GenBio-PathFM-SPECIFIC stats (NOT ImageNet's),
-        mean=(0.697, 0.575, 0.728), std=(0.188, 0.240, 0.187).
-      - `model(x)` returns the [B, 4608] CLS-feature tensor DIRECTLY (a
-        plain tensor, not a HF-style ModelOutput with `.last_hidden_state`)."""
+    """Follows the model card's documented usage, which differs from the
+    generic HF AutoModel/AutoImageProcessor pattern:
+      - No `preprocessor_config.json` in the repo, so
+        `AutoImageProcessor.from_pretrained` fails -- preprocessing is a
+        plain Resize(224,224) -> ToTensor -> Normalize with GenBio-PathFM-
+        specific stats (not ImageNet's).
+      - `model(x)` returns the [B, 4608] CLS-feature tensor directly, not
+        a HF-style ModelOutput with `.last_hidden_state`."""
 
     GENBIO_MEAN = (0.697, 0.575, 0.728)
     GENBIO_STD = (0.188, 0.240, 0.187)
@@ -53,17 +46,16 @@ class GenBioPathFMTeacher:
         return self._n_params
 
     def _preprocess(self, patches_uint8: np.ndarray):
-        """patches_uint8: (B, 224, 224, 3) uint8 RGB, already 224x224
-        (Section 5's patch extraction already produces 224x224, so the
-        model card's Resize((224,224)) is a no-op here -- applied anyway
-        for safety against any non-224 input)."""
+        """patches_uint8: (B, 224, 224, 3) uint8 RGB. Patches are already
+        224x224, but resize is applied anyway as a safety net for
+        non-224 input."""
         import torch
         import torch.nn.functional as F
 
         x = torch.from_numpy(patches_uint8).to(self.device).float() / 255.0
-        x = x.permute(0, 3, 1, 2).contiguous()  # (B, H, W, 3) -> (B, 3, H, W); the model's own
-        # forward() does `pixel_values.view(...)` internally, which requires a contiguous tensor --
-        # permute() alone returns a view with non-contiguous strides.
+        # (B, H, W, 3) -> (B, 3, H, W); must be .contiguous() -- the model's forward() does
+        # pixel_values.view(...) internally, which fails on permute()'s non-contiguous strides.
+        x = x.permute(0, 3, 1, 2).contiguous()
         if x.shape[-1] != 224 or x.shape[-2] != 224:
             x = F.interpolate(x, size=(224, 224), mode="bilinear", align_corners=False)
         mean = torch.from_numpy(self._mean).to(self.device).view(1, 3, 1, 1)
@@ -72,9 +64,7 @@ class GenBioPathFMTeacher:
 
     def embed_batch(self, patches_uint8: np.ndarray) -> np.ndarray:
         """patches_uint8: (B, H, W, 3) uint8 RGB. Returns (B, 4608) float32
-        L2-normalized CLS embeddings (Section 7: 'Use the model's
-        4608-dimensional CLS representation ... Normalize teacher
-        embeddings using L2 normalization')."""
+        L2-normalized CLS embeddings."""
         import torch
         x = self._preprocess(patches_uint8)
         with torch.no_grad():
@@ -88,32 +78,18 @@ class GenBioPathFMTeacher:
         return (cls / norm).astype(np.float32)
 
 
-import h5py  # noqa: E402
-
-
 def cache_teacher_embeddings(out_path: str | Path, patch_ids: list[str], embeddings: np.ndarray) -> None:
-    """Section 7: store patch_id <-> teacher_embedding, FP16 on disk to
-    reduce footprint (values are unit-norm so FP16 precision is adequate).
+    """Appends patch_id <-> teacher_embedding to disk (FP16 -- embeddings
+    are unit-norm, so FP16 precision is adequate).
 
-    Uses h5py's VARIABLE-length string dtype for `patch_id`, not a fixed-
-    width numpy `dtype="S"` array. This dataset is appended to across many
-    separate calls over the life of a run (one per batch, potentially
-    tens of thousands of calls); a fixed-width `S` dtype freezes its
-    per-element byte-width at whatever the FIRST call's longest string
-    happened to be, and every later `dataset[slice] = np.array(longer_ids,
-    dtype='S')` silently TRUNCATES any id exceeding that width -- no error,
-    no warning. This bit a real run: CPTAC patch_ids
-    (`{dicom_series_uid}_{x}_{y}`) vary in length with the sampled (x, y)
-    pixel coordinates' digit counts (up to ~6 chars difference between a
-    slide's smallest and largest coordinates), so a dataset created from
-    an early, short-coordinate batch truncated later, longer patch_ids --
-    corrupting them into collisions with unrelated patches (two different
-    truncated-to-the-same-prefix ids look identical) and permanently
-    breaking this cache's own resumability (a fresh, untruncated patch_id
-    string from patch_manifest.csv never string-matches its own truncated
-    form already on disk, so `_already_cached_patch_ids` never recognizes
-    it as done and re-embeds it every run). Variable-length strings have
-    no such width limit."""
+    Uses h5py's variable-length string dtype for `patch_id`, not a
+    fixed-width numpy `dtype="S"` array. A fixed-width dtype freezes its
+    per-element byte-width at the first call's longest string and
+    silently truncates any longer id appended later -- this previously
+    corrupted CPTAC patch_ids (which vary in length with pixel-coordinate
+    digit count) into collisions between unrelated patches, and broke
+    resumability (a fresh id never string-matches its truncated form on
+    disk). Variable-length strings have no such width limit."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     str_dtype = h5py.string_dtype(encoding="utf-8")
@@ -131,8 +107,8 @@ def cache_teacher_embeddings(out_path: str | Path, patch_ids: list[str], embeddi
 
 
 def verify_teacher_cache(path: str | Path, expected_dim: int) -> dict:
-    """Section 7 integrity checks: no NaNs, expected dimension, sensible
-    norms, and patch<->embedding alignment (unique, non-empty patch_ids)."""
+    """Integrity checks: no NaNs, expected dimension, near-unit norms, and
+    no duplicate patch_ids."""
     with h5py.File(path, "r") as f:
         emb = f["teacher_embedding"][:].astype(np.float32)
         pids = f["patch_id"][:].astype(str)

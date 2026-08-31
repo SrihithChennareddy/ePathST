@@ -1,20 +1,15 @@
 #!/usr/bin/env python
-"""Steps 20-21 (Sections 24-25), revised per Final_Project_V2.txt Phase 22:
-aggregate results/cv_ablation_metrics.csv, verify completeness (V2 Phase 3
-/ S9), then run the THREE PRIMARY STATISTICAL GATES (replacing V1's single
-primary-hypothesis test):
+"""Aggregates results/cv_ablation_metrics.csv, verifies completeness, then
+runs the three primary statistical gates:
 
     Gate 1 (distillation):    R_A2_distilled_patch  > R_A1_imagenet_patch
     Gate 2 (spatial context): R_A8_scale_aware_pna   > R_A2_distilled_patch
     Gate 3 (true topology):   R_A8_scale_aware_pna   > R_A5_shuffled_graph
 
-(Gate 1 RESTORED 2026-08-30 -- see sts/ablations.py for the real fix.)
-
-Gate 3 is the same "real vs. shuffled" test as V1's Section 25, now run
-against A8 (scale-aware, the proposed final model) instead of A7 (union
-multiscale) -- V2 explicitly redefines the primary spatial-topology model.
-Reported PER CANCER (primary analysis unit, V2 Phase 1) with pooled-across-
-cancers as a secondary summary."""
+Gate 3 is the decisive "real graph vs. degree-preserving shuffled graph"
+negative control, run against A8 (scale-aware, the proposed final model).
+Reported per cancer (the primary analysis unit) with pooled-across-cancers
+as a secondary summary."""
 from __future__ import annotations
 
 import argparse
@@ -49,8 +44,8 @@ def main():
     df = pd.read_csv(paths["results"] / "cv_ablation_metrics.csv")
     stats_cfg = cfg["statistics"]
 
-    # V2 Phase 3 / S9: refuse to compute any statistic over a run set that
-    # doesn't match what the CV design actually calls for.
+    # Refuse to compute any statistic over a run set that doesn't match
+    # what the CV design actually calls for.
     if not args.skip_completeness_check:
         hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
         patients_by_cancer = {c: hest_samples[hest_samples["cancer"] == c]["patient_id"].unique().tolist()
@@ -120,8 +115,7 @@ def main():
 
     print("\n[12_primary_hypothesis_test] KNOWN LIMITATION: bootstrap resampling unit here is "
           "(cancer, fold, seed) cells, not individual patients -- a stricter implementation would "
-          "plumb per-patient R_p values through to this script and bootstrap over patients directly "
-          "(Section 25's literal requirement). Flagged, not silently glossed over.")
+          "plumb per-patient R_p values through to this script and bootstrap over patients directly.")
 
 
 if __name__ == "__main__":

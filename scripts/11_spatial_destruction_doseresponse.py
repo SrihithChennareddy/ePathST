@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-"""Step 18 (Section 22): starting from the real multiscale graph,
+"""Spatial destruction dose-response: starting from the real multiscale graph,
 progressively replace q in {0,25,50,75,100}% of physical edges with random
 edges (same node/edge count), retrain/evaluate the graph correction model
-at each q, and report R(q) with bootstrap CIs -- testing dR/dq < 0."""
+at each q, and report R(q) -- testing dR/dq < 0."""
 from __future__ import annotations
 
 import argparse

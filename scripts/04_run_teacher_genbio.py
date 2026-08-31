@@ -1,20 +1,17 @@
 #!/usr/bin/env python
-"""Step 4 (Section 7): run frozen GenBio-PathFM ONCE over every selected
-CPTAC patch, cache FP16 embeddings, and verify the cache (no NaNs, correct
-dim, sensible norms, correct patch<->embedding alignment).
+"""Step 4: run the frozen 1.1B-parameter GenBio-PathFM teacher ONCE over
+every selected CPTAC patch, cache FP16 embeddings to the persistent
+teacher_embeddings store, and verify the cache (no NaNs, correct dim,
+sensible norms, correct patch<->embedding alignment). The teacher must
+never be re-run per distillation epoch -- this script is what makes that
+possible.
 
-Writes into paths.teacher_embeddings, which is the PERSISTENT
-(paths.persist_dir-backed) cache -- the whole point of Step 4 (CRITICAL:
-"Do not repeatedly run the 1.1B teacher every training epoch") extended
-here to across-run reuse too:
-  - Idempotent/resumable: patch_ids already present in the canonical cache
-    are skipped, so a rerun (including after a SLURM time-limit kill) never
-    recomputes an embedding that already exists.
-  - GPU-shardable via --shard-index/--num-shards for splitting the ~500-WSI,
-    ~700K-patch workload across multiple GPUs in one SLURM job (see
-    slurm/run_full_pipeline.slurm) -- each shard writes its own temp file
-    (never concurrent writers to the canonical cache), and --merge-shards
-    folds every shard file into the canonical cache in one pass.
+- Idempotent/resumable: patch_ids already in the canonical cache are
+  skipped, so a rerun after a SLURM time-limit kill never re-embeds.
+- GPU-shardable via --shard-index/--num-shards to split the workload
+  across multiple GPUs in one job; each shard writes its own temp file
+  (no concurrent writers to the canonical cache), and --merge-shards folds
+  every shard into the canonical cache afterward.
 """
 from __future__ import annotations
 

@@ -1,6 +1,5 @@
-"""Steps 10-12 (Sections 13-15): HEST metadata audit, patient-level fold-
-safety bookkeeping, and ST-spot-centered H&E patch extraction with
-mandatory visual alignment QC."""
+"""HEST metadata audit, patient-level fold-safety bookkeeping, and
+ST-spot-centered H&E patch extraction with visual alignment QC."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,9 +13,9 @@ HEST_SAMPLE_COLUMNS = ["sample_id", "patient_id", "study", "cancer", "organ", "s
 
 
 def audit_hest_samples(raw_meta: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, dict]:
-    """Section 13: keep only human cancer H&E+ST samples for
-    {IDC/breast, COAD/colon, CCRCC/kidney}; drop mouse, incompatible
-    non-cancer tissue, and duplicates. Returns (clean_df, report)."""
+    """Keep only human cancer H&E+ST samples for {IDC/breast, COAD/colon,
+    CCRCC/kidney}; drop mouse, off-target tissue, and duplicates.
+    Returns (clean_df, report)."""
     df = raw_meta.copy()
     n0 = len(df)
     reasons = {}
@@ -40,21 +39,21 @@ def audit_hest_samples(raw_meta: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame,
 
 
 def enforce_patient_section_grouping(df: pd.DataFrame) -> pd.DataFrame:
-    """Section 13: 'If multiple sections originate from one patient, they
-    MUST stay in the same train/test fold.' No-op transform here -- this
-    just asserts the grouping key exists; sts.cv_folds groups by
-    `patient_id`, never `sample_id`, enforcing the constraint at split time."""
+    """Multiple sections from one patient must stay in the same train/test
+    fold. No-op here beyond asserting the grouping key exists -- the
+    actual grouping happens in sts.cv_folds, which splits on `patient_id`,
+    never `sample_id`."""
     assert "patient_id" in df.columns and df["patient_id"].notna().all()
     return df
 
 
 def alignment_qc_sample(he_reader, spot_coords_px: np.ndarray, spot_ids: list[str], mpp: float, cfg: dict,
                          seed: int = 0) -> dict:
-    """Section 15: mandatory alignment check -- for a random subsample of
-    spots, extract the ST-centered patch and confirm it overlaps tissue
-    (not background), i.e. registration is plausible. Returns per-spot
-    tissue-fraction so a human/CI check can flag misalignment (near-zero
-    tissue fraction across many spots implies systematic misregistration)."""
+    """For a random subsample of spots, extract the ST-centered patch and
+    check it overlaps tissue rather than background -- a cheap proxy for
+    correct H&E/ST registration. Returns per-spot tissue fraction so
+    systematic misregistration (near-zero tissue fraction across most
+    spots) can be flagged."""
     from sts.cptac_select import tissue_mask_from_thumbnail
 
     n = cfg["hest"]["n_alignment_qc_samples"]
@@ -82,12 +81,10 @@ def alignment_qc_sample(he_reader, spot_coords_px: np.ndarray, spot_ids: list[st
 
 def extract_hest_patches_for_sample(he_reader, spot_ids: list[str], coords_px: np.ndarray, mpp: float,
                                      cfg: dict, n_threads: int = 8) -> np.ndarray:
-    """Step 12: 224x224 patch centered on every ST spot at ~0.5 um/px.
-    Reads spots concurrently via a thread pool on the one shared WSI
-    handle -- openslide's C `read_region` releases the GIL during the
-    actual tile decode, so this is genuine I/O-bound parallelism (each
-    thread mostly waits on disk/decoded-tile fetches), not just Python-
-    level interleaving. Each thread writes to its own disjoint index of
+    """224x224 patch centered on every ST spot at ~0.5 um/px. Reads
+    concurrently via a thread pool on one shared WSI handle -- openslide's
+    `read_region` releases the GIL during tile decode, so this is real
+    I/O-bound parallelism. Each thread writes a disjoint index of
     `patches`, so no locking is needed."""
     from concurrent.futures import ThreadPoolExecutor
 
@@ -106,8 +103,8 @@ def extract_hest_patches_for_sample(he_reader, spot_ids: list[str], coords_px: n
 
 def integrity_check_spot_alignment(spot_ids: list[str], patch_ids: list[str], coords: np.ndarray,
                                     expr_index: pd.Index) -> dict:
-    """Mandatory integrity assertion (Section 16): spot_id <-> patch <->
-    coordinate <-> expression vector must remain exactly aligned."""
+    """spot_id <-> patch <-> coordinate <-> expression vector must remain
+    exactly aligned; this is the check that would catch a silent reorder."""
     ok_patch = list(spot_ids) == list(patch_ids)
     ok_expr = list(spot_ids) == list(expr_index)
     ok_coords = coords.shape[0] == len(spot_ids)

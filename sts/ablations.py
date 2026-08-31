@@ -1,8 +1,7 @@
-"""Step 17 (Section 21), revised per Final_Project_V2.txt Phase 14: the
-required ablation grid A0-A9. Each ablation is expressed as a
-(feature_source, graph_source) pair so the CV driver can loop over them
-with exactly the same patient folds, training procedure, and evaluation
-code -- only the inputs/backend differ.
+"""The A0-A9 ablation grid. Each ablation is a (feature_source,
+graph_source, backend) triple so the CV driver can loop over them with
+exactly the same patient folds, training procedure, and evaluation code --
+only the inputs/backend differ.
 
     A0  mean-expression baseline           (no model)
     A1  ImageNet ConvNeXt patch-only       features=imagenet,  graph=none
@@ -17,19 +16,15 @@ code -- only the inputs/backend differ.
     A9  multiscale residual GATv2 (architecture control, not the main model)
                                             features=distilled, graph=multiscale, backend=gatv2
 
-V2 Phase 14/18 run order: primary models FIRST (A1, A2, A5, A6, A7, A8),
-secondary/lower-priority controls after (A3, A4, A9) -- so the
-scientifically essential results land before GPU time is spent on
-lower-priority controls. `ABLATION_GRID`'s list order already reflects
-this; drivers should iterate it in order and may stop after the primary
-block under time pressure.
+`ABLATION_GRID` is ordered primary block first (A1, A2, A5, A6, A7, A8),
+secondary controls after (A0, A3, A4, A9), so the scientifically essential
+results land before GPU time is spent on lower-priority controls -- a
+driver under time pressure can stop after the primary block.
 
-The GenBio-teacher-vs-student "fair comparison" (V1's old A8/A9 slots) is
-NO LONGER part of this grid -- V2 Phase 21 replaces it with a dedicated,
-methodologically stricter PCA-256-based comparison (train-fold-only PCA,
-not raw 4608-D GenBio fed to a mismatched head), implemented separately
-in sts/genbio_fair_comparison.py and run only after the student model
-matrix above is locked."""
+The GenBio-teacher-vs-student comparison is a separate, methodologically
+stricter analysis (train-fold-only PCA-256, not raw 4608-D GenBio fed to a
+mismatched head) and is not part of this grid -- see sts/genbio_pca.py,
+run only after the student model matrix above is locked."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -42,26 +37,21 @@ from sts import destruction, graph_builder
 @dataclass
 class AblationSpec:
     name: str
-    feature_source: str    # imagenet | distilled
-    graph_source: str      # none | random | shuffled | local | multiscale
-    backend: str            # none | pna_union | scale_aware | gatv2
-    priority: str            # primary | secondary
+    feature_source: str  # imagenet | distilled
+    graph_source: str    # none | random | shuffled | local | multiscale
+    backend: str          # none | pna_union | scale_aware | gatv2
+    priority: str          # primary | secondary
     description: str
 
 
 ABLATION_GRID = [
-    # --- primary block (V2 Phase 14/18: run these first) ---
-    # A1_imagenet_patch RESTORED 2026-08-30 (final-experiment diagnostic): the 2026-08-30
-    # removal (commit 96005f2) was because scripts/10_run_patient_cv.py's main() only ever
-    # loaded the DISTILLED feature cache and reused ONE patch_head for every
-    # graph_source="none" ablation, so A1's declared "imagenet" encoder was never actually
-    # consulted (silently byte-identical to A2). Fixed properly this time: script 10 now
-    # loads BOTH the "imagenet" and "distilled" caches (each asserted via
-    # sts.feature_cache.load_cached_features(expected_encoder_name=...) to only ever load
-    # its own encoder's features) and trains a SEPARATE patch_head on each, so A1 and A2
-    # now differ only in which frozen encoder produced their input features -- everything
-    # else (patient split, HVG1000/HVG50/PROGENy14 targets, head architecture, optimizer,
-    # epochs/early stopping, evaluation) is identical between them.
+    # --- primary block: run these first ---
+    # A1 and A2 must load features from separate caches, each asserted via
+    # sts.feature_cache.load_cached_features(expected_encoder_name=...), and train
+    # separate patch heads -- otherwise A1's "imagenet" encoder silently never gets
+    # consulted and A1 ends up byte-identical to A2 (a real bug this project hit once;
+    # see sts/feature_cache.py). Everything else (patient split, targets, head
+    # architecture, optimizer, evaluation) is identical between A1 and A2.
     AblationSpec("A1_imagenet_patch", "imagenet", "none", "none", "primary",
                  "ImageNet ConvNeXt, no distillation, patch-only"),
     AblationSpec("A2_distilled_patch", "distilled", "none", "none", "primary",
@@ -74,7 +64,7 @@ ABLATION_GRID = [
                  "real local+meso+macro union graph, one PNA sees all edges"),
     AblationSpec("A8_scale_aware_pna", "distilled", "multiscale", "scale_aware", "primary",
                  "PROPOSED FINAL MODEL: three per-scale PNA branches + learned softmax gate"),
-    # --- secondary block (run after primary block passes) ---
+    # --- secondary block ---
     AblationSpec("A0_mean_expression", "none", "none", "none", "secondary",
                  "predict training gene means -- sanity floor"),
     AblationSpec("A3_matched_mlp", "distilled", "none", "none", "secondary",
@@ -118,10 +108,9 @@ def build_graph_for_ablation(coords_um: np.ndarray, graph_source: str, cfg: dict
 
 
 def edge_features_for_ablation(edges: dict, graph_source: str, cfg: dict) -> np.ndarray:
-    """Always the 20-D UNION feature (V2 Phase 9) for the pna_union/gatv2
-    backends -- the scale-aware backend (A8) never calls this; it uses
-    `edge_features_per_scale` on each of the three split edge sets
-    instead (17-D each, see sts.graph_builder.per_scale_edge_features)."""
+    """20-D union edge feature (distance + RBF + scale one-hot) for the
+    pna_union/gatv2 backends. A8 (scale-aware) doesn't call this -- it uses
+    `scale_aware_edge_data` below instead."""
     g = cfg["graph"]
     if graph_source in ("multiscale", "local", "random", "shuffled"):
         return graph_builder.union_edge_features(edges["distance_um"], edges["scale"], g["macro_radius_um"],
@@ -134,14 +123,11 @@ SCALE_TO_INT = {"local": 0, "meso": 1, "macro": 2}
 
 def scale_aware_edge_data(edges: dict, cfg: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """A8 (scale-aware) helper: returns (edge_index, edge_attr, edge_scale)
-    -- the UNION edge_index (same ordering as `edges`), 17-D
-    per_scale_edge_features (no one-hot -- edge_scale carries that
-    information instead), and an int array tagging each edge's scale
-    (0=local, 1=meso, 2=macro). Feeds directly into
-    sts.graph_training.make_pyg_data's optional `edge_scale` argument and
-    sts.graph_model.ScaleAwareGraphCorrectionModel.forward, which masks by
-    `edge_scale` to route each edge to its branch -- no parallel 3-edge-set
-    data pipeline needed."""
+    -- the union edge_index, 17-D per-scale edge features (no one-hot;
+    edge_scale carries that instead), and an int array tagging each edge's
+    scale (0=local, 1=meso, 2=macro). `edge_scale` feeds into
+    ScaleAwareGraphCorrectionModel.forward, which routes each edge to its
+    branch by this tag."""
     g = cfg["graph"]
     edge_attr = graph_builder.per_scale_edge_features(edges["distance_um"], g["macro_radius_um"], g["n_rbf"], g["rbf_gamma"])
     edge_scale = np.array([SCALE_TO_INT[s] for s in edges["scale"]], dtype=np.int64)
@@ -149,8 +135,8 @@ def scale_aware_edge_data(edges: dict, cfg: dict) -> tuple[np.ndarray, np.ndarra
 
 
 def matched_mlp_hidden_dim(pna_param_count: int, in_dim: int, out_dim: int) -> int:
-    """A3: pick an MLP hidden width so its parameter count is approximately
-    matched to the real PNA model (Section 21: 'parameter-matched MLP'),
-    solving in_dim*h + h + h*out_dim + out_dim ~= pna_param_count for h."""
+    """A3: picks an MLP hidden width so its parameter count roughly matches
+    the real PNA model, solving in_dim*h + h + h*out_dim + out_dim ~=
+    pna_param_count for h."""
     h = max(8, int(round((pna_param_count - out_dim) / max(1, in_dim + out_dim + 1))))
     return h

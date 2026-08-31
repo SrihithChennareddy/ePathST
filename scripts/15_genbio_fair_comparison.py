@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""Step 24 (Section 28): A8/A9 -- run GenBio-PathFM itself on the SAME HEST
-patches, same patients/genes/folds/normalization/graph/metric as the
-student, for a like-for-like comparison of:
-  1. GenBio patch-only   2. distilled-student patch-only
-  3. GenBio + graph      4. distilled-student + graph
-Never compares this custom split against the published HEST leaderboard."""
+"""Extracts GenBio-PathFM (teacher) features on the same HEST patches used
+for the student, cached in the same format so they can be dropped into
+scripts/10_run_patient_cv.py's ablation loop for a like-for-like
+teacher-vs-student comparison (same patients/genes/folds/normalization/
+graph/metric). Superseded by the train-fold-only PCA256 comparison in
+sts/genbio_pca.py for the locked final experiment; kept for reference."""
 from __future__ import annotations
 
 import argparse
@@ -53,10 +53,9 @@ def main():
             cache_features(out_dir / f"{sample_id}.h5", shard_pids.tolist(), feats, coords)
 
     print(f"[15_genbio_fair_comparison] cached GenBio-teacher (4608-D) HEST features under {out_dir}")
-    print("[15_genbio_fair_comparison] rerun scripts/10_run_patient_cv.py's ablation loop with "
-          "feature_source='genbio_teacher' (A8/A9 in sts.ablations.ABLATION_GRID) using this cache "
-          "in place of the distilled-student features, keeping every fold/target/graph identical, "
-          "then compare against the A2/A7 rows already in results/cv_ablation_metrics.csv.")
+    print("[15_genbio_fair_comparison] to compare against the student, rerun the patch-only/graph "
+          "ablations with feature_source='genbio_teacher' in place of the distilled-student "
+          "features, keeping every fold/target/graph identical.")
 
 
 if __name__ == "__main__":

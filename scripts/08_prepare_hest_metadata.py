@@ -1,16 +1,16 @@
 #!/usr/bin/env python
-"""Steps 10-12 (Sections 13-15): audit HEST metadata for IDC/COAD/CCRCC,
-run mandatory H&E<->ST alignment QC on a random spot sample per sample, and
-extract ST-spot-centered 224x224 patches. Writes manifests/hest_samples.csv
-and one HDF5 patch shard per sample under runs/.../hest_patches/."""
+"""Steps 10-12: audit HEST metadata for IDC/COAD/CCRCC, run mandatory
+H&E<->ST alignment QC on a random spot sample per sample, and extract
+ST-spot-centered 224x224 patches. Writes manifests/hest_samples.csv and
+one HDF5 patch shard per sample under runs/.../hest_patches/."""
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -20,45 +20,29 @@ from sts.hest_prep import (HEST_SAMPLE_COLUMNS, alignment_qc_sample, audit_hest_
 from sts.utils import RunEnvironment, load_config, resolve_run_paths, save_json
 from sts.wsi_patches import open_slide, write_patch_shard
 
-# Real, on-disk layout confirmed 2026-08-29 for all three cancers, via
-# `configs/base.yaml`'s `paths.hest_by_cancer` (two different provenances:
-# breast's WSI/ST are used in place at the YurovskyGroup project space,
-# never copied locally; colon/kidney were downloaded from HuggingFace
-# MahmoodLab/hest into scratch -- see docs/INPUT_DATA.md):
-#   hest_by_cancer[cancer].metadata_csv   standard HEST-1k per-organ metadata
-#     (id, organ, disease_state, oncotree_code, st_technology, species
-#     [breast's CSV omits `species` -- every present breast sample is human,
-#     same as colon/kidney's explicit `Homo sapiens` rows], ...)
-#   hest_by_cancer[cancer].wsi_dir/{id}.tif    pyramidal generic-TIFF,
-#     openslide-readable via the `openslide-bin` wheel
-#   hest_by_cancer[cancer].st_dir/{id}.h5ad    standard scanpy/Visium-style
-#     AnnData: obs has array_row/col + pxl_row/col_in_fullres, obsm['spatial']
-#     = (x_px, y_px) = (pxl_col_in_fullres, pxl_row_in_fullres) already
-#     filtered to in_tissue==1, X = raw counts, uns['spatial']['ST']
-#     ['scalefactors']['spot_diameter_fullres'] gives the Visium 55um spot's
-#     pixel diameter
-# There is no explicit patient_id column: each `id` is one section from one
-# patient (id doubles as patient_id, matching PoC_5's confirmed
-# 23-slides=23-patients convention for this same colon cohort family).
-# HEST/oncotree codes that map onto this project's three cancer buckets.
-# COAD/COADREAD/READ are all colorectal (Section 2's HEST target is
-# "COAD / colon"), so all three map to the single "COAD" bucket rather than
-# being silently dropped or invented as extra cancer types. SCCRCC (24/25 of
-# the real kidney cohort) is a clear-cell RCC variant and maps to "CCRCC";
-# PRCC (papillary RCC, 1/25 rows) is a biologically distinct RCC subtype and
-# is deliberately left unmapped (excluded) rather than folded in. ILC
-# (invasive lobular carcinoma, 4/125 breast rows) is likewise left unmapped
-# -- this project's breast bucket is specifically IDC (invasive ductal).
+# Per-cancer HEST layout (configs/base.yaml `paths.hest_by_cancer`; breast is used
+# in place at the YurovskyGroup project space, colon/kidney came from HuggingFace
+# MahmoodLab/hest -- see docs/INPUT_DATA.md):
+#   metadata_csv  HEST-1k per-organ metadata (id, organ, disease_state, oncotree_code, ...)
+#   wsi_dir/{id}.tif   pyramidal TIFF, openslide-readable
+#   st_dir/{id}.h5ad   Visium AnnData: obsm['spatial'] = (x_px, y_px), already filtered to
+#     in_tissue==1, X = raw counts, uns['spatial']['ST']['scalefactors']['spot_diameter_fullres']
+# There is no explicit patient_id column -- each `id` is one section from one patient, so
+# `id` doubles as `patient_id`.
+#
+# Oncotree -> cancer-bucket mapping: COAD/COADREAD/READ are all colorectal and collapse to
+# "COAD". SCCRCC (clear-cell RCC) maps to "CCRCC"; PRCC (papillary RCC, a distinct subtype)
+# and ILC (invasive lobular, distinct from this project's IDC target) are deliberately left
+# unmapped and excluded.
 ONCOTREE_TO_CANCER = {"IDC": "IDC", "COAD": "COAD", "COADREAD": "COAD", "READ": "COAD",
                        "CCRCC": "CCRCC", "SCCRCC": "CCRCC"}
 
 
 def load_hest_raw_metadata(cfg: dict) -> pd.DataFrame:
-    """Reads each cancer's real per-cancer HEST metadata CSV + WSI/ST
-    directories from `cfg["paths"]["hest_by_cancer"]` (missing/not-yet-
-    available cancers are skipped and reported, exactly like the analogous
-    CPTAC incremental-download handling in scripts/01_select_cptac_wsi.py)
-    and normalizes each to sts.hest_prep.HEST_SAMPLE_COLUMNS."""
+    """Reads each cancer's HEST metadata CSV + WSI/ST directories from
+    `cfg["paths"]["hest_by_cancer"]`, normalized to
+    sts.hest_prep.HEST_SAMPLE_COLUMNS. Missing/not-yet-downloaded cancers
+    are skipped and reported, not treated as an error."""
     sources = cfg["paths"].get("hest_by_cancer", {})
     rows = []
     for cancer in cfg["cancers"]["hest"]:
@@ -72,7 +56,7 @@ def load_hest_raw_metadata(cfg: dict) -> pd.DataFrame:
         for _, r in meta.iterrows():
             mapped_cancer = ONCOTREE_TO_CANCER.get(str(r["oncotree_code"]))
             if mapped_cancer != cancer:
-                continue  # e.g. drops the 4 ILC / 1 PRCC rows described above
+                continue  # drops ILC/PRCC and any other unmapped oncotree code
             if str(r.get("disease_state", "")).strip().lower() != "cancer":
                 continue
             sample_id = str(r["id"])
@@ -91,13 +75,10 @@ def load_hest_raw_metadata(cfg: dict) -> pd.DataFrame:
 
 def _process_one_sample(sample: dict, cfg: dict, patch_shard_dir: str, n_threads: int, seed: int = 0) -> dict:
     """Runs in a worker process: alignment QC + patch extraction + shard
-    write for exactly ONE HEST sample. Fully self-contained (opens its own
-    WSI/expression handles) so different samples can safely run in
-    different processes with no shared mutable state -- each writes only
-    its own `{sample_id}.h5` shard, never touching another sample's files.
-    Returns manifest-row-sized data only, never the patch array itself,
-    since that would otherwise get pickled back across the process
-    boundary for no reason (it's already on disk)."""
+    write for exactly ONE HEST sample. Self-contained (opens its own
+    WSI/expression handles), writes only its own `{sample_id}.h5` shard,
+    and returns manifest rows only -- never the patch array, which is
+    already on disk and would otherwise get pickled back needlessly."""
     import anndata as ad
 
     reader = open_slide(sample["he_path"])
@@ -127,14 +108,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/base.yaml")
     ap.add_argument("--sample-workers", type=int, default=4,
-                     help="how many HEST samples (WSIs) to process concurrently, each in its own process "
-                          "(default 4 -- sized against this job's --mem=44G budget: a worst-case ~26k-spot "
-                          "sample's in-flight patch array is ~3.8GB, so 4 concurrent worst-case samples is "
-                          "~15GB, well inside budget; the real ceiling beyond that is shared disk/network "
-                          "I/O bandwidth, not memory or CPU, so more workers may not scale linearly)")
+                     help="HEST samples (WSIs) to process concurrently, each in its own process "
+                          "(default 4, sized against a ~44G mem budget: worst-case ~26k-spot sample's "
+                          "in-flight patch array is ~3.8GB)")
     ap.add_argument("--threads-per-sample", type=int, default=6,
                      help="per-sample thread-pool size for concurrent per-spot WSI reads (default 6; "
-                          "sample-workers x threads-per-sample = 24 matches this job's --cpus-per-task=24)")
+                          "sample-workers x threads-per-sample should match --cpus-per-task)")
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
@@ -163,7 +142,6 @@ def main():
         qc_path = paths["qc"] / "hest_alignment_qc.json"
         manifest_path = paths["manifests"] / "hest_spot_manifest.csv"
         samples_path = paths["manifests"] / "hest_samples.csv"
-        import json
         alignment_reports = json.loads(qc_path.read_text()) if qc_path.exists() else {}
         spot_manifest_rows = pd.read_csv(manifest_path).to_dict("records") if manifest_path.exists() else []
         done_samples = {r["sample_id"] for r in spot_manifest_rows}
@@ -176,14 +154,11 @@ def main():
             included_samples.to_csv(samples_path, index=False)
             pd.DataFrame(spot_manifest_rows).to_csv(manifest_path, index=False)
 
-        # `spot_id` (bare) is only unique WITHIN one sample's own patch shard/feature-cache file (both are
-        # per-sample HDF5s, so a bare lookup is always correctly scoped there). HEST spot ids are Visium
-        # array-grid coordinates like "010x016", not global barcodes -- they collide heavily ACROSS
-        # different samples/slides (confirmed live, 2026-08-29: two real breast samples SPA142/SPA137
-        # shared 144/176 spot_ids). Any code that pools multiple samples' spots together (scripts/
-        # 10_run_patient_cv.py's per-fold expression/feature tables, which always span multiple patients)
-        # must join on `spot_uid`, never bare `spot_id`, or it silently misattributes coordinates/
-        # features/targets across patients. (`_process_one_sample` builds `spot_uid` this same way.)
+        # `spot_id` alone is only unique within one sample's own shard/feature-cache file -- HEST
+        # spot ids are Visium array-grid coordinates (e.g. "010x016"), not global barcodes, and
+        # collide heavily across samples. Anything that pools multiple samples' spots (e.g. script
+        # 10's per-fold tables) must join on `spot_uid` (built the same way in `_process_one_sample`
+        # above), never bare `spot_id`, or it silently misattributes data across patients.
         pending = [row.to_dict() for _, row in clean.iterrows() if row["sample_id"] not in done_samples]
         n_since_checkpoint = 0
         with ProcessPoolExecutor(max_workers=args.sample_workers) as executor:

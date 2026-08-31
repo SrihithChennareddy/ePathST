@@ -176,9 +176,9 @@ log1p-only targets (no library-size normalization), StandardScaler+PCA(256)+Ridg
 | COAD | 2 | 0.2385 (0.0282) | 0.3264 (0.0184) | +0.0880 |
 | CCRCC | 6 | 0.2225 (0.0544) | 0.2638 (0.0277) | +0.0413 |
 
-### 7b. Custom-pipeline GenBio-PCA256-Ridge baseline (B1) -- PARTIAL
+### 7b. Custom-pipeline GenBio embedding -> trained MLP baseline (B1) -- PARTIAL
 
-Train-fold-only PCA(256) -> Ridge, on the SAME HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table -- but **fold0/seed0 only, not the full 5-fold design**. Treat as preliminary; do not compare CI-to-CI against the bootstrapped A0-A9 numbers above (no CI is computable from a single fold).
+Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no Ridge -- `scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused alternative), on the SAME HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table -- but **fold0/seed0 only, not the full 5-fold design**. Treat as preliminary; do not compare CI-to-CI against the bootstrapped A0-A9 numbers above (no CI is computable from a single fold).
 
 | Cancer | n train / test patients | HVG1000 R | HVG50 R | PROGENy14 R | Feature extract (s) | Head train (s) | Peak VRAM (GB) |
 |---|---|---|---|---|---|---|---|
@@ -209,7 +209,7 @@ Train-fold-only PCA(256) -> Ridge, on the SAME HVG1000/HVG50/PROGENy14 targets a
 
 1. **Bootstrap resampling unit.** All CIs above resample (cancer, fold, seed) cells (15 pooled, 5 per cancer), not literal per-patient R_p values -- script 10 does not persist per-patient predictions to disk. A stricter implementation would bootstrap over patients directly.
 2. **Seeds 1/2** were not run for the major models -- seed 0 only.
-3. **B1 (GenBio Ridge baseline)** is fold0/seed0 only per cancer, not the full 5-fold design the rest of this document uses.
+3. **B1 (GenBio embedding -> MLP baseline)** is fold0/seed0 only per cancer, not the full 5-fold design the rest of this document uses.
 4. **Efficiency**: only parameter counts and the derived compression ratio were measured; inference VRAM, throughput, and GNN wall-clock were not.
 5. **The IDC-specific distillation reversal** (Gate 1 section, A1 ahead of A2 in IDC specifically) has not been separately root-caused.
 6. **A8 vs. A7/A9** shows A8 is not clearly the best graph variant at this sample size (section 9) -- worth noting for anyone citing A8 as unambiguously superior.

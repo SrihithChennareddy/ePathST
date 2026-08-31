@@ -1,9 +1,7 @@
-"""Step 5 (Section 8): ConvNeXt V2-Atto student (~3.7M backbone params) +
-training-only projection head to the 4608-D GenBio teacher space. The
-projection head is never part of the reported final-encoder parameter
-count (Section 8: 'Do not include this large head when reporting final
-student encoder parameter count after distillation') and is physically
-deleted after distillation (Step 9 / Section 12)."""
+"""ConvNeXt V2-Atto student backbone + training-only projection head to the
+4608-D GenBio teacher space. The projection head is never counted in the
+reported final-encoder parameter count and is physically deleted after
+distillation (see `strip_to_encoder`)."""
 from __future__ import annotations
 
 import torch
@@ -30,7 +28,7 @@ class ConvNeXtV2AttoStudent(nn.Module):
 
 class ProjectionHead(nn.Module):
     """320 -> 1024 -> GELU -> 4608, training-only match to the teacher
-    embedding dimension (Section 8)."""
+    embedding dimension."""
 
     def __init__(self, in_dim: int, hidden_dim: int, out_dim: int):
         super().__init__()
@@ -46,8 +44,8 @@ class ProjectionHead(nn.Module):
 
 class DownstreamProjection(nn.Module):
     """Optional 320 -> 256 projection learned during HEST downstream
-    training (Section 12), kept separate from the (deleted) teacher-space
-    projection head."""
+    training, kept separate from the (deleted) teacher-space projection
+    head."""
 
     def __init__(self, in_dim: int = 320, out_dim: int = 256):
         super().__init__()
@@ -58,9 +56,9 @@ class DownstreamProjection(nn.Module):
 
 
 class DistillationStudent(nn.Module):
-    """Backbone + projection head, used only during Steps 6-8. After
-    locking (Step 9) only `.backbone` survives; `strip_to_encoder()`
-    returns a fresh ConvNeXtV2AttoStudent-compatible state_dict with the
+    """Backbone + projection head, used only during distillation training
+    and eval. After locking, only `.backbone` survives; `strip_to_encoder()`
+    returns a ConvNeXtV2AttoStudent-compatible state_dict with the
     projection head physically removed."""
 
     def __init__(self, cfg: dict, pretrained: str | None = "imagenet"):
@@ -75,8 +73,8 @@ class DistillationStudent(nn.Module):
         return {"backbone_feature": feat, "projected": proj}
 
     def strip_to_encoder(self) -> dict:
-        """Section 12: 'DELETE the 4608-D teacher projection head.' Returns
-        a state_dict containing only the ConvNeXt V2-Atto backbone."""
+        """Deletes the 4608-D teacher projection head; returns a state_dict
+        containing only the ConvNeXt V2-Atto backbone."""
         return {k[len("encoder."):]: v for k, v in self.state_dict().items() if k.startswith("encoder.")}
 
 

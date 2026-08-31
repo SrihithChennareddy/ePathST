@@ -1,6 +1,6 @@
-"""Step 8 (Section 11): evaluate whether distillation worked, on completely
-unseen CPTAC test patients. All metrics computed overall and per cancer
-type (BRCA/COAD/CCRCC), with bootstrap confidence intervals."""
+"""Evaluates whether distillation worked, on completely unseen CPTAC test
+patients. All metrics computed overall and per cancer type (BRCA/COAD/
+CCRCC), with bootstrap confidence intervals."""
 from __future__ import annotations
 
 import numpy as np
@@ -23,10 +23,10 @@ def bootstrap_ci_1d(values: np.ndarray, n_iter: int = 10000, seed: int = 0, ci=(
 
 def retrieval_overlap_at_k(student_proj: np.ndarray, teacher_emb: np.ndarray, ks=(1, 5, 10),
                             max_query: int = 2000, seed: int = 0) -> dict:
-    """Section 11.4: for each test patch, compare teacher-space nearest
-    neighbors to student-space nearest neighbors; report overlap@K. Uses a
-    random subsample of queries (max_query) against the FULL test set as
-    the search pool -- exact brute-force cosine kNN, capped for tractability
+    """For each test patch, compares teacher-space nearest neighbors to
+    student-space nearest neighbors and reports overlap@K. Uses a random
+    subsample of queries (max_query) against the full test set as the
+    search pool -- exact brute-force cosine kNN, capped for tractability
     on large test sets."""
     from sklearn.neighbors import NearestNeighbors
 
@@ -55,9 +55,9 @@ def retrieval_overlap_at_k(student_proj: np.ndarray, teacher_emb: np.ndarray, ks
 
 
 def linear_probe_sanity(student_proj: np.ndarray, labels: np.ndarray, seed: int = 0) -> dict:
-    """Section 11.6: linear-probe sanity test -- e.g. cancer-type
-    classification from the student's projected embedding, 5-fold CV
-    accuracy. Purely a sanity signal, not primary evidence."""
+    """Linear-probe sanity test -- e.g. cancer-type classification from the
+    student's projected embedding, 5-fold CV accuracy. A sanity signal
+    only, not primary evidence."""
     from sklearn.linear_model import LogisticRegression
     from sklearn.model_selection import cross_val_score
 
@@ -67,7 +67,7 @@ def linear_probe_sanity(student_proj: np.ndarray, labels: np.ndarray, seed: int 
 
 
 def umap_embedding(features: np.ndarray, seed: int = 0):
-    """Section 11.5: UMAP for visualization ONLY, never as primary proof."""
+    """UMAP for visualization only, never as primary proof."""
     import umap
     reducer = umap.UMAP(n_components=2, random_state=seed)
     return reducer.fit_transform(features)
@@ -75,7 +75,7 @@ def umap_embedding(features: np.ndarray, seed: int = 0):
 
 def evaluate_distillation(student_proj: np.ndarray, teacher_emb: np.ndarray, cancer_types: np.ndarray,
                            cfg: dict) -> dict:
-    """Runs the full Step 8 battery overall + per cancer type."""
+    """Runs the full distillation-eval battery overall + per cancer type."""
     out = {}
     groups = {"overall": np.ones(len(cancer_types), dtype=bool)}
     for c in np.unique(cancer_types):

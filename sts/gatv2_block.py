@@ -1,10 +1,8 @@
-"""Edge-aware GATv2 block (Final_Project_V2.txt Phase 15 / A9 architecture
-control). Mirrors sts.pna_block.PNABlock's structure exactly (edge-aware
-conv -> LayerNorm -> GELU -> Dropout -> residual) so the ONLY thing that
-differs between the A7/A8 (PNA) and A9 (GATv2) ablations is the message-
-passing operator itself -- same CNN, embeddings, graph, edge features,
-residual formulation, head, and folds (V2 Phase 15: "Everything except the
-message-passing layer should remain identical")."""
+"""Edge-aware GATv2 block for the A9 architecture-control ablation. Mirrors
+sts.pna_block.PNABlock's structure exactly (edge-aware conv -> LayerNorm ->
+GELU -> Dropout -> residual) so A7/A8 (PNA) and A9 (GATv2) differ only in
+the message-passing operator -- everything else (features, graph, head,
+folds) stays identical."""
 from __future__ import annotations
 
 import torch
@@ -31,9 +29,8 @@ class GATv2Block(nn.Module):
 
 
 class MultiLayerGATv2(nn.Module):
-    """Same two-layer depth as sts.pna_block.MultiLayerPNA, for a fair
-    architecture comparison (V2 Phase 15: "approximately matched
-    parameter count")."""
+    """Same depth as sts.pna_block.MultiLayerPNA for a fair, approximately
+    parameter-matched architecture comparison."""
 
     def __init__(self, hidden_dim: int, n_layers: int, edge_dim: int, heads: int = 4, dropout: float = 0.1):
         super().__init__()

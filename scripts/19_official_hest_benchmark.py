@@ -1,44 +1,38 @@
 #!/usr/bin/env python
-"""Official HEST-Benchmark reproduction (2026-08-30, final-experiment
-diagnostic -- answers a DIFFERENT question than scripts/10's custom
-three-cancer patient-held-out experiment: "how strong is this
-representation under the STANDARD, published HEST-Benchmark protocol,"
-using the official data/splits/genes/metric from
+"""Official HEST-Benchmark reproduction -- answers a different question
+than scripts/10's custom three-cancer patient-held-out experiment: how
+strong is this representation under the standard, published HEST-Benchmark
+protocol, using the official data/splits/genes/metric from
 https://huggingface.co/datasets/MahmoodLab/hest-bench.
 
-Protocol reverse-engineered directly from the official
-mahmoodlab/HEST GitHub repo (src/hest/bench/{benchmark,trainer,st_dataset}.py,
-fetched 2026-08-30) -- NOT reimplemented from memory of the paper:
+Protocol matches the official mahmoodlab/HEST repo
+(src/hest/bench/{benchmark,trainer,st_dataset}.py), not reimplemented from
+memory of the paper:
 
-  - gene target: the 50 genes in `<cancer>/var_50genes.json` (NOT
+  - gene target: the 50 genes in `<cancer>/var_50genes.json` (not
     mean_50genes.json, which the official code never reads for evaluation).
   - target preprocessing: subset raw counts to those 50 genes, then
-    `sc.pp.log1p` ONLY -- no `sc.pp.normalize_total` (confirmed from
-    `normalize_adata` in st_dataset.py; this differs from this project's
-    own `sts.expression.normalize_log1p_slide`, which does apply
-    normalize_total -- that's fine, this script exists specifically to NOT
-    use our own convention here).
+    `sc.pp.log1p` only -- no `sc.pp.normalize_total` (this differs from
+    this project's own `sts.expression.normalize_log1p_slide`, which does
+    apply normalize_total; that's intentional, this script exists
+    specifically to not use our own convention here).
   - features: Pipeline(StandardScaler -> PCA(n_components=256,
-    random_state=seed)), fit on pooled TRAIN-split patches only.
+    random_state=seed)), fit on pooled train-split patches only.
   - head: Ridge(solver='lsqr', alpha=100/(n_pca_components * n_genes),
-    fit_intercept=False, random_state=seed) -- alpha is NOT a free
-    hyperparameter, it's a fixed function of the feature/target
-    dimensionality (trainer.py's train_test_reg).
+    fit_intercept=False, random_state=seed) -- alpha is not a free
+    hyperparameter, it's a fixed function of feature/target dimensionality.
   - metric: per-gene scipy.stats.pearsonr on pooled test-split spots;
     per-fold pearson_mean = mean over the 50 genes; final pearson_mean =
-    mean over folds (benchmark.py's merge_fold_results). seed=1 (the
-    official BenchmarkConfig default) is used here for fidelity, NOT this
-    project's usual seed=0.
+    mean over folds. seed=1 (the official BenchmarkConfig default) is used
+    here for fidelity, not this project's usual seed=0.
   - k-fold split: whatever train_N.csv/test_N.csv pairs exist under
     <cancer>/splits/ in the official hest-bench data (patient/sample-level
-    leave-N-out, NOT re-derived from this project's own patient split).
+    leave-N-out, not re-derived from this project's own patient split).
 
 Only the encoders differ from the official protocol's own `trident`-based
-patch encoders: this script embeds the SAME official patches with THIS
-project's own frozen GenBio-PathFM teacher (sts.teacher_genbio) and frozen
-distilled ConvNeXt V2-Atto (sts.student_model + sts.feature_cache), reusing
-those exact existing implementations rather than reimplementing encoder
-inference."""
+patch encoders: this script embeds the same official patches with this
+project's own frozen GenBio-PathFM teacher and frozen distilled ConvNeXt
+V2-Atto, reusing the existing encoder implementations."""
 from __future__ import annotations
 
 import argparse

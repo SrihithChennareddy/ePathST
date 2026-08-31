@@ -1,15 +1,12 @@
 #!/usr/bin/env python
-"""Step 25 (Section 29), revised per Final_Project_V2.txt Phase 17: S1-S9.
-MUST all pass before launching the full 5-fold x 3-seed run. Run this
-against one small fold/patient subset first.
+"""Pipeline sanity checks S1-S9 -- MUST all pass before launching the full
+5-fold x 3-seed run. Run against a synthetic toy graph, not real data.
 
-S1-S7 are V1's original TEST1-7 (renamed to V2's S-numbering, same
-checks). S3 (zero residual), S8 (target order), and S9 (fold completeness)
-are NEW in V2 -- S3 directly targets the exact PoC_5 failure mode
-(multiscale PNA scoring below patch-only CNN) by asserting the residual
-correction is truly zero at initialization; S9 directly targets the other
-PoC_5 failure this project already found (cross-fold aggregate silently
-pooling only 3 of 4 completed folds, see docs/POC5_RESULTS.md)."""
+S3 (zero residual at init) and S9 (fold-completeness guard) target the two
+failure modes that actually broke a prior run of this pipeline (PoC_5, see
+docs/POC5_RESULTS.md): the graph correction scoring below the patch-only
+CNN because it wasn't truly a residual at init, and a cross-fold aggregate
+silently pooling only 3 of 4 completed folds."""
 from __future__ import annotations
 
 import argparse
@@ -54,10 +51,9 @@ def main():
     x, coords, gene, pathway = synthetic_toy_data(cfg)
     gene_names = [f"gene_{i}" for i in range(gene.shape[1])]
 
-    # S1: cached features through the exact patch head reproduce patch-model predictions.
-    # eval() is REQUIRED here, not optional -- patch_head.py's bottleneck trunk includes a
-    # Dropout layer (V2 Phase 7), so two forward passes in train() mode would legitimately
-    # differ (this caught a real missing-.eval() bug in ResidualGraphPredictor -- see its fix).
+    # S1: two forward passes through the frozen patch head reproduce the same predictions.
+    # eval() is required -- patch_head has a Dropout layer, so train()-mode passes would
+    # legitimately differ (this caught a real missing-.eval() bug in ResidualGraphPredictor).
     patch_head = build_patch_head(cfg, x.shape[1], gene.shape[1], pathway.shape[1]).to(args.device)
     patch_head.eval()
     xt = torch.tensor(x, dtype=torch.float32)
@@ -70,7 +66,7 @@ def main():
     spot_ids = [f"spot_{i}" for i in range(x.shape[0])]
     results["S2_integrity_alignment"] = (len(spot_ids) == x.shape[0] == coords.shape[0] == gene.shape[0])
 
-    # S4/S5: real, shuffled, random graphs contain exactly the intended nodes; degree distributions sane.
+    # S4/S5: real, shuffled, random graphs contain only the intended nodes; degree distributions sane.
     real_edges = build_graph_for_ablation(coords, "multiscale", cfg, seed=0)
     shuffled_edges = build_graph_for_ablation(coords, "shuffled", cfg, seed=0)
     random_edges = build_graph_for_ablation(coords, "random", cfg, seed=0)
@@ -96,9 +92,9 @@ def main():
     results["S6_shuffle_destroys_locality"] = bool(len(real_dist) and len(shuf_dist) and
                                                      shuf_dist.mean() > 1.15 * real_dist.mean())
 
-    # S3 (NEW, V2 Phase 11): zero-residual at init, for BOTH the union-PNA
-    # backend and the scale-aware backend -- directly targets PoC_5's
-    # observed failure (patch CNN 0.1875 > multiscale PNA 0.1268).
+    # S3: zero-residual at init, for both the union-PNA backend and the
+    # scale-aware backend -- targets PoC_5's observed failure (patch CNN
+    # 0.1875 > multiscale PNA 0.1268).
     edge_attr = edge_features_for_ablation(real_edges, "multiscale", cfg)
     ei = torch.tensor(real_edges["edge_index"], dtype=torch.long)
     ea = torch.tensor(edge_attr, dtype=torch.float32)
@@ -137,17 +133,16 @@ def main():
     target_var = float(np.var(gene))
     results["S7_tiny_overfit_and_loss_decreases"] = bool(res["best_epoch"] >= 0 and res["best_val_loss"] < target_var)
 
-    # S8 (NEW, V2 Phase 17): the exact same HVG ordering must be used by
-    # every head in a fold -- simulated here as a consistency check between
-    # the gene-name list the patch head was built against and the one the
-    # graph model's targets are keyed to (in the real pipeline this checks
-    # the fold's locked `hvg["hvg1000"]` order end-to-end).
+    # S8: the exact same HVG ordering must be used by every head in a fold.
+    # Here just a consistency check between the gene-name list the patch
+    # head was built against and the graph model's target width; in the
+    # real pipeline this checks the fold's locked `hvg["hvg1000"]` order
+    # end-to-end.
     results["S8_target_gene_order_consistent"] = bool(len(gene_names) == gene.shape[1] == patch_head.gene_head.out_features)
 
-    # S9 (NEW, V2 Phase 3/17): fold-completeness assertion actually raises
-    # on a deliberately incomplete synthetic run set, and passes on a
-    # complete one -- proves the guard itself works before relying on it
-    # for the real cross-fold aggregation (this is the PoC_5 bug class).
+    # S9: the fold-completeness assertion raises on a deliberately
+    # incomplete synthetic run set and passes on a complete one -- proves
+    # the guard itself works before relying on it for real aggregation.
     expected = {("COAD", 0, 0, "A2_distilled_patch"), ("COAD", 0, 1, "A2_distilled_patch")}
     complete = {("COAD", 0, 0, "A2_distilled_patch"), ("COAD", 0, 1, "A2_distilled_patch")}
     incomplete = {("COAD", 0, 0, "A2_distilled_patch")}  # missing seed 1 -- must raise

@@ -1,8 +1,7 @@
-"""Evaluation metrics (Final_Project.txt Section 24 / Step 20): patient-
-level Fisher-z aggregated Pearson (the primary metric -- patients, not
-spots, are the independent statistical unit), plus Spearman, MSE/MAE,
-threshold fractions, and Moran's I for spatial fidelity. Adapted from
-STS_PoC/PoC_5/crcspatial/metrics.py."""
+"""Evaluation metrics: patient-level Fisher-z aggregated Pearson (the
+primary metric -- patients, not spots, are the independent statistical
+unit), plus Spearman, MSE/MAE, threshold fractions, and Moran's I for
+spatial fidelity."""
 from __future__ import annotations
 
 import numpy as np
@@ -78,8 +77,7 @@ def spearman_per_column(y_true: np.ndarray, y_pred: np.ndarray, patient_ids: np.
 
 
 def morans_i(values: np.ndarray, coords_um: np.ndarray, k: int = 6) -> float:
-    """Moran's I of a single spatial field via a k-NN binary weight matrix
-    (Section 22.B ground-truth gene-level spatial autocorrelation)."""
+    """Moran's I of a single spatial field via a k-NN binary weight matrix."""
     from scipy.spatial import cKDTree
 
     n = len(values)
@@ -107,9 +105,8 @@ def morans_i(values: np.ndarray, coords_um: np.ndarray, k: int = 6) -> float:
 
 def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray, patient_ids: np.ndarray, cancer_types: np.ndarray,
                           col_names: list[str], cfg: dict) -> dict:
-    """Full Step 20 report: overall + per-cancer patient-level Pearson/
-    Spearman/MSE/MAE summaries for one target block (HVG50, HVG1000, or
-    pathways)."""
+    """Overall + per-cancer patient-level Pearson/Spearman/MSE/MAE summary
+    for one target block (HVG50, HVG1000, or pathways)."""
     min_regions = cfg["evaluation"]["min_regions_per_patient"]
     thresholds = tuple(cfg["evaluation"]["gene_r_thresholds"])
     out = {}

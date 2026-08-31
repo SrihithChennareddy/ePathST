@@ -1,2 +1,2 @@
-"""sts: tiny-CNN distillation (GenBio-PathFM -> ConvNeXt V2-Atto) + spatial
-PNA-GNN spatial gene expression prediction, per Final_Project.txt."""
+"""sts: tiny-CNN distillation (GenBio-PathFM -> ConvNeXt V2-Atto) + a
+PNA-GNN spatial correction model for spatial gene expression prediction."""

@@ -1,7 +1,7 @@
-"""Step 28 (Sections 32-33): final scientific interpretation. Answers the
-11 required questions strictly from computed results, classifies each as
-SUPPORTED / PARTIALLY SUPPORTED / NOT SUPPORTED, and applies the Section 33
-failure-interpretation rules rather than forcing a desired conclusion."""
+"""Final scientific interpretation. Answers each required question strictly
+from computed results, classifies it as SUPPORTED / PARTIALLY_SUPPORTED /
+NOT_SUPPORTED, and reports the actual outcome rather than forcing a
+desired conclusion."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -60,30 +60,41 @@ def classify_compression_retention(student_metric: float, genbio_metric: float) 
 
 
 def classify_real_vs_shuffled(hypothesis_test: dict) -> Conclusion:
-    """Q4: primary hypothesis (Section 25)."""
+    """Q4: primary real-vs-shuffled-graph hypothesis test."""
     ci_low = hypothesis_test["bootstrap"]["ci_low"]
-    verdict = "SUPPORTED" if hypothesis_test["h1_supported_ci_above_zero"] else (
-        "PARTIALLY_SUPPORTED" if hypothesis_test["bootstrap"]["mean_delta"] > 0 else "NOT_SUPPORTED")
+    mean_delta = hypothesis_test["bootstrap"]["mean_delta"]
+    if hypothesis_test["h1_supported_ci_above_zero"]:
+        verdict = "SUPPORTED"
+    elif mean_delta > 0:
+        verdict = "PARTIALLY_SUPPORTED"
+    else:
+        verdict = "NOT_SUPPORTED"
     note = ""
-    if verdict != "SUPPORTED":
-        note = " -- current evidence does not show topology contributes beyond graph capacity" if ci_low <= 0 <= hypothesis_test["bootstrap"]["mean_delta"] * 2 else ""
+    if verdict != "SUPPORTED" and ci_low <= 0 <= mean_delta * 2:
+        note = " -- current evidence does not show topology contributes beyond graph capacity"
     return Conclusion("Did the real graph outperform the degree-preserving shuffled graph?",
-                       f"mean delta R = {hypothesis_test['bootstrap']['mean_delta']:.4f}, "
+                       f"mean delta R = {mean_delta:.4f}, "
                        f"95% CI [{ci_low:.4f}, {hypothesis_test['bootstrap']['ci_high']:.4f}]{note}",
                        verdict, hypothesis_test)
 
 
 def classify_multiscale_vs_local(delta_ci: dict) -> Conclusion:
-    """Q5. Section 33: 'If local > multiscale, do not claim multiscale superiority.'"""
-    verdict = "SUPPORTED" if delta_ci["ci_low"] > 0 else ("NOT_SUPPORTED" if delta_ci["mean_delta"] <= 0 else "PARTIALLY_SUPPORTED")
+    """Q5: if local beats multiscale, this must not claim multiscale superiority."""
+    if delta_ci["ci_low"] > 0:
+        verdict = "SUPPORTED"
+    elif delta_ci["mean_delta"] <= 0:
+        verdict = "NOT_SUPPORTED"
+    else:
+        verdict = "PARTIALLY_SUPPORTED"
     return Conclusion("Did multiscale context outperform purely local context?",
                        f"mean delta R (multiscale-local) = {delta_ci['mean_delta']:.4f}, CI low {delta_ci['ci_low']:.4f}",
                        verdict, delta_ci)
 
 
 def classify_morans_correlation(corr_result: dict) -> Conclusion:
-    """Q6."""
+    """Q6: does graph improvement correlate with ground-truth spatial autocorrelation?"""
     r, p = corr_result["pearson_r"], corr_result["p_value"]
+    # `r == r` / `p == p` are NaN checks (NaN != NaN); NaN can appear for genes with too few valid patients.
     verdict = "SUPPORTED" if (r == r and p == p and r > 0 and p < 0.05) else (
         "PARTIALLY_SUPPORTED" if (r == r and r > 0) else "NOT_SUPPORTED")
     return Conclusion("Did graph improvement correlate with spatial autocorrelation of gene expression?",

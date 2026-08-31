@@ -1,12 +1,13 @@
 #!/usr/bin/env python
-"""Steps 26-27 (Sections 30-31): the final MODEL x {HVG50, HVG1000,
-PATHWAY} results table (mean +/- 95% CI at the patient level), the
-per-cancer breakdown table, and figures 1/4/5/7 (the figures directly
-derivable from tabular results already on disk; 2/3/6/8 are produced
-inline by scripts 02/06/13 since they need raw images/embeddings)."""
+"""Builds the MODEL x {HVG50, HVG1000, pathway} results table (mean +/-
+95% CI at the patient level), the per-cancer breakdown table, and figures
+1/4/5/7 -- the figures directly derivable from tabular results already on
+disk (2/3/6/8 are produced inline by scripts 02/06/13 since they need raw
+images/embeddings)."""
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -68,7 +69,7 @@ def main():
                                      "pathway_mean_R": sub["pathway_fisher_z_mean_patient_R"].mean() if len(sub) else None})
     pd.DataFrame(per_cancer_rows).to_csv(paths["results"] / "per_cancer_results_table.csv", index=False)
 
-    # Figures directly derivable from `table` -- HVG1000 is the primary reported target (Section 30)
+    # Figures directly derivable from `table` -- HVG1000 is the primary reported target
     valid = table.dropna(subset=["hvg1000_r_mean"])
     figures.fig1_pipeline_diagram(paths["figures"] / "fig1_pipeline.png")
     if len(valid):
@@ -77,7 +78,6 @@ def main():
 
     dose = paths["results"] / "spatial_destruction_dose_response.json"
     if dose.exists():
-        import json
         r_per_q = json.load(open(dose))
         qs = sorted(float(k) for k in r_per_q)
         rs = [r_per_q[str(q)] if str(q) in r_per_q else r_per_q[q] for q in qs]
@@ -85,17 +85,13 @@ def main():
 
     eff = paths["results"] / "model_efficiency.json"
     if eff.exists():
-        import json
         e = json.load(open(eff))
         params = [e["student"]["total_parameters"]]
         perf = [valid[valid["model"] == "A2_distilled_patch"]["hvg1000_r_mean"].values[0]] if len(
             valid[valid["model"] == "A2_distilled_patch"]) else [0]
         labels = ["distilled student"]
-        # NOTE: the GenBio-PathFM teacher point is intentionally NOT added here -- V2 moved the fair
-        # GenBio comparison out of the A8/A9 ablation slots (A8/A9 are now scale-aware PNA / GATv2, not
-        # GenBio) into a separate PCA256-based analysis (sts/genbio_pca.py) that isn't wired into a
-        # driver script yet, so there is no real GenBio performance number in cv_ablation_metrics.csv to
-        # plot here. Add it once scripts/15_genbio_fair_comparison.py's V2 rewrite exists.
+        # GenBio-PathFM teacher point intentionally not added here -- its performance lives in a
+        # separate PCA256-based comparison (sts/genbio_pca.py), not in cv_ablation_metrics.csv.
         figures.fig7_efficiency_vs_performance(params, perf, labels, paths["figures"] / "fig7_efficiency.png")
 
     print(f"[17_results_and_figures] wrote tables and figures under {paths['results']} / {paths['figures']}")

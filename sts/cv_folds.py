@@ -1,18 +1,12 @@
-"""Step 19 (Section 23), revised per Final_Project_V2.txt Phase 3: patient-
-level cross-validation, 5 folds x 3 seeds, grouped by patient (never by
-section/spot) and never randomly splitting spots within a patient. Falls
-back to fewer folds, with an explicit documented reason, when a cohort has
+"""Patient-level cross-validation, 5 folds x 3 seeds, grouped by patient
+(never by section/spot), never randomly splitting spots within a patient.
+Falls back to fewer folds, with a documented reason, when a cohort has
 too few independent patients.
 
-V2 Phase 3 adds a hard completeness requirement, quoted directly because
-it names the exact failure this project already hit once (PoC_5's
-cross-fold aggregate silently pooling only folds 0-2 out of 4 completed
-folds -- see docs/POC5_RESULTS.md): "Before final aggregation, your code
-should assert something equivalent to: expected = n_folds * n_seeds;
-assert completed_runs == expected, and print every included cancer/fold/
-seed/model before calculating the final statistics." `assert_run_completeness`
-below is that check -- every aggregation script MUST call it before
-computing any cross-fold statistic."""
+`assert_run_completeness` is a hard gate every aggregation script must
+call before computing any cross-fold statistic: it guards against
+silently pooling a partial run as if it were complete (this project once
+hit exactly that bug -- see docs/POC5_RESULTS.md)."""
 from __future__ import annotations
 
 import numpy as np
@@ -21,24 +15,17 @@ from sklearn.model_selection import GroupKFold
 
 
 def exclude_targeted_panel_samples(hest_samples: pd.DataFrame, min_genes: int = 2000) -> pd.DataFrame:
-    """Drops samples run on a targeted gene panel (e.g. Xenium, ~541 genes)
-    rather than whole-transcriptome ST -- confirmed live, 2026-08-30: 5/96
-    of IDC fold0's train patients (TENX97, TENX95, NCBI785, NCBI784,
-    NCBI783) have only 541 genes each, versus 14700+ for every other
-    breast sample. Because scripts/10_run_patient_cv.py's
-    load_fold_expression pools ALL of a cancer's training patients into
-    one matrix and selects ONE shared HVG1000 list (`common_genes =
-    set.intersection(*genes_by_sample.values())`), a handful of tiny-panel
-    outliers silently drags the whole cancer's shared-gene pool down to
-    whatever those outliers happen to cover (171 genes, confirmed) --
-    collapsing IDC's HVG1000 target to HVG171 while COAD/CCRCC (no
-    targeted-panel samples) keep the full ~1000, making a same-name
-    "HVG1000_r" comparison across cancers apples-to-oranges. `min_genes`
-    is set far below every real whole-transcriptome panel seen (14700+)
-    and far above every real targeted panel seen (541), so it cleanly
-    separates the two without being sensitive to the exact threshold.
-    Reads each sample's gene count via h5py (not a full anndata load, to
-    stay cheap over hundreds of samples)."""
+    """Drops samples run on a targeted gene panel (e.g. Xenium, ~541
+    genes) rather than whole-transcriptome ST. `load_fold_expression`
+    pools all of a cancer's training patients into one matrix and takes
+    the intersection of genes across samples for the shared HVG1000 list
+    -- a handful of targeted-panel outliers would otherwise collapse that
+    intersection to their much smaller gene set for the whole cancer,
+    making cross-cancer HVG1000 comparisons apples-to-oranges. `min_genes`
+    sits well below every real whole-transcriptome panel (14700+) and
+    above every real targeted panel (541) seen in this cohort. Reads gene
+    count via h5py rather than a full anndata load, to stay cheap over
+    hundreds of samples."""
     import h5py
 
     def n_genes(path: str) -> int:
@@ -98,10 +85,9 @@ def carve_validation_from_train(train_patients: list[str], val_frac: float, seed
 
 
 def build_cv_grid(patient_ids_by_cancer: dict[str, list[str]], cfg: dict) -> dict:
-    """Section 23: report pooled-across-cancers AND per-cancer folds.
-    Builds folds independently per cancer type (so cohort-size adaptation
-    is per-cancer, as required), then also returns the pooled patient list
-    for a pooled analysis pass."""
+    """Builds folds independently per cancer type (so cohort-size
+    adaptation is per-cancer), plus a pooled-across-cancers fold set for
+    a secondary pooled analysis pass."""
     cv = cfg["cross_validation"]
     per_cancer = {}
     for cancer, pids in patient_ids_by_cancer.items():
@@ -116,10 +102,8 @@ def build_cv_grid(patient_ids_by_cancer: dict[str, list[str]], cfg: dict) -> dic
         "pooled": {"folds": pooled_folds, "n_folds_used": pooled_n, "adaptation_reason": pooled_reason,
                    "n_patients": len(pooled_pids)},
         "seeds": cv["seeds"],
-        # V2 Phase 1 / "Make the three cancers separate primary experiments":
-        # per-cancer results are the primary analysis unit; `pooled` is
-        # reported secondarily. Aggregation/reporting code should key off
-        # this flag rather than hard-coding the assumption.
+        # per-cancer results are the primary analysis unit; `pooled` is secondary.
+        # Aggregation/reporting code should key off this flag, not a hard-coded assumption.
         "primary_analysis_unit": "per_cancer",
     }
 
@@ -127,9 +111,9 @@ def build_cv_grid(patient_ids_by_cancer: dict[str, list[str]], cfg: dict) -> dic
 def expected_run_keys(cv_grid: dict, ablation_names: list[str], unit: str = "per_cancer") -> set[tuple]:
     """Enumerates every (cancer, fold, seed, ablation) -- or, for
     `unit='pooled'`, every (fold, seed, ablation) -- combination the CV
-    design calls for, given the ACTUAL (possibly cohort-size-adapted)
-    n_folds_used per cancer. This is the "expected" side of the V2 Phase 3
-    completeness assertion."""
+    design calls for, given the actual (possibly cohort-size-adapted)
+    n_folds_used per cancer. The "expected" side of the completeness
+    assertion below."""
     seeds = cv_grid["seeds"]
     keys = set()
     if unit == "per_cancer":
@@ -147,12 +131,10 @@ def expected_run_keys(cv_grid: dict, ablation_names: list[str], unit: str = "per
 
 
 def assert_run_completeness(expected: set[tuple], completed: set[tuple], context: str = "") -> None:
-    """V2 Phase 3's required hard gate: `assert completed_runs == expected`,
-    printing every included (cancer, fold, seed, model) row first so a
-    partial run is loud and visible, never silently pooled as if it were
-    complete (this is the exact PoC_5 bug -- see module docstring).
-    Raises AssertionError (not a soft warning) on any mismatch, by design:
-    V2 explicitly wants aggregation to FAIL rather than quietly proceed."""
+    """Hard completeness gate: prints every included (cancer, fold, seed,
+    model) row, then asserts completed == expected. Raises AssertionError
+    (not a soft warning) on any mismatch -- aggregation must fail loudly
+    rather than silently proceed on a partial run (see module docstring)."""
     print(f"[assert_run_completeness{f' ({context})' if context else ''}] "
           f"{len(completed)}/{len(expected)} expected runs present")
     for key in sorted(completed):

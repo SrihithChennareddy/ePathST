@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-"""Step 13 (Section 16): run the frozen, locked GenBio-distilled ConvNeXt
-V2-Atto (per seed) on every HEST patch and cache 320-D node features with
-full spot_id<->patch<->coordinate<->embedding integrity checks. Also
-extracts ImageNet-only (A1) and GenBio-teacher (A8/A9, Step 24) features on
-the identical patches for fair ablation/baseline comparisons."""
+"""Step 13: run the frozen, locked GenBio-distilled ConvNeXt V2-Atto (per
+seed) and the off-the-shelf ImageNet-pretrained encoder (A1 baseline) on
+every HEST patch, caching 320-D node features with full
+spot_id<->patch<->coordinate<->embedding integrity checks."""
 from __future__ import annotations
 
 import argparse
@@ -11,7 +10,6 @@ import sys
 from pathlib import Path
 
 import h5py
-import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
@@ -72,8 +70,7 @@ def main():
                                 checkpoint_source=checkpoint_sources[feat_name], sample_id=sample_id)
 
                 expr_idx = load_expression_index(sample_id, Path(cfg["paths"]["hest_root"]), hest_samples)
-                import pandas as _pd
-                assert_full_alignment(shard_pids.tolist(), feats, coords, _pd.DataFrame(index=expr_idx))
+                assert_full_alignment(shard_pids.tolist(), feats, coords, pd.DataFrame(index=expr_idx))
 
         print(f"[09_extract_student_features_hest] wrote cached features under {paths['student_embeddings']}")
 

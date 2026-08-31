@@ -1,15 +1,14 @@
-"""Final_Project_V2.txt Phase 19: pathway activity computed POST HOC from
-PREDICTED gene expression, as an alternative/complement to the direct
-pathway head. V2's own reasoning, quoted: "You can also compute pathway
-activity post hoc from predicted genes, which is scientifically cleaner
-because the pathway result then tests biological consistency rather than
-giving the model the answer through an auxiliary objective."
+"""Pathway activity computed POST HOC from PREDICTED gene expression, as an
+alternative/complement to the direct pathway head. This is scientifically
+cleaner than a direct head: it tests biological consistency (do predicted
+genes imply the right pathway activity?) rather than giving the model the
+answer through an auxiliary objective.
 
-This never affects training (no gradients flow through this module) -- it
-is purely an evaluation-time analysis: take a model's HVG1000 gene
-predictions, run the same PROGENy scoring used for ground truth, and
-compare the resulting pathway score to (a) the ground-truth PROGENy score
-and (b) the model's own direct pathway head output (if it has one)."""
+Purely an evaluation-time analysis (no gradients flow through this module):
+take a model's HVG1000 gene predictions, run the same PROGENy scoring used
+for ground truth, and compare the resulting pathway score to (a) the
+ground-truth PROGENy score and (b) the model's own direct pathway head
+output (if it has one)."""
 from __future__ import annotations
 
 import numpy as np
@@ -21,19 +20,17 @@ from sts.pathways import compute_progeny_scores
 def posthoc_pathway_scores(predicted_genes: np.ndarray, gene_names: list[str], progeny_net: pd.DataFrame,
                             spot_ids: list[str], min_n: int = 5) -> pd.DataFrame:
     """`predicted_genes`: (n_spots, n_genes) standardized-scale model
-    output, `gene_names`: the exact HVG1000 order used to produce it
-    (never re-derive or reorder -- must match the fold's locked gene
-    order). Returns (n_spots, n_pathways) post-hoc PROGENy scores, same
+    output. `gene_names` must be the exact HVG1000 order used to produce
+    it -- never re-derive or reorder, it must match the fold's locked gene
+    order. Returns (n_spots, n_pathways) post-hoc PROGENy scores, same
     shape/convention as `sts.pathways.compute_progeny_scores`'s
-    ground-truth output, so the two are directly comparable.
+    ground-truth output.
 
-    Note: PROGENy's MLM scoring expects log-normalized expression-scale
-    values, not standardized (z-scored) training targets -- callers
-    computing this on standardized model predictions should be aware the
-    resulting post-hoc pathway scores live on a different scale than
-    to the ground-truth PROGENy scores computed from raw log-normalized
-    expression (Section 14); compare RANKS/correlations, not raw
-    magnitudes, unless both sides are put on the same scale first."""
+    Gotcha: PROGENy's MLM scoring expects log-normalized expression-scale
+    values, not standardized (z-scored) targets, so post-hoc scores from
+    standardized predictions live on a different scale than the
+    ground-truth PROGENy scores. Compare ranks/correlations, not raw
+    magnitudes, unless both sides are rescaled first."""
     expr_df = pd.DataFrame(predicted_genes, index=spot_ids, columns=gene_names)
     return compute_progeny_scores(expr_df, progeny_net, min_n=min_n)
 

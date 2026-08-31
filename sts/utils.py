@@ -1,6 +1,5 @@
-"""Shared utilities: config loading, seeding, JSON I/O, run-environment
-capture (Section 3: git commit, package versions, CUDA/GPU, wall-clock,
-GPU-hours, peak VRAM)."""
+"""Shared utilities: config loading, seeding, JSON I/O, and run-environment
+capture (git commit, package versions, CUDA/GPU, wall-clock, peak VRAM)."""
 from __future__ import annotations
 
 import json
@@ -46,17 +45,16 @@ def _resolve_templates(node, root: dict):
 
 def resolve_run_paths(cfg: dict) -> dict[str, Path]:
     """Turns cfg['paths'] into absolute Path objects under work_dir and
-    creates every directory listed in Final_Project.txt Section 3 (configs/
-    logs/ manifests/ qc/ teacher_embeddings/ student_checkpoints/
-    student_embeddings/ graphs/ predictions/ results/ figures/).
+    creates every run subdirectory (configs/logs/manifests/qc/
+    teacher_embeddings/student_checkpoints/student_embeddings/graphs/
+    predictions/results/figures).
 
     `teacher_embeddings` and `student_checkpoints` are the two expensive,
-    reusable artifacts this project is explicitly asked to cache once and
-    reuse (the frozen GenBio-PathFM teacher's cached embeddings, and the
-    final locked ConvNeXt V2-Atto encoder). If cfg['paths'] sets
-    `persist_dir`, those two subdirs are created there instead of under the
-    (possibly ephemeral/scratch) work_dir, so they survive independently of
-    any particular run and are trivially reusable by later runs/experiments."""
+    reusable artifacts (frozen GenBio-PathFM teacher embeddings, and the
+    locked ConvNeXt V2-Atto encoder). If cfg['paths'] sets `persist_dir`,
+    those two subdirs are created there instead of under the (possibly
+    ephemeral/scratch) work_dir, so they survive independently of any one
+    run and are reusable by later runs."""
     work_dir = Path(cfg["paths"]["work_dir"])
     persist_dir = cfg["paths"].get("persist_dir")
     persist_dir = Path(persist_dir) if persist_dir else None
@@ -117,12 +115,10 @@ def ensure_dir(path: str | Path) -> Path:
 
 
 class RunEnvironment:
-    """Captures the Section 3 reproducibility record. Use as a context
-    manager around any expensive stage; writes a JSON record with
-    wall-clock seconds, peak VRAM (if CUDA available), package versions,
-    CUDA version, GPU model, and the current git commit (if this directory
-    is version-controlled -- it usually is not, so that field is simply
-    omitted rather than failing the run)."""
+    """Reproducibility record. Use as a context manager around any
+    expensive stage; writes a JSON record with wall-clock seconds, peak
+    VRAM (if CUDA available), package versions, CUDA version, GPU model,
+    and the current git commit (omitted, not failed, if not a git repo)."""
 
     def __init__(self, stage_name: str, out_path: str | Path):
         self.stage_name = stage_name
@@ -152,7 +148,7 @@ class RunEnvironment:
         }
         record.update(_gpu_record())
         save_json(record, self.out_path)
-        return False  # never swallow exceptions -- failures must surface (Section: CRITICAL RULE)
+        return False  # never swallow exceptions -- failures must surface
 
 
 def _git_commit() -> str | None:
@@ -190,8 +186,8 @@ def _gpu_record() -> dict:
 
 
 def count_parameters(model) -> dict:
-    """Section 27/Step 23: exact, programmatically-counted parameter
-    counts. Never estimate manually."""
+    """Exact, programmatically-counted parameter counts -- never estimate
+    manually."""
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
     return {"trainable_parameters": int(trainable), "total_parameters": int(total)}

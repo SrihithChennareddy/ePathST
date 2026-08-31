@@ -1,5 +1,4 @@
-"""Step 1 (Final_Project.txt Section 4): select one high-quality CPTAC WSI
-per patient.
+"""Select one high-quality CPTAC WSI per patient.
 
 Design: first apply hard exclusions, then rank remaining candidates per
 patient by the deterministic composite score
@@ -47,10 +46,8 @@ class WSIQualityRecord:
 # ---------------------------------------------------------------- tissue --
 def tissue_mask_from_thumbnail(thumb_rgb: np.ndarray, sat_thresh: int = 15, val_thresh: int = 235) -> np.ndarray:
     """Simple, dependency-light tissue mask: HSV saturation/value
-    thresholding (glass background is low-saturation, near-white; tissue is
-    saturated and darker). Good enough for global tissue-fraction QC; the
-    same routine is reused for tile sampling and for Step 2 patch masking."""
-    import colorsys
+    thresholding (glass background is low-saturation, near-white; tissue
+    is saturated and darker). Reused for tile sampling and patch masking."""
     arr = thumb_rgb.astype(np.float32) / 255.0
     maxc = arr.max(axis=-1)
     minc = arr.min(axis=-1)
@@ -62,9 +59,7 @@ def tissue_mask_from_thumbnail(thumb_rgb: np.ndarray, sat_thresh: int = 15, val_
 
 def focus_score_laplacian(tile_gray: np.ndarray) -> float:
     """Variance of Laplacian: standard, cheap focus/blur metric. Higher =
-    sharper. Implemented with a 3x3 kernel convolution to avoid a hard
-    cv2/scipy dependency; scipy is already a required package (Section 3),
-    so we use scipy.ndimage directly."""
+    sharper."""
     from scipy.ndimage import laplace
     lap = laplace(tile_gray.astype(np.float32))
     return float(lap.var())
@@ -73,8 +68,7 @@ def focus_score_laplacian(tile_gray: np.ndarray) -> float:
 def artifact_fraction_tile(tile_rgb: np.ndarray) -> float:
     """Fraction of a tile flagged as artifact: pen marks (highly saturated,
     non-tissue hue), folds/tears (near-uniform very-dark or very-bright
-    patches), air bubbles. Heuristic, deterministic, and documented as such
-    -- Section 4 asks for an artifact-fraction QC signal, not a learned
+    patches), air bubbles. A deterministic heuristic, not a learned
     artifact detector."""
     hsv_sat = _rgb_to_sat(tile_rgb)
     pen_like = hsv_sat > 200  # oversaturated ink
@@ -106,10 +100,10 @@ def stain_outlier_score(tile_rgbs: list[np.ndarray], reference_mean: np.ndarray 
 def compute_wsi_qc(wsi_path: str, cfg: dict, reader) -> dict:
     """`reader` is a duck-typed slide-reader object exposing
     `get_thumbnail(max_dim)`, `read_region_20x(x, y, size)`, `mpp`,
-    `dimensions`, `tissue_bbox()`. Kept as a parameter (rather than importing
-    openslide here) so this module stays importable without openslide for
-    unit tests. See sts/wsi_patches.OpenSlideReader for the real
-    implementation used by scripts/01_select_cptac_wsi.py."""
+    `dimensions`. Kept as a parameter (rather than importing openslide
+    here) so this module stays importable without openslide for unit
+    tests -- see sts.wsi_patches.OpenSlideReader for the real
+    implementation."""
     thumb = reader.get_thumbnail(cfg["wsi_selection"]["thumbnail_max_dim"])
     tissue_mask = tissue_mask_from_thumbnail(thumb)
     tissue_fraction = float(tissue_mask.mean())
@@ -152,7 +146,7 @@ def compute_wsi_qc(wsi_path: str, cfg: dict, reader) -> dict:
 
 
 def apply_hard_filters(rec: dict, cfg: dict) -> tuple[bool, str | None]:
-    """Section 4 hard exclusions 1-7. Returns (excluded, reason)."""
+    """Hard exclusions checked in order. Returns (excluded, reason)."""
     hf = cfg["wsi_selection"]["hard_filters"]
     if rec.get("is_he") is False:
         return True, "not_HE"
@@ -177,7 +171,7 @@ def apply_hard_filters(rec: dict, cfg: dict) -> tuple[bool, str | None]:
 
 
 def compute_q_score(rec: dict, cfg: dict, cohort_stats: dict) -> float:
-    """Deterministic ranking, Section 4:
+    """Deterministic ranking:
     Q = 0.35*usable_tissue + 0.25*focus + 0.20*artifact_free
         + 0.10*stain_quality + 0.10*representativeness
     Each component is min-max normalized against the (post-hard-filter)
@@ -226,8 +220,7 @@ def compute_cohort_stats(records: list[dict]) -> dict:
 def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list[dict], dict]:
     """Applies hard filters, computes cohort-relative Q per cancer type,
     then selects the max-Q WSI per patient. Returns (selected_records,
-    report) where report has the Section-4-required exclusion/count
-    summary."""
+    report) with the exclusion/count summary."""
     for r in all_records:
         excluded, reason = apply_hard_filters(r, cfg)
         r["excluded"], r["exclusion_reason"] = excluded, reason
@@ -257,10 +250,8 @@ def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list
     n_before_cap = len(selected)
     target_n = cfg["wsi_selection"].get("target_n_patients")
     if target_n and n_before_cap > target_n:
-        # Section 2: "Target approximately ~500 patient-unique WSIs total."
-        # When more patients pass QC than the target, keep the highest-Q
-        # patients, capped proportionally per cancer so no single cancer
-        # type is squeezed out by another's higher average Q.
+        # More patients passed QC than the target: keep the highest-Q patients, capped
+        # proportionally per cancer so no cancer type is squeezed out by another's higher average Q.
         by_cancer_selected: dict[str, list[dict]] = {}
         for r in selected:
             by_cancer_selected.setdefault(r["cancer_type"], []).append(r)
@@ -298,8 +289,7 @@ def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list
 
 
 def to_manifest_rows(selected: list[dict]) -> list[dict]:
-    """Maps a selected-record dict to exactly the manifests/cptac_selected_wsi.csv
-    schema in Section 4."""
+    """Maps a selected-record dict to the manifests/cptac_selected_wsi.csv schema."""
     cols = ["patient_id", "cancer_type", "wsi_id", "wsi_path", "specimen_type", "mpp",
             "width", "height", "tissue_area_mm2", "tissue_fraction", "focus_score",
             "artifact_fraction", "stain_score", "qc_score", "selection_reason"]

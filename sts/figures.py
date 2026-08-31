@@ -1,7 +1,7 @@
-"""Step 27 (Section 31): the 8 required figures. Every figure function
-takes already-computed data (never re-derives results) and a `criterion`
-string documenting how any example was chosen, since Section 31 explicitly
-forbids cherry-picking visualization examples for looking good."""
+"""The 8 project figures. Every figure function takes already-computed
+data (never re-derives results); example-selection functions take an
+explicit `criterion` string so visualization examples are never picked
+just because they look good."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -126,10 +126,9 @@ def fig8_spatial_maps(coords_um: np.ndarray, y_true: np.ndarray, y_pred: np.ndar
 
 
 def representative_gene_selection(per_gene_r: pd.Series, criterion: str = "median") -> str:
-    """Section 31: 'Never choose visualization examples only because they
-    look unusually good.' Predetermined selection: median-performing gene
-    by default (also supports 'best' / 'worst' / 'top_quartile_median' for
-    documented, non-cherry-picked alternatives)."""
+    """Predetermined, documented example selection (never cherry-picked):
+    median-performing gene by default; also supports 'best' / 'worst' /
+    'top_quartile_median'."""
     s = per_gene_r.dropna().sort_values()
     if len(s) == 0:
         return None

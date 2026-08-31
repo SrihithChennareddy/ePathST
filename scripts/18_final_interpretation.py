@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-"""Step 28 (Sections 32-33): final scientific interpretation. Answers each
-of the 11 required questions strictly from files already written by
-scripts 06/12/13/14/17, classifies SUPPORTED / PARTIALLY_SUPPORTED /
-NOT_SUPPORTED, and writes results/final_scientific_interpretation.md."""
+"""Final scientific interpretation: answers each required question strictly
+from files already written by scripts 06/12/13/14/17, classifies each as
+SUPPORTED / PARTIALLY_SUPPORTED / NOT_SUPPORTED, and writes
+results/final_scientific_interpretation.md."""
 from __future__ import annotations
 
 import argparse
@@ -63,8 +63,7 @@ def main():
                                        "NOT_SUPPORTED", {}))
 
     if primary is not None:
-        from sts.report import classify_real_vs_shuffled as _c
-        conclusions.append(_c(primary))
+        conclusions.append(classify_real_vs_shuffled(primary))
     else:
         conclusions.append(Conclusion("Did the real graph outperform the degree-preserving shuffled graph?",
                                        "primary_hypothesis_test.json missing -- rerun script 12", "NOT_SUPPORTED", {}))

@@ -1,6 +1,6 @@
-"""Step 23 (Section 27): model-efficiency accounting. Reports exact
-programmatically-derived counts -- never manual estimates -- and always
-separates teacher-label-generation cost from student inference cost."""
+"""Model-efficiency accounting. Reports exact programmatically-derived
+counts -- never manual estimates -- and always separates teacher-label-
+generation cost from student inference cost."""
 from __future__ import annotations
 
 import time
@@ -24,10 +24,9 @@ def compression_ratio(teacher_params: dict, student_params: dict) -> dict:
 
 
 def measure_flops_macs(model, input_shape: tuple, device: str = "cuda") -> dict:
-    """FLOPs/MACs per patch (Section 27). Uses `fvcore` if available (no
-    hard new dependency added to requirements beyond what's already listed
-    -- falls back to reporting `None` with an explanatory note if fvcore
-    isn't installed, rather than fabricating a number)."""
+    """FLOPs/MACs per patch. Uses `fvcore` if available; falls back to
+    reporting `None` with an explanatory note if it isn't installed,
+    rather than fabricating a number."""
     try:
         from fvcore.nn import FlopCountAnalysis
         model.eval()
@@ -42,9 +41,7 @@ def measure_flops_macs(model, input_shape: tuple, device: str = "cuda") -> dict:
 @torch.no_grad()
 def measure_inference_throughput(model, patches_uint8: np.ndarray, device: str, batch_size: int = 64,
                                   n_warmup: int = 2) -> dict:
-    """CNN feature-extraction time and patches/sec (Section 27)."""
-    from sts.distill_train import IMAGENET_MEAN, IMAGENET_STD
-
+    """CNN feature-extraction time and patches/sec."""
     model.eval()
     n = len(patches_uint8)
     for i in range(min(n_warmup, n // batch_size or 1)):
@@ -76,10 +73,9 @@ def _prep_batch(batch_uint8: np.ndarray, device: str):
 
 
 def measure_graph_inference_time(model, graphs: list, device: str) -> dict:
-    import time as _time
     from torch_geometric.data import Batch
     model.eval()
-    t0 = _time.time()
+    t0 = time.time()
     n_nodes, n_edges = 0, 0
     with torch.no_grad():
         for g in graphs:
@@ -89,7 +85,7 @@ def measure_graph_inference_time(model, graphs: list, device: str) -> dict:
             n_edges += g.edge_index.shape[1]
     if device.startswith("cuda"):
         torch.cuda.synchronize()
-    elapsed = _time.time() - t0
+    elapsed = time.time() - t0
     return {"n_graphs": len(graphs), "total_nodes": n_nodes, "total_edges": n_edges,
             "elapsed_seconds": elapsed, "seconds_per_1000_nodes": elapsed / max(1, n_nodes) * 1000}
 

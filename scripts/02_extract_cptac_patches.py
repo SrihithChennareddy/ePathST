@@ -1,11 +1,10 @@
 #!/usr/bin/env python
-"""Step 2 (Section 5): tissue-masked, spatially-sampled 224x224 patch
-extraction at ~0.5 um/px from every selected CPTAC WSI, written as one
-HDF5 shard per WSI plus a global patch manifest.
+"""Step 2: tissue-masked, spatially-sampled 224x224 patch extraction at
+~0.5 um/px from every selected CPTAC WSI, written as one HDF5 shard per
+WSI plus a global patch manifest.
 
-Parallel + resumable, same rationale as scripts/01_select_cptac_wsi.py: one
-process per WSI (CPU/IO-bound), and a WSI whose shard file already exists
-on disk is skipped on rerun rather than re-extracted."""
+Parallel + resumable, same as scripts/01_select_cptac_wsi.py: one process
+per WSI, and a WSI whose shard already exists on disk is skipped on rerun."""
 from __future__ import annotations
 
 import argparse

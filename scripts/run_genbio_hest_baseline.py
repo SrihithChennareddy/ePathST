@@ -1,42 +1,26 @@
 #!/usr/bin/env python
 """Standalone GenBio-PathFM patch-only baseline for the HEST IDC/COAD/CCRCC
 downstream experiment: frozen GenBio-PathFM (the same teacher used for
-CNN/GNN distillation, sts.teacher_genbio.GenBioPathFMTeacher) embeds every
-HEST H&E ST spot once (4608-D CLS representation, cached to disk,
-resumable), then a small trainable projection+prediction head (4608 -> 320
--> 128 -> {HVG1000, PROGENy14}) is fit on TRAIN-patient spots only, using
-the EXACT existing seed/fold patient split the CNN/GNN experiment
-(scripts/10_run_patient_cv.py) uses. HVG50 is reported as a strict column
-slice of the HVG1000 predictions/targets -- no separate model. GenBio
-itself is never fine-tuned and no graph/GNN of any kind is built here; this
-is a patch-only pathology-foundation-model baseline for comparison against
-the CNN/GNN pipeline, not a replacement for it.
+CNN/GNN distillation) embeds every HEST H&E ST spot once (4608-D CLS
+representation, cached to disk, resumable), then a small trainable
+projection+prediction head (4608 -> 320 -> 128 -> {HVG1000, PROGENy14}) is
+fit on TRAIN-patient spots only, using the EXACT existing seed/fold patient
+split scripts/10_run_patient_cv.py uses. HVG50 is a strict column slice of
+the HVG1000 predictions/targets -- no separate model. GenBio itself is
+never fine-tuned and no graph/GNN is built here: this is a patch-only
+foundation-model baseline for comparison against the CNN/GNN pipeline, not
+a replacement for it.
 
-Reuses (imports, never modifies): sts.teacher_genbio.GenBioPathFMTeacher
-(frozen GenBio-PathFM loader -- the exact HF repo/dtype/embedding-dim
-config.teacher.* used as the CPTAC distillation teacher), sts.expression
-(normalize_log1p_slide / TrainOnlyStandardizer / select_hvg_for_fold),
-sts.pathways (fetch_and_cache_progeny_net / compute_progeny_scores,
-identical PROGENy14 top-100-weighted-target setting), sts.cv_folds
-(build_cv_grid / carve_validation_from_train -- deterministic GroupKFold,
-no RNG, so recomputing it from the same hest_samples.csv patient list that
-scripts/10_run_patient_cv.py itself derives its split from is bit-identical
-to loading a persisted split), sts.patch_head.patch_head_loss (identical
-gene-only-by-default loss), sts.metrics (patient-level Fisher-z Pearson
-aggregation), sts.utils (config/paths/env-capture conventions), and
-scripts/10_run_patient_cv.py's own `load_fold_expression` helper (imported
-via importlib from the numerically-named module -- never copy-pasted).
-Reads (never writes) scripts/08_prepare_hest_metadata.py's outputs
-(manifests/hest_samples.csv, manifests/hest_spot_manifest.csv,
-<work_dir>/hest_patches/*.h5) -- the exact same 224x224 @ 0.5um/px ST-spot-
-centered patches / alignment QC the CNN/GNN experiment uses. Writes only to
-its own new output locations: <persist_dir>/genbio_baseline_embeddings/
-(GenBio embedding cache, analogous to but separate from
-student_embeddings/) and results/genbio_baseline/ (summary + per-gene/
-per-pathway metrics + saved HVG lists + saved splits). Never touches
-student_checkpoints/, student_embeddings/, results/cv_ablation_metrics.csv,
-hest_patches/, or manifests/ -- those belong to the concurrently-running
-CNN/GNN job."""
+Reuses (imports, never modifies) sts.teacher_genbio/expression/pathways/
+cv_folds/patch_head/metrics/utils, plus scripts/10_run_patient_cv.py's own
+`load_fold_expression` (loaded via importlib since a leading-digit filename
+can't be `import`ed normally -- never copy-pasted). Reads scripts/08's
+outputs (manifests/hest_samples.csv, hest_spot_manifest.csv, hest_patches/)
+read-only. Writes only to its own output locations:
+<persist_dir>/genbio_baseline_embeddings/ and results/genbio_baseline/.
+Never touches student_checkpoints/, student_embeddings/,
+results/cv_ablation_metrics.csv, hest_patches/, or manifests/ -- those
+belong to the concurrently-running CNN/GNN job (scripts/10)."""
 from __future__ import annotations
 
 import argparse
@@ -165,11 +149,10 @@ def load_cached_genbio_features(path: Path) -> dict:
 
 # ------------------------------------------------------------------------ CSV read w/ retry
 def _read_csv_with_retry(path: Path, retries: int = 5, delay: float = 2.0) -> pd.DataFrame:
-    """manifests/hest_samples.csv and hest_spot_manifest.csv are periodically
-    rewritten in full by the concurrently-running scripts/08 job (job 84327/
-    84331) -- a read landing mid-rewrite can see a truncated/partial CSV.
-    Retries a few times on parse failure rather than crashing this
-    independent, read-only job."""
+    """The HEST manifests are periodically rewritten in full by the
+    concurrently-running scripts/08 job -- a read landing mid-rewrite can
+    see a truncated/partial CSV. Retries on parse failure rather than
+    crashing this independent, read-only job."""
     last_err = None
     for _ in range(retries):
         try:
@@ -183,23 +166,17 @@ def _read_csv_with_retry(path: Path, retries: int = 5, delay: float = 2.0) -> pd
 # --------------------------------------------------------------- wait for scripts/08 to finish
 def wait_for_hest_manifest_complete(cfg: dict, paths: dict, poll_seconds: float = 60.0,
                                      stable_checks: int = 3, timeout_seconds: float = 20 * 3600) -> None:
-    """scripts/08 (job 84327/84331) writes manifests/hest_samples.csv and
-    hest_spot_manifest.csv in full at every checkpoint, but partway through
-    its run only a subset of cancers (e.g. IDC first, then COAD, then
-    CCRCC) have any QC-passed rows yet. Reading the manifest before that job
-    finishes Step 8 would silently give this script an incomplete,
-    single-cancer view. Polls until every cfg['cancers']['hest'] cancer has
-    at least one QC-eligible sample AND the total eligible-sample count is
-    unchanged across `stable_checks` consecutive polls (i.e. scripts/08 has
-    stopped adding rows), then returns. Read-only -- never touches
-    scripts/08's files. `timeout_seconds` only lets this proceed early once
-    every cancer has at least one sample but the count hasn't gone stable yet
-    (scripts/08 still trickling in more of the same cancers) -- it never
-    proceeds while a whole cancer is still completely missing, since the
-    downstream smoke test hard-requires a sample from every cancer and would
-    just crash. If a cancer never appears this waits until the SLURM
-    wall-clock kills the job, which is a clean failure rather than a wasted
-    silent partial run."""
+    """scripts/08 rewrites the HEST manifests in full at every checkpoint,
+    but partway through its run only a subset of cancers have any QC-passed
+    rows yet -- reading before it finishes Step 8 would silently give this
+    script an incomplete, single-cancer view. Polls until every configured
+    cancer has at least one QC-eligible sample AND the eligible-sample count
+    is unchanged across `stable_checks` consecutive polls. `timeout_seconds`
+    only lets this proceed early once every cancer is present but the count
+    hasn't gone stable yet -- it never proceeds while a whole cancer is
+    still missing (the smoke test hard-requires all cancers and would just
+    crash), so a cancer that never appears stalls until SLURM kills the job
+    -- a clean failure, not a silent partial run. Read-only."""
     expected_cancers = set(cfg["cancers"]["hest"])
     samples_path = paths["manifests"] / "hest_samples.csv"
     manifest_path = paths["manifests"] / "hest_spot_manifest.csv"
@@ -231,21 +208,16 @@ def wait_for_hest_manifest_complete(cfg: dict, paths: dict, poll_seconds: float 
 
 # --------------------------------------------------------------------------- CV split reuse
 def load_or_recompute_split(cfg: dict, paths: dict, hest_samples: pd.DataFrame, cancer: str, seed: int, fold: int) -> tuple[dict, str]:
-    """Requirement: reuse the EXACT seed/fold patient split
-    scripts/10_run_patient_cv.py uses -- never regenerate a new random
-    split. Prefers loading the persisted manifests/hest_cv_folds.json that
-    job 84327/84331's Step 10 writes (paths["manifests"] / "hest_cv_folds.json",
-    see scripts/10_run_patient_cv.py's `save_json(cv_grid, ...)`); if that
-    job hasn't reached Step 10 yet, falls back to calling the identical
-    `sts.cv_folds.build_cv_grid` deterministically (GroupKFold has no RNG --
-    it depends only on the sorted patient-id list) on the CURRENT
-    manifests/hest_samples.csv. hest_samples.csv is written in full (not
-    incrementally) at every one of Step 8's checkpoints, so its patient set
-    is already stable well before Step 8 finishes extracting every sample's
-    patches -- once Step 10 does run, it will derive the identical
-    patients_by_cancer from the same stable file and therefore produce a
-    bit-identical fold 0, so this fallback is not an approximation, just an
-    earlier evaluation of the same deterministic function."""
+    """Reuses the EXACT seed/fold patient split scripts/10_run_patient_cv.py
+    uses -- never regenerates a new random split. Prefers loading the
+    persisted manifests/hest_cv_folds.json that script 10 writes; if that
+    job hasn't reached its Step 10 yet, falls back to calling the identical
+    `sts.cv_folds.build_cv_grid` on the current hest_samples.csv. This
+    fallback is not an approximation: GroupKFold has no RNG (it depends
+    only on the sorted patient-id list), and hest_samples.csv is written in
+    full at every checkpoint, so once script 10 does run it derives the
+    same patients_by_cancer from the same stable file and produces a
+    bit-identical fold."""
     cv_path = paths["manifests"] / "hest_cv_folds.json"
     if cv_path.exists():
         cv_grid = json.loads(cv_path.read_text())
@@ -338,8 +310,7 @@ def main():
     persist_dir = Path(cfg["paths"].get("persist_dir") or cfg["paths"]["work_dir"])
     embed_dir = persist_dir / "genbio_baseline_embeddings"
     patch_shard_dir = Path(cfg["paths"]["work_dir"]) / "hest_patches"  # read-only: owned by scripts/08
-    # separate results dir per --head so a ridge run never silently reuses or clobbers the
-    # mlp run's cached per-cancer JSON / summary CSVs (they're not comparable head-for-head reuse)
+    # separate results dir per --head so a ridge run never clobbers the mlp run's cached results
     results_dir = paths["results"] / ("genbio_baseline" if args.head == "mlp" else f"genbio_baseline_{args.head}")
     hvg_lists_dir = results_dir / "hvg_lists"
     splits_dir = results_dir / "splits_used"
@@ -356,7 +327,7 @@ def main():
     wait_for_hest_manifest_complete(cfg, paths)
     hest_samples = _read_csv_with_retry(paths["manifests"] / "hest_samples.csv")
     spot_manifest = _read_csv_with_retry(paths["manifests"] / "hest_spot_manifest.csv")
-    # "eligible" (requirement 4): passed scripts/08's alignment QC, i.e. has a real patch shard + spot_manifest rows.
+    # "eligible" = passed scripts/08's alignment QC, i.e. has a real patch shard + spot_manifest rows.
     eligible_sample_ids = set(spot_manifest["sample_id"].unique())
     hest_samples = hest_samples[hest_samples["sample_id"].isin(eligible_sample_ids)].reset_index(drop=True)
     hest_samples = exclude_targeted_panel_samples(hest_samples)
@@ -464,12 +435,9 @@ def main():
                 gene_std.assert_no_leakage(expr.index)  # test/val patients must never overlap the fit set
             gene_t = gene_std.transform(expr[hvg["hvg1000"]].reindex(columns=hvg["hvg1000"]).values)
             path_t = path_std.transform(progeny.reindex(columns=pathway_names).values)
-            # NaN is expected here, not a bug: sts.pathways.compute_progeny_scores documents that spots
-            # decoupler drops as degenerate come back NaN, "handled by the same missingness-aware QC as
-            # any other target" -- confirmed live, 2026-08-30: real IDC spots hit this (decoupler dropped
-            # 1/306 and 1/292 spots as degenerate). patch_head_loss (shared with scripts/10_run_patient_cv.py,
-            # which has no equivalent finite-only assertion) already masks NaN via gene_mask/path_mask, so
-            # training tolerates it correctly -- only Inf would indicate a real standardization bug.
+            # NaN is expected here, not a bug: decoupler returns NaN for spots it drops as degenerate
+            # (sts.pathways.compute_progeny_scores), and patch_head_loss already masks NaN via
+            # gene_mask/path_mask. Only Inf would indicate a real standardization bug.
             assert not np.isinf(gene_t).any() and not np.isinf(path_t).any(), \
                 f"{cancer}: Inf in standardized targets for {'train' if is_train else 'eval'} patients"
             return gene_t, path_t, expr.index.astype(str)
@@ -503,14 +471,12 @@ def main():
         seed_everything(args.seed)
         t_train0 = time.time()
         if args.head == "ridge":
-            # Standard closed-form linear-probe baseline most published HEST-1k-style
-            # benchmarks actually use on frozen foundation-model embeddings -- far less
-            # prone to the small-neural-MLP underfitting/overfitting found in this run
-            # (see docs/RUN_STATUS.md's GNN-overfitting entry, 2026-08-30). RidgeCV
-            # selects its regularization strength via built-in leave-one-out CV on the
-            # TRAIN+VAL spots only (never test) -- no separate early-stopping loop needed,
-            # so train+val are combined here (unlike the MLP path, which needs val held
-            # out purely for early-stopping signal).
+            # Closed-form linear-probe baseline, the standard choice for frozen
+            # foundation-model embeddings and less prone to MLP over/underfitting
+            # (docs/RUN_STATUS.md). RidgeCV picks its regularization via built-in
+            # leave-one-out CV on TRAIN+VAL (never test), so no early-stopping loop
+            # is needed and train+val can be combined -- unlike the MLP path below,
+            # which needs val held out for early-stopping.
             from sklearn.linear_model import RidgeCV
             x_fit = np.concatenate([x_train, x_val], axis=0)
             y_gene_fit = np.concatenate([y_gene_train, y_gene_val], axis=0)
@@ -582,10 +548,8 @@ def main():
             "cancer": cancer, "n_train_patients": len(train_p), "n_test_patients": len(test_patients),
             "n_train_spots": len(ids_train), "n_test_spots": len(ids_test),
             "HVG50_r": r_hvg50, "HVG1000_r": r_hvg1000, "PROGENy14_r": r_pathway,
-            # mean_mse/mean_mae: same per-patient-per-column mse/mae per_patient_per_column_pearson already
-            # computes (mirrors sts.metrics.evaluate_predictions's mean_mse/mean_mae, which target_summary
-            # itself doesn't surface -- added per explicit user request to keep alongside Pearson r for
-            # every target block, matching what cv_ablation_metrics.csv already has for the CNN/GNN run).
+            # mirrors sts.metrics.evaluate_predictions's mean_mse/mean_mae (target_summary doesn't
+            # surface these) so this table has the same columns as cv_ablation_metrics.csv.
             "HVG50_mse": float(pp_hvg50["mse"].mean()) if len(pp_hvg50) else float("nan"),
             "HVG50_mae": float(pp_hvg50["mae"].mean()) if len(pp_hvg50) else float("nan"),
             "HVG1000_mse": float(pp_hvg1000["mse"].mean()) if len(pp_hvg1000) else float("nan"),

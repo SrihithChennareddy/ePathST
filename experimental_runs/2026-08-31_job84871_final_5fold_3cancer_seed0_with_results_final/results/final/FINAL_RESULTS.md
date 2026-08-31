@@ -81,7 +81,11 @@ which uses train-fold HVG selection, a trained patch head, and GNN correction)
 | CCRCC    | distilled_convnextv2_atto |         6 |         0.2225 |        0.0544 |
 | CCRCC    | genbio_pathfm             |         6 |         0.2638 |        0.0277 |
 
-## GenBio-PCA256-Ridge baseline (B1) -- **PARTIAL, fold0/seed0 only, not full 5-fold CV**
+## GenBio embedding -> trained MLP baseline (B1) -- **PARTIAL, fold0/seed0 only, not full 5-fold CV**
+
+Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no
+Ridge -- `scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused
+alternative), on the same HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table.
 
 | cancer   | status                                                                                                                               |   HVG50_r |   HVG1000_r |   PROGENy14_r |
 |:---------|:-------------------------------------------------------------------------------------------------------------------------------------|----------:|------------:|--------------:|
@@ -102,8 +106,8 @@ conclusion.
    since job 84871's design, not new to this aggregation step.
 2. **Seeds 1/2** for the major models (A2/A8/B1) were not run -- seed 0 only, per the spec's
    "seed 0 is primary; seeds 1/2 only if compute allows" allowance.
-3. **B1 (GenBio Ridge baseline)** is fold0/seed0 only for each cancer (see above), not the full
-   5-fold design the rest of this table uses.
+3. **B1 (GenBio embedding -> MLP baseline)** is fold0/seed0 only for each cancer (see above),
+   not the full 5-fold design the rest of this table uses.
 4. **Efficiency**: only parameter counts (student, teacher, compression ratio) were measured;
    VRAM/throughput/wall-clock were not.
 5. The **IDC-specific distillation reversal** noted during the interactive diagnostic session

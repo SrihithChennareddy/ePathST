@@ -1,28 +1,26 @@
 #!/usr/bin/env python
-"""Step 28 (post-Phase 22): assembles results/final/ -- the single
-consolidated, submission-ready output directory for the LOCKED final
-5-fold x 3-cancer x seed-0 experiment (job 84871, 2026-08-31). Pure
-aggregation over files scripts 10/12/17/19 and the GenBio-Ridge baseline
-already wrote to disk -- never re-derives a number by any means other than
-reading it back out of one of those files (no re-fitting, no estimation,
-no extrapolation).
+"""Assembles results/final/ -- the single consolidated, submission-ready
+output directory for the LOCKED final 5-fold x 3-cancer x seed-0
+experiment (job 84871, 2026-08-31). Pure aggregation over files scripts
+10/12/17/19 and the GenBio baseline already wrote to disk -- never
+re-derives a number by any means other than reading it back out of one of
+those files (no re-fitting, no estimation, no extrapolation).
 
-Per the FINAL STOP RULE (Final_Project_V2.txt): every number here is
-either (a) a real measured result from a completed run, or (b) explicitly
-labeled NOT MEASURED / PARTIAL / SEPARATE PROTOCOL -- never silently
-omitted or fabricated.
+Per the FINAL STOP RULE: every number here is either (a) a real measured
+result from a completed run, or (b) explicitly labeled NOT MEASURED /
+PARTIAL / SEPARATE PROTOCOL -- never silently omitted or fabricated.
 
 Writes, under results/final/:
-    tables/model_comparison_macro.csv       -- all 10 ablations x {hvg50,hvg1000,pathway}, pooled 3-cancer bootstrap CI
-    tables/model_comparison_per_cancer.csv  -- same, broken out per cancer (5-fold bootstrap CI within cancer)
-    tables/gate_summary.csv                 -- the 3 primary gates, pooled + per-cancer, verdicts
-    tables/secondary_comparisons.csv        -- the 5 secondary A8-vs-X comparisons (pooled)
-    tables/pathway_progeny_results.csv      -- pathway-only view (macro + per-cancer)
-    tables/official_hest_benchmark.csv      -- SEPARATE official-protocol numbers (never mixed with the above)
-    tables/genbio_ridge_baseline_B1.csv     -- PARTIAL (fold0-only) GenBio-PCA256-Ridge baseline
-    tables/efficiency.csv                   -- real measured params + compression ratio; unmeasured rows flagged
-    folds/cv_folds_used.csv                 -- exact (cancer, fold, split, patient_id) used, for audit
-    FINAL_RESULTS.md                        -- narrative: Q1-Q5 answered, tables inlined, honest limitations
+    tables/model_comparison_macro.csv          -- all 10 ablations x {hvg50,hvg1000,pathway}, pooled 3-cancer bootstrap CI
+    tables/model_comparison_per_cancer.csv     -- same, broken out per cancer (5-fold bootstrap CI within cancer)
+    tables/gate_summary.csv                    -- the 3 primary gates, pooled + per-cancer, verdicts
+    tables/secondary_comparisons.csv           -- the 5 secondary A8-vs-X comparisons (pooled)
+    tables/pathway_progeny_results.csv         -- pathway-only view (macro + per-cancer)
+    tables/official_hest_benchmark.csv         -- SEPARATE official-protocol numbers (never mixed with the above)
+    tables/genbio_embedding_mlp_baseline_B1.csv -- PARTIAL (fold0-only), GenBio embedding -> trained MLP
+    tables/efficiency.csv                      -- real measured params + compression ratio; unmeasured rows flagged
+    folds/cv_folds_used.csv                    -- exact (cancer, fold, split, patient_id) used, for audit
+    FINAL_RESULTS.md                           -- narrative: Q1-Q5 answered, tables inlined, honest limitations
 """
 from __future__ import annotations
 
@@ -151,13 +149,15 @@ def main():
     if len(official_df):
         official_df.to_csv(out_dir / "tables" / "official_hest_benchmark.csv", index=False)
 
-    # -- G) GenBio-Ridge baseline B1 (PARTIAL: fold0/seed0 only, not full 5-fold) --
+    # -- G) GenBio embedding -> MLP baseline B1 (PARTIAL: fold0/seed0 only, not full 5-fold).
+    # scripts/run_genbio_hest_baseline.py's default --head is a trained MLP on the raw 4608-D
+    # GenBio embedding (no PCA, no Ridge) -- --head ridge is an available but unused alternative.
     genbio_src = results / "genbio_baseline" / "genbio_summary.csv"
     genbio_df = pd.read_csv(genbio_src) if genbio_src.exists() else pd.DataFrame()
     if len(genbio_df):
         genbio_df.insert(1, "status", "PARTIAL: fold0/seed0 only, not full 5-fold CV -- do not compare directly "
                                         "to the 5-fold macro table above without accounting for this")
-        genbio_df.to_csv(out_dir / "tables" / "genbio_ridge_baseline_B1.csv", index=False)
+        genbio_df.to_csv(out_dir / "tables" / "genbio_embedding_mlp_baseline_B1.csv", index=False)
 
     # -- H) efficiency (real measured items only; everything else explicitly NOT MEASURED) --
     student_params = None
@@ -278,7 +278,11 @@ which uses train-fold HVG selection, a trained patch head, and GNN correction)
 
 {official_table_md}
 
-## GenBio-PCA256-Ridge baseline (B1) -- **PARTIAL, fold0/seed0 only, not full 5-fold CV**
+## GenBio embedding -> trained MLP baseline (B1) -- **PARTIAL, fold0/seed0 only, not full 5-fold CV**
+
+Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no
+Ridge -- `scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused
+alternative), on the same HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table.
 
 {genbio_table_md}
 
@@ -295,8 +299,8 @@ conclusion.
    since job 84871's design, not new to this aggregation step.
 2. **Seeds 1/2** for the major models (A2/A8/B1) were not run -- seed 0 only, per the spec's
    "seed 0 is primary; seeds 1/2 only if compute allows" allowance.
-3. **B1 (GenBio Ridge baseline)** is fold0/seed0 only for each cancer (see above), not the full
-   5-fold design the rest of this table uses.
+3. **B1 (GenBio embedding -> MLP baseline)** is fold0/seed0 only for each cancer (see above),
+   not the full 5-fold design the rest of this table uses.
 4. **Efficiency**: only parameter counts (student, teacher, compression ratio) were measured;
    VRAM/throughput/wall-clock were not.
 5. The **IDC-specific distillation reversal** noted during the interactive diagnostic session

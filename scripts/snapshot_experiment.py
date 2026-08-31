@@ -36,11 +36,9 @@ def _headline_metric(results_dir: Path) -> str:
     primary = results_dir / "primary_hypothesis_test.json"
     if primary.exists():
         d = json.loads(primary.read_text())
-        # Bug fix (2026-08-31): this used to read d["bootstrap"] directly, but script 12
-        # actually nests results as {"pooled": {"<gate_name>": {"bootstrap": {...}}, ...},
-        # "per_cancer": {...}} -- there is no top-level "bootstrap" key, so b.get(...) always
-        # returned None and crashed the :.4f format below. Pick gate2 (spatial context, the
-        # flagship comparison) as the headline, falling back to whichever gate exists.
+        # script 12 nests results as {"pooled": {"<gate_name>": {"bootstrap": {...}}, ...},
+        # "per_cancer": {...}} -- there is no top-level "bootstrap" key. Pick gate2 (spatial
+        # context, the flagship comparison) as the headline, falling back to whichever gate exists.
         pooled = d.get("pooled", {})
         gate_name = next((g for g in ("gate2_spatial_context", "gate3_true_topology", "gate1_distillation")
                            if g in pooled), next(iter(pooled), None))

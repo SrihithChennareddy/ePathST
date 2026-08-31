@@ -1,10 +1,7 @@
-"""Training loop for the residual graph model (Steps 16-17), revised per
-Final_Project_V2.txt to support three interchangeable backends
-(pna_union / scale_aware / gatv2 -- see sts/graph_model.py) through one
-shared training/eval/predict path. One graph per patient/slide; batches of
-1-4 graphs per optimizer step (gradient accumulation for larger effective
-batches), matching the linear-in-N compute scaling argument for PNA (fixed
-degree k => |E| = O(N))."""
+"""Training loop for the residual graph model. Supports three
+interchangeable backends (pna_union / scale_aware / gatv2 -- see
+sts/graph_model.py) through one shared train/eval/predict path. One graph
+per patient/slide; batches of 1-4 graphs per optimizer step."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,7 +20,7 @@ def make_pyg_data(features: np.ndarray, edge_index: np.ndarray, edge_attr: np.nd
                    gene_target: np.ndarray, pathway_target: np.ndarray, patient_id: str,
                    edge_scale: np.ndarray | None = None) -> Data:
     """`edge_scale` (optional): (E,) int array {0,1,2}={local,meso,macro},
-    required only for backend="scale_aware" (sts.ablations.scale_aware_edge_data)."""
+    required only for backend="scale_aware"."""
     kwargs = {}
     if edge_scale is not None:
         kwargs["edge_scale"] = torch.tensor(edge_scale, dtype=torch.long)
@@ -40,8 +37,8 @@ def make_pyg_data(features: np.ndarray, edge_index: np.ndarray, edge_attr: np.nd
 
 def _build_correction_model(backend: str, in_dim: int, cfg: dict, train_graphs: list[Data], edge_dim: int,
                              gene_dim: int, pathway_dim: int):
-    """Constructs the right graph_correction module for `backend`,
-    including its (train-fold-only, V2 Phase 13) degree histogram(s)."""
+    """Constructs the right graph_correction module for `backend`. Degree
+    histogram(s) are computed from `train_graphs` only, never val/test."""
     if backend == "pna_union":
         deg = compute_degree_histogram([g.edge_index for g in train_graphs], [g.num_nodes for g in train_graphs])
         return GraphCorrectionModel(in_dim, cfg, deg, edge_dim, gene_dim, pathway_dim)
@@ -75,7 +72,7 @@ def train_graph_model(patch_head, train_graphs: list[Data], val_graphs: list[Dat
     graph_corr = _build_correction_model(backend, in_dim, cfg, train_graphs, edge_dim, gene_dim, pathway_dim)
     model = ResidualGraphPredictor(patch_head, graph_corr).to(device)
 
-    # V2 Phase 11 / S3: zero-residual MUST hold before any graph training step.
+    # zero-residual must hold before any graph training step (see graph_model.assert_zero_residual_at_init)
     probe = Batch.from_data_list([train_graphs[0]]).to(device)
     assert_zero_residual_at_init(model, probe.x, *_forward_args(probe, backend))
 
@@ -131,8 +128,11 @@ def _eval_loss(model, graphs: list[Data], cfg: dict, device: str, backend: str =
 
 @torch.no_grad()
 def predict_graph_model(model, graphs: list[Data], device: str, backend: str = "pna_union") -> dict:
-    """Returns per-patient arrays of gene/pathway final + patch-only
-    predictions, for downstream metrics + the primary hypothesis test."""
+    """Returns gene/pathway final + patch-only predictions concatenated in
+    the order `graphs` is iterated (one block per patient/graph). Callers
+    must reorder their own ground-truth/id arrays to match this order
+    before scoring -- reusing the original id order silently misaligns
+    predictions with targets."""
     model.eval()
     out = {"patient_id": [], "gene_pred": [], "pathway_pred": [], "gene_patch_only": [], "pathway_patch_only": []}
     scale_weights = []

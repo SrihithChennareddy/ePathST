@@ -4,7 +4,7 @@
   "job_id": "84871",
   "partition": "b40x4-long",
   "gpu": "1x RTX PRO 6000 Blackwell",
-  "stage": "expand RESULTS_SUMMARY.md to full detail (script 21 rewrite); add docs/ copy",
+  "stage": "fix B1 baseline mislabeling (was called PCA256-Ridge; actually GenBio-embedding->MLP)",
   "source_work_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_genbio_distill_hest_pna_work",
   "source_persist_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith",
   "files_captured": {

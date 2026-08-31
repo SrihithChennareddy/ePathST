@@ -1,19 +1,15 @@
 #!/usr/bin/env python
-"""Step 1 (Final_Project.txt Section 4): inspect CPTAC_ROOT/CPTAC_METADATA,
-compute per-WSI QC, apply hard filters + Q-score ranking, select one WSI per
-patient, and write manifests/cptac_selected_wsi.csv.
+"""Step 1: inspect CPTAC_ROOT/CPTAC_METADATA, compute per-WSI QC, apply hard
+filters + Q-score ranking, select one WSI per patient, and write
+manifests/cptac_selected_wsi.csv.
 
-Does NOT assume a fixed CPTAC directory layout -- inspects whatever is
-actually present under cfg.paths.cptac_root/cptac_metadata first (Section 4:
-'Expected structure may differ, so first inspect the actual files and
-metadata rather than assuming filenames').
+Directory layout is discovered at runtime rather than assumed, since the
+scratch download's structure can vary.
 
-Parallel + resumable: QC is CPU/IO-bound (WSI thumbnail + ~80 tile reads per
-slide) and embarrassingly parallel across WSIs, so it runs in a process pool
-sized to the node's core count. Each completed WSI's QC record is appended
-to qc/wsi_qc_cache.jsonl immediately, so a killed/time-limited job (this
-project's real run is time-budgeted on a shared SLURM allocation) resumes
-from where it left off on rerun instead of recomputing everything."""
+QC is CPU/IO-bound (thumbnail + ~80 tile reads per slide) and runs in a
+process pool. Each completed WSI's QC record is appended to
+qc/wsi_qc_cache.jsonl immediately, so a killed/time-limited SLURM job
+resumes from where it left off instead of recomputing everything."""
 from __future__ import annotations
 
 import argparse
@@ -30,30 +26,17 @@ from sts.cptac_select import compute_wsi_qc, select_one_wsi_per_patient, to_mani
 from sts.utils import RunEnvironment, load_config, resolve_run_paths, save_json
 from sts.wsi_patches import open_slide
 
-# Real, on-disk CPTAC/IDC metadata layout confirmed against
-# /lustre/nvwulf/scratch/schennareddy/CPTAC (2026-08-28 scratch download):
-#   CPTAC_METADATA/{CANCER}_selected_WSI_per_patient.txt  (TSV, one row per
-#     patient -- an upstream specimen-rank dedup has ALREADY reduced multiple
-#     WSIs/patient to one row: columns patient_id, wsi_series_uid, study_uid,
-#     specimen_label, specimen_rank, series_size_MB, instanceCount,
-#     aws_bucket, series_aws_url)
-#   CPTAC_ROOT/{CANCER}/{patient_id}/*.dcm  (one DICOM whole-slide-image
-#     SERIES per patient -- multiple .dcm instances forming a pyramid,
-#     VOLUME/LABEL/OVERVIEW/THUMBNAIL -- see sts.wsi_patches.open_slide).
-#     As of the full 2026-08-28 download, this lives under CPTAC_ROOT/data/
-#     (configs/base.yaml's cptac_root already points there).
 # Cancer-type folder names on disk use CPTAC's own casing (BRCA/COAD/ccRCC),
-# which need not match cfg.cancers.cptac's casing (BRCA/COAD/CCRCC).
+# which doesn't match cfg.cancers.cptac's casing (BRCA/COAD/CCRCC).
 CANCER_DIR_ALIASES = {"BRCA": "BRCA", "COAD": "COAD", "CCRCC": "ccRCC"}
 
 
 def discover_candidates(cptac_root: Path, cptac_metadata: Path, cancers: list[str]) -> pd.DataFrame:
     """Reads each cancer's `{CANCER}_selected_WSI_per_patient.txt` (already
     one row per patient) and keeps only rows whose series has actually
-    landed locally under CPTAC_ROOT/{cancer_dir}/{patient_id}/ -- the
-    scratch download is incremental, so some patients may be absent until
-    it finishes; those are reported, not treated as an error (Section 4:
-    'first inspect the actual files ... rather than assuming filenames')."""
+    landed locally under CPTAC_ROOT/{cancer_dir}/{patient_id}/. The scratch
+    download is incremental, so missing patients are reported, not treated
+    as an error."""
     rows = []
     n_not_yet_downloaded = 0
     for cancer in cancers:
@@ -63,13 +46,9 @@ def discover_candidates(cptac_root: Path, cptac_metadata: Path, cancers: list[st
             print(f"[01_select_cptac_wsi] no metadata file for {cancer} at {meta_path}", file=sys.stderr)
             continue
         meta = pd.read_csv(meta_path, sep="\t")
-        # BRCA/COAD use column `wsi_series_uid`; ccRCC's metadata file uses a
-        # differently-named (but equivalent) column `wsi_name` and additionally
-        # ships its own precomputed QC fields (qc_status/tissue_fraction/
-        # focus_score/...) -- we still recompute QC ourselves via
-        # sts.cptac_select.compute_wsi_qc for a uniform Q-score methodology
-        # across all three cancers (Section 4's ranking must be applied
-        # consistently), so only the WSI-identifier column is normalized here.
+        # ccRCC's metadata uses `wsi_name` instead of `wsi_series_uid` and ships its own
+        # precomputed QC fields, but we recompute QC via compute_wsi_qc for all three
+        # cancers so the Q-score ranking is methodologically consistent.
         id_col = "wsi_series_uid" if "wsi_series_uid" in meta.columns else "wsi_name"
         cancer_dir = cptac_root / dir_name
         for _, r in meta.iterrows():
@@ -94,9 +73,8 @@ def discover_candidates(cptac_root: Path, cptac_metadata: Path, cancers: list[st
 
 def _qc_one(rec: dict, cfg: dict) -> dict:
     """Runs in a worker process: QC one WSI, returning the updated record.
-    Any read failure is captured as `readable=False` rather than crashing
-    the whole pool (Section 4 hard filter #5 already handles unreadable
-    slides as an exclusion, not a fatal error)."""
+    A read failure is captured as `readable=False` rather than crashing the
+    pool -- unreadable slides are excluded downstream, not fatal."""
     try:
         reader = open_slide(rec["wsi_path"])
         qc = compute_wsi_qc(rec["wsi_path"], cfg, reader)

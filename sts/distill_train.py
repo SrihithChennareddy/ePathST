@@ -1,5 +1,4 @@
-"""Steps 6-7 (Sections 9-10): distillation training loop and the S0/S1/S2
-baseline definitions.
+"""Distillation training loop and the S0/S1/S2 baseline definitions.
 
   S0 - ImageNet ConvNeXt V2-Atto, NO pathology distillation (encoder used
        as-is; nothing to train here, see scripts/05).
@@ -25,9 +24,8 @@ IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
 def augment_train(patch_uint8: np.ndarray, rng: np.random.RandomState, cfg: dict) -> np.ndarray:
-    """Section 9 augmentations: flips, 90-deg rotations, moderate color/
-    stain augmentation, mild brightness/contrast -- never destructive to
-    tissue morphology."""
+    """Flips, 90-deg rotations, moderate color/stain augmentation, mild
+    brightness/contrast -- never destructive to tissue morphology."""
     aug = cfg["distillation"]["augmentation"]
     img = patch_uint8.copy()
     if aug["hflip"] and rng.rand() < 0.5:
@@ -59,7 +57,7 @@ def to_tensor_normalized(img_float01: np.ndarray) -> np.ndarray:
 class CPTACDistillDataset(Dataset):
     """Reads patches on-demand from per-WSI HDF5 shards (sts.wsi_patches
     format) and pairs each with its cached teacher embedding by patch_id.
-    Enforces strict patch<->embedding alignment (Section 7 integrity)."""
+    Asserts every manifest patch has a cached embedding before training starts."""
 
     def __init__(self, patch_manifest, teacher_h5_path: str, shard_dir: str, train: bool, cfg: dict):
         self.manifest = patch_manifest.reset_index(drop=True)
@@ -120,19 +118,17 @@ def evaluate_val_cosine(model, loader, device) -> float:
 
 def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, seed: int, device: str = "cuda",
                    time_budget_seconds: float | None = None) -> dict:
-    """`baseline` in {"S1", "S2"} (S0 needs no training loop). Returns a
-    dict with best checkpoint path and training curve; saves the best
-    checkpoint (selected by validation teacher-cosine similarity, never
-    test) to out_dir/{baseline}_seed{seed}_best.pt.
+    """`baseline` in {"S1", "S2"} (S0 needs no training loop). Saves the
+    best checkpoint (selected by validation teacher-cosine similarity,
+    never test) to out_dir/{baseline}_seed{seed}_best.pt.
 
-    Resumable + wall-clock-budgeted for the real, time-limited SLURM run:
-    a full training-state snapshot (model+optimizer+scaler+step counters,
-    NOT just the best-val model weights) is saved every epoch to
-    out_dir/{baseline}_seed{seed}_resume.pt and reloaded automatically if
-    present, so a job killed by the 8-hour wall clock resumes exactly where
-    it left off on the next `sbatch` rather than restarting. If
+    Resumable and wall-clock-budgeted for SLURM: a full training-state
+    snapshot (model+optimizer+scaler+step counters, not just best-val
+    weights) is saved every epoch to out_dir/{baseline}_seed{seed}_resume.pt
+    and reloaded automatically if present, so a job killed by the wall
+    clock resumes on the next `sbatch` instead of restarting. If
     `time_budget_seconds` is set, training stops (saving both checkpoints
-    first) once elapsed time exceeds it, returning normally with
+    first) once elapsed time exceeds it, returning with
     `stopped_early_for_time=True` rather than raising."""
     import time
     from sts.utils import seed_everything

@@ -1,16 +1,13 @@
-"""PROGENy14 pathway scoring (Final_Project.txt Section 14 target set) via
-decoupler's MLM method. Adapted from STS_PoC/PoC_5/crcspatial/pathways.py.
+"""PROGENy14 pathway scoring via decoupler's MLM method. Adapted from
+STS_PoC/PoC_5/crcspatial/pathways.py.
 
-decoupler's API was restructured between v1 and v2 -- confirmed live
-against the installed v2.2.0 (2026-08-29, during the V1->V2 real-data
-validation run): `dc.get_progeny(...)` -> `dc.op.progeny(...)` (same
-kwargs/return schema: source/target/weight/padj columns) and
-`dc.run_mlm(mat=..., net=..., source=..., target=..., weight=...,
-min_n=...)` -> `dc.mt.mlm(data=..., net=..., tmin=...)` (net's
-source/target/weight column NAMES are still the standard decoupler
-schema and no longer passed as separate kwargs; `min_n` renamed `tmin`).
-Return shape/type (a (acts_df, pvals_df) tuple, spots x pathways) is
-unchanged."""
+decoupler's API changed between v1 and v2 (confirmed against installed
+v2.2.0): `dc.get_progeny(...)` -> `dc.op.progeny(...)` (same kwargs/return
+schema), and `dc.run_mlm(mat=..., net=..., source=..., target=...,
+weight=..., min_n=...)` -> `dc.mt.mlm(data=..., net=..., tmin=...)` --
+source/target/weight are now inferred from `net`'s standard column names
+instead of passed as kwargs, and `min_n` was renamed `tmin`. Return shape
+(spots x pathways) is unchanged."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -33,9 +30,8 @@ def fetch_and_cache_progeny_net(cache_path: str | Path, top: int = 100, organism
 
 
 def check_pathway_gene_coverage(net: pd.DataFrame, genes_by_slide: dict[str, set[str]]) -> pd.DataFrame:
-    """Section 14: check pathway gene coverage for every ST platform/slide.
-    Only keep pathways with acceptable target-gene coverage across all
-    retained slides."""
+    """Checks pathway target-gene coverage per ST platform/slide, so
+    pathways with poor coverage on any retained slide can be excluded."""
     rows = []
     for pathway, sub in net.groupby("source"):
         targets = set(sub["target"])

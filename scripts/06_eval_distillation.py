@@ -1,14 +1,13 @@
 #!/usr/bin/env python
-"""Step 8 (Section 11): evaluate S0/S1/(S2) on unseen CPTAC test patients --
-cosine similarity distribution, retrieval overlap@K, linear-probe sanity,
-and UMAP visualization -- overall and per cancer type, with bootstrap CIs."""
+"""Step 8: evaluate S0/S1/(S2) on unseen CPTAC test patients -- cosine
+similarity distribution, retrieval overlap@K, linear-probe sanity, and
+UMAP visualization -- overall and per cancer type, with bootstrap CIs."""
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
 
-import h5py
 import numpy as np
 import pandas as pd
 import torch

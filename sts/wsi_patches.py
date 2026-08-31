@@ -1,14 +1,15 @@
 """WSI I/O (openslide for .svs/.ndpi/... and wsidicom for the DICOM
-whole-slide-image series CPTAC actually ships via the Imaging Data Commons
--- see sts.wsi_patches.open_slide) + tissue-masked patch extraction
-(Final_Project.txt Step 2, and reused for HEST ST-centered patches in Step
-12). Never resizes whole WSIs -- always reads the pyramid level nearest the
-target mpp and extracts fixed-physical-size regions.
+whole-slide-image series CPTAC ships via the Imaging Data Commons) plus
+tissue-masked patch extraction, reused for both CPTAC tissue sampling and
+HEST ST-spot-centered patches. Never resizes whole WSIs -- always reads
+the pyramid level nearest the target mpp and extracts fixed-physical-size
+regions.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
+import h5py
 import numpy as np
 
 from sts.cptac_select import tissue_mask_from_thumbnail
@@ -16,34 +17,23 @@ from sts.cptac_select import tissue_mask_from_thumbnail
 
 def _clamp_region(x0: int, y0: int, size: int, level_width: int, level_height: int) -> tuple[int, int]:
     """Shifts (x0, y0) so the `size`x`size` box stays fully within
-    [0, level_width) x [0, level_height) -- patches sampled near a tissue
-    edge routinely land within half a patch-width of the slide boundary
-    (Section 5's spatial-coverage sampling has no reason to avoid edges),
-    and reading past the boundary either crashes (wsidicom raises
-    WsiDicomOutOfBoundsError) or silently returns black padding
-    (openslide) instead of the real tissue that's actually there. Clamping
-    trades a small, harmless shift in the patch's exact center (at most
-    half the out-of-bounds amount) for real tissue content -- and, more
-    importantly, for not losing every OTHER patch in the same WSI when a
-    single edge coordinate would otherwise raise and abort the whole
-    WSI's extraction (see sts.wsi_patches module docstring / the
-    2026-08-28 real-run bug this fixes)."""
+    [0, level_width) x [0, level_height). Patches sampled near a tissue
+    edge routinely land within half a patch-width of the slide boundary;
+    reading past it either crashes (wsidicom) or returns black padding
+    (openslide) instead of real tissue. Clamping trades a small, harmless
+    shift in the patch's exact center for real tissue content -- and for
+    not aborting the whole WSI's extraction over one edge coordinate."""
     x0 = max(0, min(x0, max(0, level_width - size)))
     y0 = max(0, min(y0, max(0, level_height - size)))
     return x0, y0
 
 
 def open_slide(path: str):
-    """Factory: a directory (or a path containing multiple sibling .dcm
-    files) is a DICOM whole-slide-image series (the actual CPTAC/IDC
-    layout: one series = 7+ separate SOP instances -- VOLUME pyramid
-    levels, LABEL, OVERVIEW, THUMBNAIL -- addressed by directory, never a
-    single filename); anything else is opened via openslide. Confirmed
-    against a real downloaded CPTAC-BRCA series (01BR001,
-    s3://idc-open-data/e20e17fe-.../): SOPClassUID
-    1.2.840.10008.5.1.4.1.1.77.1.6 (VL Whole Slide Microscopy Image), base
-    level 0.4942 um/px -- already almost exactly the Section 5 target of
-    ~0.5 um/px, so no resampling is needed for CPTAC's native resolution."""
+    """Factory: a directory (or a path with sibling .dcm files) is a DICOM
+    whole-slide-image series -- CPTAC/IDC ships one series as multiple SOP
+    instances (VOLUME pyramid levels, LABEL, OVERVIEW, THUMBNAIL)
+    addressed by directory, never a single filename. Anything else is
+    opened via openslide."""
     p = Path(path)
     if p.is_dir() or (p.exists() and any(p.parent.glob("*.dcm"))):
         return WsiDicomReader(str(p if p.is_dir() else p.parent))
@@ -190,7 +180,7 @@ class OpenSlideReader:
     def sample_tissue_tile_coords(self, tissue_mask: np.ndarray, n_tiles: int, tile_px: int) -> list[tuple[int, int]]:
         """Uniformly samples up to n_tiles level-0 coordinates from tissue
         pixels in the thumbnail mask, spread across the tissue area rather
-        than clustered (Section 4: 'sample 50-100 tissue tiles')."""
+        than clustered."""
         ys, xs = np.where(tissue_mask)
         if len(xs) == 0:
             return []
@@ -210,9 +200,8 @@ class OpenSlideReader:
                             out_px: int, source_mpp: float | None = None) -> np.ndarray:
         """Reads a `physical_size_um`-wide square centered at
         (center_x_px, center_y_px) in level-0 pixel coordinates, at the
-        level nearest 0.5 um/px, then resizes to out_px x out_px. Used both
-        for Step 2 (spatial tissue sampling) and Step 12 (ST-spot-centered
-        HEST patches)."""
+        level nearest 0.5 um/px, then resizes to out_px x out_px. Used for
+        both CPTAC tissue sampling and ST-spot-centered HEST patches."""
         from PIL import Image
         mpp = source_mpp or self.mpp or 0.25
         native_span = physical_size_um / mpp
@@ -227,12 +216,11 @@ class OpenSlideReader:
 
 
 def sample_patch_grid(reader: OpenSlideReader, tissue_mask_thumb: np.ndarray, cfg: dict, rng_seed: int) -> list[tuple[int, int]]:
-    """Step 2: spatial-coverage sampling. Lays a regular grid at the target
-    patch spacing across the WSI, keeps only grid points overlapping the
+    """Spatial-coverage sampling: lays a regular grid at the target patch
+    spacing across the WSI, keeps only grid points overlapping the
     thumbnail tissue mask above the tissue-fraction threshold, then
-    subsamples down to the target patch-count range -- this spreads
-    patches across the whole tissue area rather than taking many adjacent
-    redundant patches (Section 5)."""
+    subsamples down to the target patch-count range -- spreading patches
+    across the tissue rather than clustering many adjacent redundant ones."""
     patching = cfg["patching"]
     patch_px, target_mpp = patching["patch_px"], patching["target_mpp"]
     w0, h0 = reader.dimensions
@@ -265,14 +253,10 @@ def patch_tissue_fraction(patch_rgb: np.ndarray) -> float:
     return float(mask.mean())
 
 
-import h5py  # noqa: E402
-
-
 def write_patch_shard(out_path: str | Path, patch_ids: list[str], patches: np.ndarray, meta: dict) -> None:
-    """One HDF5 shard per WSI (Section 5 storage guidance: WebDataset/LMDB/
-    coordinate-based on-demand reading preferred over millions of PNGs; we
-    use HDF5 with per-image chunking so single-row training reads stay
-    cheap -- see the identical rationale in the PoC_5 patch store)."""
+    """One HDF5 shard per WSI, with per-image chunking so single-row
+    training reads stay cheap -- coordinate-based on-demand reading is
+    preferred over millions of individual PNG files."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(out_path, "w") as f:

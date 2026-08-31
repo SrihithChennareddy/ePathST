@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Steps 5-7 (Sections 8-10): train the S1 (GenBio-distilled) and, if
-enabled, S2 (random-init distilled) students for every seed. S0
-(ImageNet, no distillation) needs no training loop -- it is just the
-off-the-shelf ImageNet-pretrained ConvNeXt V2-Atto encoder, handled
-directly by scripts/06_eval_distillation.py."""
+"""Steps 5-7: train the S1 (GenBio-distilled) and, if enabled, S2
+(random-init distilled) students for every seed. S0 (ImageNet, no
+distillation) needs no training loop -- it's the off-the-shelf
+ImageNet-pretrained ConvNeXt V2-Atto encoder, handled directly by
+scripts/06_eval_distillation.py."""
 from __future__ import annotations
 
 import argparse
@@ -26,9 +26,9 @@ def main():
     ap.add_argument("--baselines", nargs="+", default=None, choices=["S1", "S2"],
                      help="override which baselines to train (priority order); default both, S1 first")
     ap.add_argument("--time-budget-hours", type=float, default=None,
-                     help="total wall-clock budget across every (baseline, seed) run below; the LAST "
-                          "run in priority order gets whatever remains, so put the most important "
-                          "baseline/seed first -- S1 seed0 is the main Section 10 comparison target")
+                     help="total wall-clock budget across every (baseline, seed) run below; runs "
+                          "later in priority order get whatever remains, so put the most important "
+                          "baseline/seed first -- S1 seed0 is the primary comparison target")
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)

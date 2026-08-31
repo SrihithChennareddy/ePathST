@@ -1,8 +1,7 @@
-"""Graph-destruction controls (Final_Project.txt Section 21 A4/A5, Section
-22 dose-response). All functions preserve the total (undirected) edge count
-of the real physical graph so any performance difference is attributable to
-topology, not degree/capacity. Adapted verbatim from
-STS_PoC/PoC_5/crcspatial/destruction.py."""
+"""Graph-destruction controls used by ablations A4 (random) and A5
+(degree-preserving shuffle), plus the dose-response sweep. All functions
+preserve the real graph's total (undirected) edge count, so any
+performance difference is attributable to topology, not degree/capacity."""
 from __future__ import annotations
 
 import numpy as np
@@ -40,9 +39,9 @@ def random_graph(edge_index: np.ndarray, n_nodes: int, seed: int) -> np.ndarray:
 
 
 def degree_preserving_rewire(edge_index: np.ndarray, seed: int, n_swap_multiplier: int = 10) -> np.ndarray:
-    """A5 -- the most important negative control: double-edge-swap
-    rewiring. Exactly preserves every node's degree while destroying the
-    real physical adjacency structure."""
+    """A5, the critical negative control: double-edge-swap rewiring.
+    Exactly preserves every node's degree while destroying the real
+    physical adjacency structure."""
     rng = np.random.RandomState(seed)
     pairs = _undirected_pairs(edge_index)
     edge_set = {tuple(p) for p in pairs}
@@ -75,7 +74,7 @@ def degree_preserving_rewire(edge_index: np.ndarray, seed: int, n_swap_multiplie
 
 def partial_edge_replacement(edge_index: np.ndarray, n_nodes: int, fraction: float, seed: int,
                               distance_um: np.ndarray | None = None, placeholder_distance: float = 0.0) -> dict:
-    """Section 22 dose-response: replace `fraction` of the real physical
+    """Dose-response sweep: replace `fraction` of the real physical
     (undirected) edges with random edges, keeping total edge count fixed.
     fraction in {0, 0.25, 0.5, 0.75, 1.0}."""
     rng = np.random.RandomState(seed)

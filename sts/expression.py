@@ -1,8 +1,7 @@
-"""HEST molecular preprocessing (Final_Project.txt Section 14 / Step 11):
-per-slide normalize+log1p, train-fold-only standardization, and
-leakage-free per-fold HVG1000/HVG50 selection (nested: G_50 subset G_1000).
-Adapted from STS_PoC/PoC_5/crcspatial/expression.py; generalized for
-multiple cancer types / ST platforms."""
+"""HEST molecular preprocessing: per-slide normalize+log1p, train-fold-only
+standardization, and leakage-free per-fold HVG1000/HVG50 selection (nested:
+G_50 subset G_1000). Adapted from STS_PoC/PoC_5/crcspatial/expression.py;
+generalized for multiple cancer types / ST platforms."""
 from __future__ import annotations
 
 import numpy as np
@@ -18,28 +17,24 @@ def normalize_log1p_slide(adata, target_sum: float = 1e4) -> None:
 
 
 def ensure_gene_symbol_index(adata):
-    """Some HEST slides (confirmed live, 2026-08-30: a real mix within the
-    breast/IDC cohort -- e.g. `NCBI*` samples already index by HGNC gene
-    SYMBOL, `SPA1xx` samples index by Ensembl gene ID with the symbol
-    stashed in `var['SYMBOL']` instead) don't share one gene-ID convention.
-    Everything downstream (PROGENy's net, HVG selection, cross-sample gene
-    intersection) is keyed by gene SYMBOL, so an Ensembl-indexed slide has
-    ~zero overlap with any of that and silently produces nonsense (or, for
-    PROGENy, decoupler hard-crashes with 'No sources with more than
-    tmin=N targets'). Detects an Ensembl-style index (`ENSG...`) with a
-    `SYMBOL` column present and remaps to it; drops genes with no symbol
-    and collapses duplicate symbols (keep first -- confirmed a small
-    minority, ~3 in 16.7k genes on a real affected slide) so var_names
-    stay unique. Slides already indexed by symbol are returned unchanged
-    EXCEPT for a final var_names_make_unique() pass -- confirmed live,
-    2026-08-30: 4 real COAD slides (TENX156/155/154/128) already index by
-    symbol but have a handful (3/18085) of naturally duplicate gene
-    symbols, which decoupler's mlm hard-crashes on ('mat contains repeated
-    feature names') regardless of whether the Ensembl-remap path above
-    ran. var_names_make_unique() suffixes duplicates (GENE, GENE-1, ...)
-    rather than dropping them -- the suffixed copies just won't match any
-    gene-symbol-keyed net/HVG list, which is the same harmless outcome as
-    any other gene absent from those, not a crash."""
+    """HEST slides don't share one gene-ID convention (e.g. within the
+    breast/IDC cohort, `NCBI*` samples index by HGNC symbol while `SPA1xx`
+    samples index by Ensembl ID with the symbol stashed in
+    `var['SYMBOL']`). Everything downstream (PROGENy's net, HVG selection,
+    cross-sample gene intersection) is keyed by gene symbol, so an
+    Ensembl-indexed slide left unconverted has ~zero overlap with any of
+    that -- or makes decoupler hard-crash ('No sources with more than
+    tmin=N targets').
+
+    Detects an Ensembl-style index (`ENSG...`) with a `SYMBOL` column and
+    remaps to it, dropping genes with no symbol and keeping the first of
+    any duplicate symbols. Always finishes with var_names_make_unique(),
+    even for slides already symbol-indexed: a few real COAD slides
+    (TENX128/154/155/156) are symbol-indexed but contain a handful of
+    naturally duplicate symbols that make decoupler's MLM hard-crash
+    ('mat contains repeated feature names') otherwise. The suffixed
+    duplicates (GENE-1, ...) simply won't match any symbol-keyed
+    net/HVG list -- the same harmless outcome as any other absent gene."""
     if adata.var.index.size and str(adata.var.index[0]).startswith("ENSG") and "SYMBOL" in adata.var.columns:
         symbol = adata.var["SYMBOL"].astype(str)
         keep = symbol.notna() & (symbol != "nan") & ~symbol.duplicated(keep="first")
@@ -51,8 +46,8 @@ def ensure_gene_symbol_index(adata):
 
 class TrainOnlyStandardizer:
     """Fits mu/sigma on training spots only; applies identically to val/
-    test (Section 14: 'Never allow test-patient gene-expression statistics
-    to determine ... scaling'). Tracks fit ids so leakage can be asserted."""
+    test. Never let val/test statistics leak into the scaling -- tracks
+    fit ids so leakage can be asserted via `assert_no_leakage`."""
 
     def __init__(self, eps: float = 1e-8):
         self.eps = eps
@@ -76,9 +71,9 @@ class TrainOnlyStandardizer:
 
 
 def cross_platform_gene_intersection(genes_by_slide: dict[str, set[str]]) -> list[str]:
-    """Section 14: 'Handle cross-platform gene intersections explicitly.
-    Never silently change gene order.' Returns a deterministic
-    (lexicographically sorted) common-gene list."""
+    """Common genes across slides/platforms, as a deterministic
+    (lexicographically sorted) list -- gene order must never change
+    silently between calls."""
     common = set.intersection(*genes_by_slide.values()) if genes_by_slide else set()
     return sorted(common)
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Step 9 (Section 12): lock the student. Given hyperparameters chosen from
-train/val only, either (Option A) keep the validated S1 checkpoint per
-seed, or (Option B) retrain on ALL CPTAC patients with the locked config.
-Either way: delete the 4608-D teacher projection head and save only the
-320-D ConvNeXt V2-Atto encoder as the final pathology encoder."""
+"""Step 9: lock the student. Given hyperparameters chosen from train/val
+only, either (Option A) keep the validated S1 checkpoint per seed, or
+(Option B) retrain on ALL CPTAC patients with the locked config. Either
+way: drop the 4608-D teacher projection head and save only the 320-D
+ConvNeXt V2-Atto encoder as the final pathology encoder."""
 from __future__ import annotations
 
 import argparse

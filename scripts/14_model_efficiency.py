@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""Step 23 (Section 27): parameter counts, compression ratio, FLOPs/MACs,
-throughput, graph inference cost, VRAM, stored embedding size -- teacher
-and student costs reported and accounted separately."""
+"""Model efficiency report: parameter counts, compression ratio, FLOPs/MACs,
+stored embedding size. Teacher and student costs are reported separately --
+teacher inference is a one-time distillation cost, not a per-run cost."""
 from __future__ import annotations
 
 import argparse
@@ -43,9 +43,8 @@ def main():
             teacher = GenBioPathFMTeacher(cfg, device=args.device)
             teacher_params = {"total_parameters": teacher.n_parameters, "trainable_parameters": 0}
         except Exception as e:
-            print(f"[14_model_efficiency] could not load GenBio teacher for live param count ({e}); "
-                  f"falling back to the ~1.1B figure from the model card for the ratio only -- "
-                  f"flag this explicitly rather than silently reporting an unverified number.")
+            print(f"[14_model_efficiency] could not load GenBio teacher for a live param count ({e}); "
+                  f"reporting teacher params as unmeasured rather than guessing.")
             teacher_params = {"total_parameters": None, "trainable_parameters": 0, "note": "not measured this run"}
 
         report["teacher"] = teacher_params

@@ -1,36 +1,33 @@
-"""Steps 16 & 20 (Sections 19-20), revised per Final_Project_V2.txt Phases
-10-15: PNA / Scale-Aware PNA / GATv2 graph models, all wrapped in the same
-RESIDUAL correction on top of the (frozen) patch-only predictor.
+"""PNA / Scale-Aware PNA / GATv2 graph models, all wrapped in the same
+RESIDUAL correction on top of the (frozen) patch-only predictor:
 
-    y_patch,i  = patch_predictor(h_i)                         [frozen, Step 14]
-    dy_graph,i = GNN(h_i, neighborhood_i)                     [this module]
+    y_patch,i  = patch_predictor(h_i)          [frozen]
+    dy_graph,i = GNN(h_i, neighborhood_i)      [this module]
     y_final,i  = y_patch,i + dy_graph,i
 
-The graph correction heads are initialized near zero so y_final ~= y_patch
-at initialization (Section 20 / V2 Phase 11) -- this is what makes
-A0-A9 interpretable as "how much does spatial context add on top of what
-the patch already predicts," rather than the graph model re-deriving the
-whole prediction from scratch. V2 Phase 11 directly attributes PoC_5's
-failure mode (patch CNN 0.1875 vs. multiscale PNA falling to 0.1268,
-i.e. the graph model made things WORSE) to not having this residual
-design tightly enforced with an explicit init-time check -- see
-`assert_zero_residual_at_init` below, which V2 requires as a unit test
-run before every graph-training call.
+The graph correction heads are zero-initialized so y_final == y_patch at
+initialization -- this is what makes the A0-A9 grid interpretable as "how
+much does spatial context add on top of the patch prediction," rather
+than the graph model re-deriving everything from scratch. An earlier
+project iteration (PoC_5) once regressed below patch-only performance
+because this wasn't enforced; `assert_zero_residual_at_init` below is the
+init-time check that now guards against that class of bug on every
+graph-training call.
 
 Three interchangeable graph-correction backends, all producing the same
 {"latent", "gene_delta", "pathway_delta"} output so `ResidualGraphPredictor`
 is backend-agnostic:
-  - `GraphCorrectionModel`      -- union multiscale PNA (A4/A5/A6/A7): one
-    PNA sees all edges (of possibly mixed scale) at once, 20-D union edge
+  - `GraphCorrectionModel` -- union multiscale PNA (A4/A5/A6/A7): one PNA
+    sees all edges (of possibly mixed scale) at once, 20-D union edge
     features (sts.graph_builder.union_edge_features).
-  - `ScaleAwareGraphCorrectionModel` -- V2 Phase 12 (A8, the proposed
-    final model): three independent PNA branches (local/meso/macro), each
-    over ONLY its own scale's edges (17-D per_scale_edge_features), fused
-    by a learned softmax gate.
-  - `GATv2CorrectionModel`      -- V2 Phase 15 (A9, architecture control):
-    identical to GraphCorrectionModel except the message-passing layer is
-    GATv2 instead of PNA (sts.gatv2_block.MultiLayerGATv2) -- same input,
-    same edge features, same head, same residual formulation.
+  - `ScaleAwareGraphCorrectionModel` -- the proposed final model (A8):
+    three independent PNA branches (local/meso/macro), each over ONLY its
+    own scale's edges (17-D per_scale_edge_features), fused by a learned
+    softmax gate.
+  - `GATv2CorrectionModel` -- architecture control (A9): identical to
+    GraphCorrectionModel except the message-passing layer is GATv2
+    instead of PNA -- same input, edge features, head, and residual
+    formulation.
 """
 from __future__ import annotations
 
@@ -66,9 +63,9 @@ class GraphCorrectionModel(nn.Module):
 
 
 class GATv2CorrectionModel(nn.Module):
-    """V2 Phase 15 (A9): identical structure to GraphCorrectionModel with
-    GATv2 in place of PNA -- the architecture-isolation control. No degree
-    histogram needed (GATv2 doesn't use PNA's degree scalers)."""
+    """A9: identical structure to GraphCorrectionModel with GATv2 in place
+    of PNA -- the architecture-isolation control. No degree histogram
+    needed (GATv2 doesn't use PNA's degree scalers)."""
 
     def __init__(self, in_dim: int, cfg: dict, edge_dim: int, gene_dim: int, pathway_dim: int):
         super().__init__()
@@ -91,9 +88,8 @@ class GATv2CorrectionModel(nn.Module):
 
 
 class ScaleAwareGraphCorrectionModel(nn.Module):
-    """V2 Phase 12 -- the proposed final architecture (A8). Three
-    independent PNA branches, one per physical scale, each seeing ONLY its
-    own scale's edges:
+    """The proposed final architecture (A8). Three independent PNA
+    branches, one per physical scale, each seeing ONLY its own scale's edges:
 
         h_i^0 = W_stem(h_i^CNN)
         h_i^L = PNA_L(h_i^0, E_local)
@@ -103,17 +99,14 @@ class ScaleAwareGraphCorrectionModel(nn.Module):
         [a_L, a_M, a_G] = softmax(MLP_gate(c_i))
         h_i^spatial = a_L*h_i^L + a_M*h_i^M + a_G*h_i^G
 
-    followed by the same 128->64->{gene,pathway} delta heads,
-    zero-initialized exactly as the union model. `deg_local/meso/macro`
-    are separate TRAINING-fold degree histograms, one per branch (each
-    branch's own PNA needs its own scalers -- V2 Phase 13's per-fold,
-    train-only degree-histogram requirement applies to each branch
-    independently).
+    followed by the same delta heads, zero-initialized exactly as the
+    union model. `deg_local/meso/macro` are separate train-fold-only
+    degree histograms, one per branch, since each branch's own PNA needs
+    its own scalers.
 
     Interface note: rather than a parallel 3-edge-set data pipeline, this
-    reuses the SAME single-`Data`-object PyG plumbing every other backend
-    uses (sts/graph_training.py's make_pyg_data/train_graph_model/
-    predict_graph_model, unchanged) -- `edge_index`/`edge_attr` carry the
+    reuses the same single-`Data`-object PyG plumbing every other backend
+    uses (sts/graph_training.py). `edge_index`/`edge_attr` carry the
     UNION of all three scales' edges (17-D per_scale_edge_features, no
     one-hot needed), and a parallel `edge_scale` LongTensor (0=local,
     1=meso, 2=macro) tags which branch each edge belongs to. forward()
@@ -169,35 +162,33 @@ def _zero_init_delta_heads(model: nn.Module, pna_cfg: dict) -> None:
 
 
 class ResidualGraphPredictor(nn.Module):
-    """Wraps a FROZEN patch-only MolecularBottleneckHead (Step 14) with any
+    """Wraps a FROZEN patch-only MolecularBottleneckHead with any
     trainable graph-correction backend (GraphCorrectionModel /
     GATv2CorrectionModel / ScaleAwareGraphCorrectionModel); forward()
     returns final = patch + delta. The patch predictor's parameters never
-    receive gradients here -- isolating "what does spatial context add" is
-    the entire point of the residual design (Section 20).
+    receive gradients here -- isolating "what does spatial context add"
+    is the entire point of the residual design.
 
     Backend-agnostic via *graph_args passthrough: union/GATv2 backends
-    take (edge_index, edge_attr); the scale-aware backend takes
-    (edges_local, edges_meso, edges_macro) -- either way this class just
-    forwards whatever was passed to `self.graph_correction`."""
+    take (edge_index, edge_attr); the scale-aware backend also takes
+    edge_scale -- either way this class just forwards whatever was passed
+    to `self.graph_correction`."""
 
     def __init__(self, patch_head, graph_correction: nn.Module):
         super().__init__()
         self.patch_head = patch_head
         for p in self.patch_head.parameters():
             p.requires_grad_(False)
-        self.patch_head.eval()  # frozen -> always inference mode (disables Dropout/BatchNorm
-        # stochasticity); without this, patch_head.py's V2-added Dropout layer made the "frozen"
-        # patch predictor non-deterministic across calls -- caught by scripts/16_sanity_checks.py's S1.
+        # frozen -> always eval mode; without this, patch_head's Dropout layer would make the
+        # "frozen" patch predictor non-deterministic across calls (caught by sanity check S1).
+        self.patch_head.eval()
         self.graph_correction = graph_correction
 
     def train(self, mode: bool = True):
         """Keep patch_head in eval() even when the parent module's
-        .train() is called (e.g. by the training loop toggling the whole
-        ResidualGraphPredictor to train mode for the graph_correction
-        branch) -- it must never see BatchNorm/Dropout train-mode
-        stochasticity since it's frozen and meant to reproduce
-        `ŷ_patch,i` exactly (Section 20 / S1)."""
+        .train() is called -- it's frozen and must reproduce y_patch
+        exactly, so it can never see BatchNorm/Dropout train-mode
+        stochasticity."""
         super().train(mode)
         self.patch_head.eval()
         return self
@@ -218,12 +209,10 @@ class ResidualGraphPredictor(nn.Module):
 
 def assert_zero_residual_at_init(model: ResidualGraphPredictor, x: torch.Tensor, *graph_args,
                                   tol: float = 1e-5) -> None:
-    """V2 Phase 11's required unit test, run once before every graph-
-    training call (see scripts/16_sanity_checks.py S3): with the graph
-    correction heads freshly zero-initialized, y_final must exactly equal
-    y_patch. This directly targets the PoC_5 failure mode where an
-    untested graph model could silently start WORSE than patch-only
-    (observed there: patch CNN 0.1875 vs. multiscale PNA 0.1268)."""
+    """Run before every graph-training call: with the graph correction
+    heads freshly zero-initialized, y_final must exactly equal y_patch.
+    Guards against the graph model silently starting out worse than
+    patch-only (the PoC_5 failure mode this module's docstring describes)."""
     model.eval()
     with torch.no_grad():
         out = model(x, *graph_args)
@@ -237,10 +226,9 @@ def assert_zero_residual_at_init(model: ResidualGraphPredictor, x: torch.Tensor,
 
 def graph_loss(pred: dict, gene_target: torch.Tensor, pathway_target: torch.Tensor,
                pathway_weight: float = 0.0) -> dict:
-    """V2 Phase 7/19: primary loss is gene-only (pathway_weight=0.0
-    default, changed from V1's mandatory 0.2 -- pathway loss becomes an
-    ablation swept AFTER the architecture is locked, see
-    sts/patch_head.py's matching default change)."""
+    """Primary loss is gene-only by default (pathway_weight=0.0); pathway
+    loss weight is swept separately as an ablation once the architecture
+    is locked (see sts/patch_head.py's matching default)."""
     from sts.patch_head import patch_head_loss
     fake_pred = {"gene": pred["gene"], "pathway": pred["pathway"]}
     return patch_head_loss(fake_pred, gene_target, pathway_target, pathway_weight)

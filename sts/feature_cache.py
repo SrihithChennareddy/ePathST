@@ -1,6 +1,5 @@
-"""Step 13 (Section 16): extract frozen GenBio-distilled ConvNeXt V2-Atto
-features on every HEST patch and cache them with stable spot IDs, plus
-strong spot_id <-> patch <-> coordinate <-> embedding <-> expression
+"""Extracts frozen encoder features on HEST patches and caches them to
+disk, with spot_id <-> patch <-> coordinate <-> embedding <-> expression
 integrity assertions."""
 from __future__ import annotations
 
@@ -14,8 +13,9 @@ import torch
 @torch.no_grad()
 def extract_student_features(encoder, patches_uint8: np.ndarray, device: str, batch_size: int = 256,
                                downstream_proj=None) -> np.ndarray:
-    """h_i = StudentCNN(x_i) in R^320 (or R^256 if downstream_proj given).
-    Gene expression is never used as input here -- image only (Section 16)."""
+    """Runs the frozen encoder over patches in batches; image only, no
+    expression data touches this path. Returns R^320 features (R^256 if
+    `downstream_proj` is given)."""
     from sts.distill_train import IMAGENET_MEAN, IMAGENET_STD
 
     encoder.eval()
@@ -36,11 +36,10 @@ def extract_student_features(encoder, patches_uint8: np.ndarray, device: str, ba
 def cache_features(out_path: str | Path, spot_ids: list[str], features: np.ndarray, coords_um: np.ndarray,
                     encoder_name: str | None = None, checkpoint_source: str | None = None,
                     sample_id: str | None = None) -> None:
-    """`encoder_name`/`checkpoint_source`/`sample_id` are stored as h5 attrs
-    (final-experiment diagnostic, 2026-08-30): lets `load_cached_features`
-    assert a cache actually belongs to the encoder callers think it does --
-    this is what makes A1 (imagenet) vs A2 (distilled) a real comparison
-    rather than a silent feature-loading mixup (see sts/ablations.py)."""
+    """Stores `encoder_name`/`checkpoint_source`/`sample_id` as h5 attrs so
+    `load_cached_features` can assert a cache belongs to the encoder the
+    caller expects -- without this, A1 (ImageNet) and A2 (distilled) can
+    silently load each other's features (see sts/ablations.py)."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(out_path, "w") as f:
@@ -68,15 +67,15 @@ def load_cached_features(path: str | Path, expected_encoder_name: str | None = N
         assert out["encoder_name"] == expected_encoder_name, (
             f"cache routing error: {path} was cached by encoder "
             f"'{out['encoder_name']}', but the caller required '{expected_encoder_name}' -- "
-            f"this is exactly the A1/A2 feature-mixup bug fixed 2026-08-30, see sts/ablations.py")
+            f"this is the A1/A2 feature-mixup bug class, see sts/ablations.py")
     return out
 
 
 def assert_full_alignment(spot_ids: list[str], embedding: np.ndarray, coords_um: np.ndarray,
                            expr_df, expr_spot_col: str = None) -> dict:
-    """Section 16: 'spot_id <-> patch <-> coordinate <-> student embedding
-    <-> expression vector must remain exactly aligned.' `expr_df` is
-    indexed (or has a column) by spot_id."""
+    """Checks that spot_id <-> patch <-> coordinate <-> embedding <->
+    expression stay in identical order. `expr_df` is indexed (or has a
+    column) by spot_id."""
     expr_ids = expr_df.index.astype(str).tolist() if expr_spot_col is None else expr_df[expr_spot_col].astype(str).tolist()
     checks = {
         "n_spot_ids": len(spot_ids),
