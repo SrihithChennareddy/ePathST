@@ -1,0 +1,107 @@
+{
+  "scale_aware_vs_local": {
+    "better": "A8_scale_aware_pna",
+    "worse": "A6_local_pna",
+    "units": [
+      "CCRCC_f0_s0",
+      "COAD_f0_s0",
+      "IDC_f0_s0"
+    ],
+    "bootstrap": {
+      "mean_delta": 0.00048482672254286635,
+      "ci_low": -0.002393979721757901,
+      "ci_high": 0.0031439408422344003,
+      "n_patients": 3,
+      "effect_size_cohens_d": 0.17468154621545362
+    },
+    "sign_flip_test": {
+      "observed_mean": 0.00048482672254286635,
+      "p_value_one_sided": 0.3758624137586241
+    },
+    "supported_ci_above_zero": false
+  },
+  "scale_aware_vs_union_multiscale": {
+    "better": "A8_scale_aware_pna",
+    "worse": "A7_multiscale_pna",
+    "units": [
+      "CCRCC_f0_s0",
+      "COAD_f0_s0",
+      "IDC_f0_s0"
+    ],
+    "bootstrap": {
+      "mean_delta": -0.0010614349233944661,
+      "ci_low": -0.0023272405699070993,
+      "ci_high": 0.0004504928421091999,
+      "n_patients": 3,
+      "effect_size_cohens_d": -0.7554012391396118
+    },
+    "sign_flip_test": {
+      "observed_mean": -0.0010614349233944661,
+      "p_value_one_sided": 0.8697130286971303
+    },
+    "supported_ci_above_zero": false
+  },
+  "scale_aware_vs_random": {
+    "better": "A8_scale_aware_pna",
+    "worse": "A4_random_graph",
+    "units": [
+      "CCRCC_f0_s0",
+      "COAD_f0_s0",
+      "IDC_f0_s0"
+    ],
+    "bootstrap": {
+      "mean_delta": 3.7708458302300345e-05,
+      "ci_low": -0.0032765799936666992,
+      "ci_high": 0.0025611800676367,
+      "n_patients": 3,
+      "effect_size_cohens_d": 0.012577241593933806
+    },
+    "sign_flip_test": {
+      "observed_mean": 3.7708458302300345e-05,
+      "p_value_one_sided": 0.49895010498950104
+    },
+    "supported_ci_above_zero": false
+  },
+  "scale_aware_vs_matched_mlp": {
+    "better": "A8_scale_aware_pna",
+    "worse": "A3_matched_mlp",
+    "units": [
+      "CCRCC_f0_s0",
+      "COAD_f0_s0",
+      "IDC_f0_s0"
+    ],
+    "bootstrap": {
+      "mean_delta": -0.07599465357499673,
+      "ci_low": -0.0804593422099862,
+      "ci_high": -0.0675143230224773,
+      "n_patients": 3,
+      "effect_size_cohens_d": -10.342767714387762
+    },
+    "sign_flip_test": {
+      "observed_mean": -0.07599465357499673,
+      "p_value_one_sided": 1.0
+    },
+    "supported_ci_above_zero": false
+  },
+  "scale_aware_vs_gatv2": {
+    "better": "A8_scale_aware_pna",
+    "worse": "A9_gatv2_multiscale",
+    "units": [
+      "CCRCC_f0_s0",
+      "COAD_f0_s0",
+      "IDC_f0_s0"
+    ],
+    "bootstrap": {
+      "mean_delta": -0.0005955557339692004,
+      "ci_low": -0.0027972683133154993,
+      "ci_high": 0.0011246189655720988,
+      "n_patients": 3,
+      "effect_size_cohens_d": -0.2970654297459291
+    },
+    "sign_flip_test": {
+      "observed_mean": -0.0005955557339692004,
+      "p_value_one_sided": 0.7488251174882512
+    },
+    "supported_ci_above_zero": false
+  }
+}
