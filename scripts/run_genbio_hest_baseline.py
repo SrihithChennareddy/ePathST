@@ -327,6 +327,10 @@ def main():
     ap.add_argument("--train-only", action="store_true", help="skip extraction, assume embeddings already cached")
     ap.add_argument("--skip-smoke-test", action="store_true", help="skip the 1-sample-per-cancer smoke test")
     ap.add_argument("--smoke-test-only", action="store_true", help="run only the smoke test, then exit")
+    ap.add_argument("--head", choices=["mlp", "ridge"], default="mlp",
+                     help="downstream head on the frozen GenBio embeddings: 'mlp' (default, this project's "
+                          "small trained neural head) or 'ridge' (closed-form RidgeCV linear probe, the "
+                          "standard downstream head most published HEST-1k-style benchmarks use)")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -334,7 +338,9 @@ def main():
     persist_dir = Path(cfg["paths"].get("persist_dir") or cfg["paths"]["work_dir"])
     embed_dir = persist_dir / "genbio_baseline_embeddings"
     patch_shard_dir = Path(cfg["paths"]["work_dir"]) / "hest_patches"  # read-only: owned by scripts/08
-    results_dir = paths["results"] / "genbio_baseline"
+    # separate results dir per --head so a ridge run never silently reuses or clobbers the
+    # mlp run's cached per-cancer JSON / summary CSVs (they're not comparable head-for-head reuse)
+    results_dir = paths["results"] / ("genbio_baseline" if args.head == "mlp" else f"genbio_baseline_{args.head}")
     hvg_lists_dir = results_dir / "hvg_lists"
     splits_dir = results_dir / "splits_used"
     for d in (embed_dir, results_dir, hvg_lists_dir, splits_dir):
@@ -495,43 +501,63 @@ def main():
               f"(split source: {split_source})")
 
         seed_everything(args.seed)
-        head = GenBioDownstreamHead(gene_dim=len(hvg["hvg1000"]), pathway_dim=14,
-                                     dropout=cfg["patch_head"].get("dropout", 0.1)).to(device)
-        opt = torch.optim.AdamW(head.parameters(), lr=cfg["patch_head"]["lr"], weight_decay=cfg["patch_head"]["weight_decay"])
-        if device == "cuda":
-            torch.cuda.reset_peak_memory_stats()
         t_train0 = time.time()
-        best_val, patience_ctr, best_state = float("inf"), 0, None
-        for epoch in range(cfg["patch_head"]["max_epochs"]):
-            head.train()
-            xb = torch.tensor(x_train, dtype=torch.float32, device=device)
-            gb = torch.tensor(y_gene_train, dtype=torch.float32, device=device)
-            pb = torch.tensor(y_path_train, dtype=torch.float32, device=device)
-            opt.zero_grad()
-            loss = patch_head_loss(head(xb), gb, pb, cfg["patch_head"]["pathway_loss_weight"])
-            loss["loss"].backward()
-            opt.step()
+        if args.head == "ridge":
+            # Standard closed-form linear-probe baseline most published HEST-1k-style
+            # benchmarks actually use on frozen foundation-model embeddings -- far less
+            # prone to the small-neural-MLP underfitting/overfitting found in this run
+            # (see docs/RUN_STATUS.md's GNN-overfitting entry, 2026-08-30). RidgeCV
+            # selects its regularization strength via built-in leave-one-out CV on the
+            # TRAIN+VAL spots only (never test) -- no separate early-stopping loop needed,
+            # so train+val are combined here (unlike the MLP path, which needs val held
+            # out purely for early-stopping signal).
+            from sklearn.linear_model import RidgeCV
+            x_fit = np.concatenate([x_train, x_val], axis=0)
+            y_gene_fit = np.concatenate([y_gene_train, y_gene_val], axis=0)
+            y_path_fit = np.concatenate([y_path_train, y_path_val], axis=0)
+            alphas = np.logspace(-2, 4, 13)
+            gene_ridge = RidgeCV(alphas=alphas).fit(x_fit, y_gene_fit)
+            path_ridge = RidgeCV(alphas=alphas).fit(x_fit, y_path_fit)
+            gene_pred = gene_ridge.predict(x_test)
+            path_pred = path_ridge.predict(x_test)
+            peak_vram_gb = float("nan")  # sklearn, CPU-only, no CUDA allocation to report
+        else:
+            head = GenBioDownstreamHead(gene_dim=len(hvg["hvg1000"]), pathway_dim=14,
+                                         dropout=cfg["patch_head"].get("dropout", 0.1)).to(device)
+            opt = torch.optim.AdamW(head.parameters(), lr=cfg["patch_head"]["lr"], weight_decay=cfg["patch_head"]["weight_decay"])
+            if device == "cuda":
+                torch.cuda.reset_peak_memory_stats()
+            best_val, patience_ctr, best_state = float("inf"), 0, None
+            for epoch in range(cfg["patch_head"]["max_epochs"]):
+                head.train()
+                xb = torch.tensor(x_train, dtype=torch.float32, device=device)
+                gb = torch.tensor(y_gene_train, dtype=torch.float32, device=device)
+                pb = torch.tensor(y_path_train, dtype=torch.float32, device=device)
+                opt.zero_grad()
+                loss = patch_head_loss(head(xb), gb, pb, cfg["patch_head"]["pathway_loss_weight"])
+                loss["loss"].backward()
+                opt.step()
+
+                head.eval()
+                with torch.no_grad():
+                    xv = torch.tensor(x_val, dtype=torch.float32, device=device)
+                    gv = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
+                    pv = torch.tensor(y_path_val, dtype=torch.float32, device=device)
+                    val_loss = patch_head_loss(head(xv), gv, pv, cfg["patch_head"]["pathway_loss_weight"])["loss"].item()
+                if val_loss < best_val:
+                    best_val, patience_ctr, best_state = val_loss, 0, {k: v.clone() for k, v in head.state_dict().items()}
+                else:
+                    patience_ctr += 1
+                if patience_ctr >= cfg["patch_head"]["early_stop_patience"]:
+                    break
+            head.load_state_dict(best_state)
+            peak_vram_gb = torch.cuda.max_memory_allocated() / 1e9 if device == "cuda" else float("nan")
 
             head.eval()
             with torch.no_grad():
-                xv = torch.tensor(x_val, dtype=torch.float32, device=device)
-                gv = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
-                pv = torch.tensor(y_path_val, dtype=torch.float32, device=device)
-                val_loss = patch_head_loss(head(xv), gv, pv, cfg["patch_head"]["pathway_loss_weight"])["loss"].item()
-            if val_loss < best_val:
-                best_val, patience_ctr, best_state = val_loss, 0, {k: v.clone() for k, v in head.state_dict().items()}
-            else:
-                patience_ctr += 1
-            if patience_ctr >= cfg["patch_head"]["early_stop_patience"]:
-                break
-        head.load_state_dict(best_state)
+                out = head(torch.tensor(x_test, dtype=torch.float32, device=device))
+            gene_pred, path_pred = out["gene"].cpu().numpy(), out["pathway"].cpu().numpy()
         head_training_seconds = time.time() - t_train0
-        peak_vram_gb = torch.cuda.max_memory_allocated() / 1e9 if device == "cuda" else float("nan")
-
-        head.eval()
-        with torch.no_grad():
-            out = head(torch.tensor(x_test, dtype=torch.float32, device=device))
-        gene_pred, path_pred = out["gene"].cpu().numpy(), out["pathway"].cpu().numpy()
 
         test_patient_ids = spot_by_uid.loc[ids_test, "patient_id"].values
         n_hvg50 = len(hvg["hvg50"])
