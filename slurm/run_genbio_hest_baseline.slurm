@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=44G
+#SBATCH --mem=160G
 #SBATCH --gres=gpu:nvidia_rtx_pro_6000_blackwell:1
 #SBATCH --time=24:00:00
 #SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_genbio_baseline_%j.out
@@ -20,6 +20,13 @@
 # and hest_patches/*.h5 (never writes to them). Its own outputs live under
 # a new persist_dir subdir (genbio_baseline_embeddings/) and a new results
 # subdir (results/genbio_baseline/) that the CNN/GNN job never touches.
+#
+# --mem=160G (bumped from 44G, 2026-08-30, after a real OOM kill on
+# COAD): this script's per-cancer downstream-head loop reuses scripts/
+# 10_run_patient_cv.py's load_fold_expression, which pools every
+# training sample's full dense expression matrix -- same memory
+# footprint that forced the CNN/GNN job's --mem up to 160G, since it's
+# literally the same shared function.
 #
 # 24h wall-clock (vs. the CNN/GNN job's 8h) because a single run here does
 # the full 3-cancer GenBio feature-extraction pass PLUS downstream-head
