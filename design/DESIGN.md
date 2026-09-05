@@ -131,7 +131,9 @@ without PyYAML) — nothing is hard-coded in the scripts. See
   (patch extraction; dispatches between DICOM (`wsidicom`) and plain
   openslide-readable formats), `hest_prep.py` (HEST metadata audit,
   alignment QC, ST-spot patch extraction), `patient_split.py` (patient-level
-  splitting, no leakage across train/val/test).
+  splitting, no leakage across train/val/test), `feature_cache.py` (runs a
+  frozen encoder over patches and caches embeddings to disk, with
+  spot_id/patch/coordinate/embedding/expression integrity checks).
 - **Models**: `teacher_genbio.py` (frozen GenBio-PathFM wrapper, non-standard
   HF preprocessing/output handling), `student_model.py` (ConvNeXt V2-Atto +
   projection head + lock/strip logic), `distill_loss.py` /
@@ -228,9 +230,11 @@ reported both pooled and per-cancer (per-cancer is primary):
 | 3 — True topology (decisive) | R(A8 scale-aware PNA) > R(A5 shuffled graph) |
 
 Statistics: patient-level Pearson r per gene/pathway, Fisher-z aggregation
-across patients, 10,000-resample bootstrap CIs, Benjamini-Hochberg FDR
-correction (q=0.05) across genes — everything is evaluated at the patient
-level (not spot level) to avoid pseudo-replication. Before any statistic is
+across patients, 10,000-resample bootstrap CIs — everything is evaluated at
+the patient level (not spot level) to avoid pseudo-replication.
+`src/pathology_st/stats_tests.bh_fdr` (Benjamini-Hochberg FDR, q=0.05) is
+implemented and unit-tested but not yet called by `12_primary_hypothesis_test.py`
+— a follow-up, not yet part of the actual reported statistics. Before any statistic is
 aggregated, `src/pathology_st/cv_folds.assert_run_completeness` hard-fails on a
 mismatch between the expected and completed (cancer, fold, seed, ablation)
 run set — added after PoC_5's own aggregate silently pooled an incomplete
@@ -274,8 +278,11 @@ writeup and results.
   the earlier 23-slide `simons_2026/colon` CRC23 subset used for PoC_5/early
   validation. `load_hest_raw_metadata` still skips-and-reports any cancer
   with no configured/found source, for whenever a future cohort is added.
-  Full alignment QC + patch extraction across all 202 samples at scale has
-  not yet been run (only exercised on a 1-2 sample subset so far).
+  The custom-protocol grid (`10_run_patient_cv.py`) has run against a
+  5-fold/3-cancer subset (see `docs/RUN_STATUS.md`); the official-protocol
+  suite (scripts 19/22/23) has since run against real samples across all
+  12 official folds (IDC 4, COAD 2, CCRCC 6) for all three cancers — see
+  `docs/HEST_OFFICIAL_ABLATION_RESULTS.md`.
 - `10_run_patient_cv.py`'s A0 (mean-expression) and A3 (parameter-matched
   `MolecularBottleneckHead`) ablations are real implementations (fixed
   during the V1->V2 migration — V1's driver silently skipped both).
