@@ -1,0 +1,34 @@
+{
+  "run_id": "2026-09-05_job88050_official_hest_ablation_grid",
+  "captured_at": "2026-09-05",
+  "job_id": "88050",
+  "partition": "h200x8-then-b40x4",
+  "gpu": "1x RTX PRO 6000 Blackwell",
+  "stage": "official A0-A9 grid, all 3 cancers, official protocol (Fisher-z + official pooled Pearson)",
+  "source_work_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_genbio_distill_hest_pna_work",
+  "source_persist_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith",
+  "files_captured": {
+    "results": [
+      "cv_ablation_metrics.csv",
+      "distillation_evaluation.json",
+      "distillation_training_summary.json",
+      "final",
+      "final_results_table.csv",
+      "genbio_baseline",
+      "genbio_teacher_param_count.json",
+      "morans_i_diagnostic",
+      "official_hest_ablation_grid",
+      "official_hest_benchmark",
+      "per_cancer_results_table.csv",
+      "primary_hypothesis_test.json",
+      "secondary_hypothesis_tests.json",
+      "student_encoder_param_count_seed0.json"
+    ],
+    "figures": [
+      "fig1_pipeline.png",
+      "fig4_ablation_comparison.png",
+      "umap_S0_seed0.npz",
+      "umap_S1_seed0.npz"
+    ]
+  }
+}

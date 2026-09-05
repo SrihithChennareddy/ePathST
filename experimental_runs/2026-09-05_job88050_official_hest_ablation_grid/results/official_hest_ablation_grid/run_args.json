@@ -1,0 +1,15 @@
+{
+  "config": {
+    "config": "configs/base.yaml",
+    "bench_root": "/lustre/nvwulf/scratch/schennareddy/HEST-1k/hest_bench",
+    "cancers": [
+      "IDC",
+      "COAD",
+      "CCRCC"
+    ],
+    "device": "cuda",
+    "seed": 1,
+    "feature_seed": 0,
+    "max_folds_per_cancer": null
+  }
+}

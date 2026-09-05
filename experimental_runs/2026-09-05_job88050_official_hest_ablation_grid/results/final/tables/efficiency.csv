@@ -1,0 +1,7 @@
+metric,value,status,source
+student_encoder_total_parameters,3387400.0,MEASURED,"scripts (ConvNeXt V2-Atto student), student_encoder_param_count_seed0.json"
+genbio_pathfm_teacher_total_parameters,1133686784.0,MEASURED,"AutoModel.from_pretrained('genbio-ai/genbio-pathfm'), sum(p.numel()), 2026-08-31"
+compression_ratio_teacher_over_student,334.6775650941725,MEASURED,derived from the two rows above
+gpu_peak_vram_inference,,NOT MEASURED,no inference-time VRAM profiling run this session
+patches_per_second_throughput,,NOT MEASURED,no throughput benchmark run this session
+A8_gnn_inference_wallclock_per_patient,,NOT MEASURED,no dedicated timing harness run this session
