@@ -2,7 +2,7 @@
 
 Real, computed results from the first fully clean end-to-end completion
 of Steps 8-12 against the real 3-cancer HEST dataset
-(`scripts/10_run_patient_cv.py` / `scripts/12_primary_hypothesis_test.py`,
+(`src/scripts/10_run_patient_cv.py` / `src/scripts/12_primary_hypothesis_test.py`,
 job **84733**, 2026-08-30). Compiled directly from
 `results/cv_ablation_metrics.csv` and `results/primary_hypothesis_test.json`
 (mirrored into `experimental_runs/2026-08-30_job84733_hest_downstream_full_3cancer/`)
@@ -145,7 +145,7 @@ worth debugging before drawing a real scientific conclusion.
   this run completed, once its results were found to be byte-identical
   to A2's across all 3 cancers -- a real feature-loading bug (A1's
   declared "ImageNet, no distillation" encoder was never actually
-  consulted; `scripts/10_run_patient_cv.py` always loaded the distilled
+  consulted; `src/scripts/10_run_patient_cv.py` always loaded the distilled
   feature cache regardless of ablation spec). Confirmed every other
   ablation (A0, A2-A9) already specs the encoder that's actually loaded,
   so only A1's own row and Gate 1 were invalid -- everything in this

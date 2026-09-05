@@ -1,7 +1,7 @@
 """Distillation training loop and the S0/S1/S2 baseline definitions.
 
   S0 - ImageNet ConvNeXt V2-Atto, NO pathology distillation (encoder used
-       as-is; nothing to train here, see scripts/05).
+       as-is; nothing to train here, see src/scripts/05).
   S1 - GenBio-distilled ConvNeXt V2-Atto (ImageNet init -> distilled). Main comparison target.
   S2 - random-init ConvNeXt V2-Atto distilled against the GenBio teacher.
 """

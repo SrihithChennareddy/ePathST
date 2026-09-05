@@ -106,7 +106,7 @@ class ScaleAwareGraphCorrectionModel(nn.Module):
 
     Interface note: rather than a parallel 3-edge-set data pipeline, this
     reuses the same single-`Data`-object PyG plumbing every other backend
-    uses (sts/graph_training.py). `edge_index`/`edge_attr` carry the
+    uses (src/sts/graph_training.py). `edge_index`/`edge_attr` carry the
     UNION of all three scales' edges (17-D per_scale_edge_features, no
     one-hot needed), and a parallel `edge_scale` LongTensor (0=local,
     1=meso, 2=macro) tags which branch each edge belongs to. forward()
@@ -228,7 +228,7 @@ def graph_loss(pred: dict, gene_target: torch.Tensor, pathway_target: torch.Tens
                pathway_weight: float = 0.0) -> dict:
     """Primary loss is gene-only by default (pathway_weight=0.0); pathway
     loss weight is swept separately as an ablation once the architecture
-    is locked (see sts/patch_head.py's matching default)."""
+    is locked (see src/sts/patch_head.py's matching default)."""
     from sts.patch_head import patch_head_loss
     fake_pred = {"gene": pred["gene"], "pathway": pred["pathway"]}
     return patch_head_loss(fake_pred, gene_target, pathway_target, pathway_weight)

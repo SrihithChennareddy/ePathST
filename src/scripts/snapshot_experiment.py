@@ -8,7 +8,7 @@ never mistaken for a complete one.
 
 Usage (typically called from a SLURM script right after a stage
 completes, or by hand):
-    python3 scripts/snapshot_experiment.py --config configs/base.yaml \\
+    python3 src/scripts/snapshot_experiment.py --config configs/base.yaml \\
         --job-id 83723 --partition b40x4 --gpu "1x RTX PRO 6000 Blackwell" \\
         --label cptac_distill_b40x4 --stage "step1-2 complete"
 """

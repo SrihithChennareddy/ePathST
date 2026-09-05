@@ -21,7 +21,7 @@ genes**. This doc lists both, per cancer, and explains why they diverge (see als
    against that cancer.
 
 **This project's own HVG50** (`sts.expression.select_hvg_for_fold`, used by
-`scripts/10_run_patient_cv.py`'s custom protocol):
+`src/scripts/10_run_patient_cv.py`'s custom protocol):
 1. Per fold, using **train patients only** (a fresh selection every fold -- leakage-free by
    construction, but not the same list across folds or comparable to a fixed benchmark panel).
 2. Per-slide `normalize_total(target_sum=1e4)` + `log1p` (official has no `normalize_total`).

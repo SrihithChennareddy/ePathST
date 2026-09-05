@@ -178,7 +178,7 @@ log1p-only targets (no library-size normalization), StandardScaler+PCA(256)+Ridg
 
 ### 7b. Custom-pipeline GenBio embedding -> trained MLP baseline (B1) -- PARTIAL
 
-Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no Ridge -- `scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused alternative), on the SAME HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table -- but **fold0/seed0 only, not the full 5-fold design**. Treat as preliminary; do not compare CI-to-CI against the bootstrapped A0-A9 numbers above (no CI is computable from a single fold).
+Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no Ridge -- `src/scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused alternative), on the SAME HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table -- but **fold0/seed0 only, not the full 5-fold design**. Treat as preliminary; do not compare CI-to-CI against the bootstrapped A0-A9 numbers above (no CI is computable from a single fold).
 
 | Cancer | n train / test patients | HVG1000 R | HVG50 R | PROGENy14 R | Feature extract (s) | Head train (s) | Peak VRAM (GB) |
 |---|---|---|---|---|---|---|---|

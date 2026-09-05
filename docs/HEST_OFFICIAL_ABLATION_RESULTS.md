@@ -2,21 +2,21 @@
 
 **Job**: SLURM 87551 (`slurm/run_official_hest_ablation_grid.slurm`), all 3 cancers, all official
 k-folds, seed=1 (official `BenchmarkConfig` default), feature-seed=0 (locked distilled encoder).
-Runtime: 26 min (2026-09-04 11:34-12:01). Driver: `scripts/22_official_hest_ablation_grid.py`.
+Runtime: 26 min (2026-09-04 11:34-12:01). Driver: `src/scripts/22_official_hest_ablation_grid.py`.
 
 ## What this is
 
-`scripts/10_run_patient_cv.py` runs the full A0-A9 grid under this project's own custom
+`src/scripts/10_run_patient_cv.py` runs the full A0-A9 grid under this project's own custom
 protocol (own patient-level GroupKFold splits, HVG1000/HVG50 selected per-fold from
 train-only variance, normalize_total+log1p targets, PROGENy14 pathway scores).
-`scripts/19_official_hest_benchmark.py` reproduces the **official** HEST-1k Benchmark protocol
+`src/scripts/19_official_hest_benchmark.py` reproduces the **official** HEST-1k Benchmark protocol
 (official k-fold splits, official curated 50-gene panel, log1p-only targets) but only for two
 raw encoders via a from-scratch PCA(256)+Ridge head -- it never touches the trained
 patch-head + PNA/GATv2 graph-correction models.
 
 This run closes that gap: the *same* A0-A9 models script 10 trains (same `run_ablation`/
 `train_patch_head` code, reused via `importlib`, not reimplemented) evaluated against the
-*official* protocol's data, splits, and gene targets. See `scripts/22_official_hest_ablation_grid.py`'s
+*official* protocol's data, splits, and gene targets. See `src/scripts/22_official_hest_ablation_grid.py`'s
 module docstring for the exact list of required adaptations (official 50-gene target, no
 PROGENy pathway target -- not part of the official benchmark at all, `patient_id` = official
 `sample_id`, pixel->micron spot coordinates via `mpp = 55/spot_diameter_fullres`, and a
@@ -71,7 +71,7 @@ Difficulty ranks the same way as the custom-protocol run: IDC (easiest) > COAD >
 
 ## GenBio-PathFM teacher reference (same official protocol, PCA(256)+Ridge head)
 
-From `scripts/19_official_hest_benchmark.py` (`results/official_hest_benchmark/`), a
+From `src/scripts/19_official_hest_benchmark.py` (`results/official_hest_benchmark/`), a
 methodologically separate comparison (raw embeddings -> train-fold PCA(256) -> Ridge, not the
 trained MLP bottleneck head A1/A2 use -- numbers are close to but not directly comparable to
 A1/A2 above):
@@ -109,8 +109,8 @@ across both protocols, not the absolute R values.
 
 ## Leakage check
 
-Traced explicitly for this run (see `scripts/22_official_hest_ablation_grid.py` and
-`scripts/10_run_patient_cv.py::run_ablation`):
+Traced explicitly for this run (see `src/scripts/22_official_hest_ablation_grid.py` and
+`src/scripts/10_run_patient_cv.py::run_ablation`):
 
 - Official train/test splits are sample-disjoint: verified 0 overlapping `sample_id`s across
   all 12 official train/test fold pairs.

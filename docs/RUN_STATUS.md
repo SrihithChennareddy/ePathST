@@ -4,7 +4,7 @@ See also `experimental_runs/` (sibling to `docs/`) for captured result
 snapshots used for cross-run comparison/analysis -- this file is the
 operational log (what ran, what broke, what to do next); that folder is
 the scientific record (actual numbers). Both SLURM scripts call
-`scripts/snapshot_experiment.py` automatically at the end of their run.
+`src/scripts/snapshot_experiment.py` automatically at the end of their run.
 
 Living document tracking the real (non-simulated) execution of the CPTAC
 distillation pipeline: what's been submitted, what happened, what's
@@ -48,7 +48,7 @@ were moved to the YurovskyGroup-nvwulf project space, which has a real
   cache (or, when GPU-sharded, its own shard's partial file). Never
   recomputes an embedding that already exists -- this is the "run GenBio
   only once" guarantee.
-- **Step 5** (`05_train_student_distill.py` / `sts/distill_train.train_student`):
+- **Step 5** (`05_train_student_distill.py` / `src/sts/distill_train.train_student`):
   saves a full training-state snapshot (`{baseline}_seed{seed}_resume.pt`
   -- model+optimizer+scaler+step counters) every epoch, separate from the
   best-val checkpoint (`{baseline}_seed{seed}_best.pt`). A rerun with the
@@ -111,7 +111,7 @@ job's Step 1-2).
   patch loop in one try/except, a single edge-adjacent coordinate anywhere
   in a WSI's sample list aborted that WSI's ENTIRE patch set, not just the
   one bad patch. ~7/363 WSIs (~2%) lost to this before the fix landed.
-  **Fixed** in `sts/wsi_patches.py` (new `_clamp_region` helper, applied
+  **Fixed** in `src/sts/wsi_patches.py` (new `_clamp_region` helper, applied
   in both `WsiDicomReader.read_region_at_mpp` and
   `OpenSlideReader.read_region_at_mpp`): shifts the read region to stay
   within the level's bounds instead of raising, trading a small
@@ -209,7 +209,7 @@ if I disconnect"):
   the real on-disk state rather than trusting any stale summary.
 
 ### CRITICAL BUG -- both jobs 83723 and 83737 crashed (found ~05:00-08:00)
-**Root cause**: `sts/teacher_genbio.cache_teacher_embeddings` created the
+**Root cause**: `src/sts/teacher_genbio.cache_teacher_embeddings` created the
 teacher-embeddings cache's `patch_id` HDF5 dataset with a FIXED-width
 numpy `dtype="S"` string type, sized from whatever the FIRST batch's
 longest patch_id string happened to be (71 bytes, as it turned out). This
@@ -247,13 +247,13 @@ against the shared cache surfaced it sooner) -- it would eventually have
 corrupted even a single solo run, the moment any one run's patch_id
 lengths varied enough from its own first batch.
 
-**Fix**: `sts/teacher_genbio.cache_teacher_embeddings` now uses
+**Fix**: `src/sts/teacher_genbio.cache_teacher_embeddings` now uses
 `h5py.string_dtype(encoding="utf-8")` (h5py variable-length strings)
 instead of fixed-width `dtype="S"` for the `patch_id` dataset -- no width
 limit, verified with a round-trip test (short batch then a much-longer
 batch, ids preserved exactly, `no_duplicate_patch_ids: True`). Audited
 the other 3 `dtype="S"` call sites in the codebase
-(`sts/wsi_patches.write_patch_shard`, `sts/feature_cache.cache_features`)
+(`src/sts/wsi_patches.write_patch_shard`, `src/sts/feature_cache.cache_features`)
 -- both write their string dataset in a single one-shot `create_dataset`
 call (correctly auto-sized to that exact array, never resized/appended
 across separate calls afterward), so they were never at risk of this
@@ -291,7 +291,7 @@ job instead.
 **Solution**: abandoned the single-24h-job approach. Instead, chained
 THREE 8-hour jobs on the regular (fast-scheduling) `b40x4` partition via
 SLURM job dependencies -- functionally equivalent to one 24h run, given
-Step 5's already-built resume-checkpoint mechanism (`sts/distill_train.
+Step 5's already-built resume-checkpoint mechanism (`src/sts/distill_train.
 train_student` saves full training state every epoch and auto-resumes),
 and Steps 1-4's resumable caches (near-instant on links 2 and 3, since
 everything is already extracted/embedded by link 1):
@@ -347,7 +347,7 @@ no way to compare the model at different training stages afterward.
 Added permanent, never-overwritten snapshots every 10 completed epochs:
 `{baseline}_seed{seed}_epoch{N}.pt` (N=10,20,30,...100), covering the
 requested 20/50/100 examples. Implemented in
-`sts/distill_train.train_student` -- link 2 (83826) and link 3 (83827)
+`src/sts/distill_train.train_student` -- link 2 (83826) and link 3 (83827)
 will save these natively since they start fresh Python processes that
 load the updated code.
 
@@ -384,7 +384,7 @@ stale (frozen at epoch 14)** even though the raw best checkpoint
 (`S1_seed0_best.pt`) is current and correct (epoch 38 as of the chain's
 end). Not fixed yet since the user hasn't asked for it and nothing
 downstream is reading the locked encoder yet -- but re-run
-`scripts/07_lock_student.py --mode A` manually (fast, no GPU compute
+`src/scripts/07_lock_student.py --mode A` manually (fast, no GPU compute
 needed beyond one forward pass to strip the head) once training is
 where you want it, or fix the time budget in the `.slurm` script to
 reserve enough for Step 6 + Step 9 both.
@@ -423,11 +423,11 @@ resumability design holds under real, repeated failure.
 **Step 8 parallelization** (previously ~single-threaded, one WSI region
 read at a time -- confirmed the actual bottleneck, not GPU-bound: Step 8
 touches no CUDA code path at all):
-- `sts/hest_prep.extract_hest_patches_for_sample` now reads a sample's
+- `src/sts/hest_prep.extract_hest_patches_for_sample` now reads a sample's
   spots concurrently via a `ThreadPoolExecutor` -- openslide's
   `read_region` releases the GIL during the tile decode, so this is
   genuine I/O parallelism on one WSI handle.
-- `scripts/08_prepare_hest_metadata.py` now also runs multiple SAMPLES
+- `src/scripts/08_prepare_hest_metadata.py` now also runs multiple SAMPLES
   concurrently via `ProcessPoolExecutor` (`--sample-workers`, default 4)
   each running its own `--threads-per-sample` (default 6) thread pool --
   4x6=24 matches the job's `--cpus-per-task=24`. Checkpointing (every 5
@@ -447,12 +447,12 @@ touches no CUDA code path at all):
   file's Job 83815 entry, just for a different partition. Reverted to
   `b40x4`/`b40x4-long`, which has consistently had usable headroom.
 
-**New GenBio-PathFM baseline** (`scripts/run_genbio_hest_baseline.py` /
+**New GenBio-PathFM baseline** (`src/scripts/run_genbio_hest_baseline.py` /
 `slurm/run_genbio_hest_baseline.slurm`): a standalone, frozen
 GenBio-PathFM (1.1B params, 4608-D embedding) patch-only comparison --
 no GNN, no fine-tuning, reuses the main pipeline's exact seed=0/fold=0
 split and HVG1000/HVG50/PROGENy14 target definitions via
-`scripts/10_run_patient_cv.load_fold_expression` (imported via
+`src/scripts/10_run_patient_cv.load_fold_expression` (imported via
 `importlib`, never copy-pasted, so every Step-10 fix below applies to it
 automatically). Writes `results/genbio_baseline/genbio_summary.csv` (one
 row per cancer: `HVG50_r/HVG1000_r/PROGENy14_r` + now also
@@ -516,7 +516,7 @@ decision** (excluding the outliers, not accepting a degraded HVG171):
 `sts.cv_folds.exclude_targeted_panel_samples` (threshold 2000 genes --
 real whole-transcriptome panels seen are 14700+, real targeted panels
 seen are 541) drops these 11 samples from the CV split entirely in both
-`scripts/10_run_patient_cv.py` and `scripts/run_genbio_hest_baseline.py`,
+`src/scripts/10_run_patient_cv.py` and `src/scripts/run_genbio_hest_baseline.py`,
 so the remaining 191 samples (IDC 114, COAD 53, CCRCC 24) all get the
 full HVG1000/HVG50, keeping the `HVG1000_r`/`HVG50_r` comparison
 apples-to-apples across all 3 cancers. Also fixed the dimension bug
@@ -562,7 +562,7 @@ success/failure detection is wrong, not investigated further here).
 
 **Fifth bug found from these real results, not a crash this time**:
 `A1_imagenet_patch` and `A2_distilled_patch` produced BYTE-IDENTICAL
-metrics across all 3 cancers. Root cause: `scripts/10_run_patient_cv.py`'s
+metrics across all 3 cancers. Root cause: `src/scripts/10_run_patient_cv.py`'s
 `main()` loads features exactly once (`feat_dir = paths[
 "student_embeddings"] / "distilled"`), before the ablation loop, and
 `run_ablation`'s `graph_source == "none"` branch (which handles both A1
@@ -578,8 +578,8 @@ trustworthy as-is.
 **Per explicit user decision**: rather than fix the feature-loading and
 rerun, removed `A1_imagenet_patch` from `sts.ablations.ABLATION_GRID`
 entirely, and `gate1_distillation` from `configs/base.yaml`'s
-`primary_gates` (also updated `scripts/12_primary_hypothesis_test.py`'s
-docstring/gate_names and `scripts/17_make_results_tables_and_figures.py`'s
+`primary_gates` (also updated `src/scripts/12_primary_hypothesis_test.py`'s
+docstring/gate_names and `src/scripts/17_make_results_tables_and_figures.py`'s
 `MODEL_ORDER` for consistency). **Important gotcha caught while doing
 this**: `sts.utils.load_config` prefers a sibling `.json` over `.yaml`
 when both exist, and `configs/base.json` DOES exist -- editing only
@@ -621,7 +621,7 @@ treating this as a real negative result.
   decoupler-dropped degenerate spots come back NaN by design ("handled
   by the same missingness-aware QC as any other target"), confirmed live
   (decoupler dropped 1/306 and 1/292 spots as degenerate on this run),
-  and the shared `patch_head_loss` (same one `scripts/10_run_patient_cv.py`
+  and the shared `patch_head_loss` (same one `src/scripts/10_run_patient_cv.py`
   uses, which has no equivalent assertion) already masks NaN correctly
   via `gene_mask`/`path_mask`. Narrowed the assertion to only catch real
   `Inf` values.
@@ -707,6 +707,6 @@ improving on it.
    script (see the two scripts under `STS_src/slurm/`). Resumability
    means this is always safe and never redoes finished work.
 6. If the failure looks like a real code bug: fix it in `STS_src/sts/` or
-   `STS_src/scripts/`, `python3 -m py_compile sts/*.py scripts/*.py` to
+   `STS_src/scripts/`, `python3 -m py_compile src/sts/*.py src/scripts/*.py` to
    sanity check, then resubmit.
 7. Update this file's Run log with the new job ID and outcome.

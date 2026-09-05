@@ -1,6 +1,6 @@
 # Final_Project.txt master configuration. Every major decision lives here;
 # nothing structural should be hard-coded in the scripts. Mirrored as
-# base.json (see sts/utils.load_config) so GPU nodes without PyYAML can
+# base.json (see src/sts/utils.load_config) so GPU nodes without PyYAML can
 # still read it.
 
 experiment_name: cptac_genbio_distill_hest_pna
@@ -16,7 +16,7 @@ paths:
   # downloaded from HuggingFace MahmoodLab/hest into scratch. Each has its
   # own standard HEST-1k metadata CSV (`id` is the join key for both the
   # WSI file `{wsi_dir}/{id}.tif` and the ST file `{st_dir}/{id}.h5ad`) --
-  # see sts/hest_prep.py / scripts/08_prepare_hest_metadata.py.
+  # see src/sts/hest_prep.py / src/scripts/08_prepare_hest_metadata.py.
   hest_by_cancer:
     IDC:                                                            # breast, 127 WSI / 125 ST (~62GB + ~7.4GB), 121/125 rows are oncotree=IDC (4 ILC excluded)
       wsi_dir: /lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026/breast/wsis
@@ -184,7 +184,7 @@ patch_head:
 
 # --------------------------------------------------------- Step 15 -------
 # V2 Phase 9: two edge-feature widths now, not one 19-D feature everywhere
-# (see sts/graph_builder.py's union_edge_features / per_scale_edge_features):
+# (see src/sts/graph_builder.py's union_edge_features / per_scale_edge_features):
 #   union_edge_dim = 1 (normalized distance) + n_rbf + 3 (scale one-hot) = 20
 #   per_scale_edge_dim = 1 (normalized distance) + n_rbf = 17
 graph:
@@ -276,7 +276,7 @@ genbio_fair_comparison:
 # test). Gate 3 is the same "real vs shuffled" test as V1's Section 25,
 # now explicitly run against A8 (scale-aware) rather than A7 (union
 # multiscale), since A8 is the proposed final model.
-# gate1_distillation RESTORED 2026-08-30 -- see sts/ablations.py for the real fix
+# gate1_distillation RESTORED 2026-08-30 -- see src/sts/ablations.py for the real fix
 # (A1 now loads its own imagenet feature cache + its own patch_head, no longer
 # silently reusing A2's distilled features).
 primary_gates:

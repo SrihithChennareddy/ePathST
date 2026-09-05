@@ -3,7 +3,7 @@
 (random-init distilled) students for every seed. S0 (ImageNet, no
 distillation) needs no training loop -- it's the off-the-shelf
 ImageNet-pretrained ConvNeXt V2-Atto encoder, handled directly by
-scripts/06_eval_distillation.py."""
+src/scripts/06_eval_distillation.py."""
 from __future__ import annotations
 
 import argparse

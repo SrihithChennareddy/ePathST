@@ -150,7 +150,7 @@ def main():
         official_df.to_csv(out_dir / "tables" / "official_hest_benchmark.csv", index=False)
 
     # -- G) GenBio embedding -> MLP baseline B1 (PARTIAL: fold0/seed0 only, not full 5-fold).
-    # scripts/run_genbio_hest_baseline.py's default --head is a trained MLP on the raw 4608-D
+    # src/scripts/run_genbio_hest_baseline.py's default --head is a trained MLP on the raw 4608-D
     # GenBio embedding (no PCA, no Ridge) -- --head ridge is an available but unused alternative.
     genbio_src = results / "genbio_baseline" / "genbio_summary.csv"
     genbio_df = pd.read_csv(genbio_src) if genbio_src.exists() else pd.DataFrame()
@@ -281,7 +281,7 @@ which uses train-fold HVG selection, a trained patch head, and GNN correction)
 ## GenBio embedding -> trained MLP baseline (B1) -- **PARTIAL, fold0/seed0 only, not full 5-fold CV**
 
 Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no
-Ridge -- `scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused
+Ridge -- `src/scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused
 alternative), on the same HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table.
 
 {genbio_table_md}

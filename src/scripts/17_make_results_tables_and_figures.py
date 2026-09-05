@@ -91,7 +91,7 @@ def main():
             valid[valid["model"] == "A2_distilled_patch"]) else [0]
         labels = ["distilled student"]
         # GenBio-PathFM teacher point intentionally not added here -- its performance lives in a
-        # separate PCA256-based comparison (sts/genbio_pca.py), not in cv_ablation_metrics.csv.
+        # separate PCA256-based comparison (src/sts/genbio_pca.py), not in cv_ablation_metrics.csv.
         figures.fig7_efficiency_vs_performance(params, perf, labels, paths["figures"] / "fig7_efficiency.png")
 
     print(f"[17_results_and_figures] wrote tables and figures under {paths['results']} / {paths['figures']}")

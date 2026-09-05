@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Official HEST-Benchmark reproduction -- answers a different question
-than scripts/10's custom three-cancer patient-held-out experiment: how
+than src/scripts/10's custom three-cancer patient-held-out experiment: how
 strong is this representation under the standard, published HEST-Benchmark
 protocol, using the official data/splits/genes/metric from
 https://huggingface.co/datasets/MahmoodLab/hest-bench.

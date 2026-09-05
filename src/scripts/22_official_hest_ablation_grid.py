@@ -4,10 +4,10 @@ the OFFICIAL HEST-1k Benchmark protocol (official splits/genes/log1p-only
 targets from https://huggingface.co/datasets/MahmoodLab/hest-bench) --
 answers "how do the patch-only / GNN-corrected ablations compare on the
 official 50-gene per-cancer panel and official k-fold splits", as opposed
-to scripts/10_run_patient_cv.py's custom HVG1000/HVG50/PROGENy14 protocol
+to src/scripts/10_run_patient_cv.py's custom HVG1000/HVG50/PROGENy14 protocol
 with this project's own patient-level GroupKFold splits.
 
-`scripts/19_official_hest_benchmark.py` already reproduces the official
+`src/scripts/19_official_hest_benchmark.py` already reproduces the official
 protocol, but only for two raw encoders via a from-scratch PCA(256)+Ridge
 head -- it never touches the A0-A9 grid (trained patch_head + PNA/GATv2
 graph correction). This script instead reuses that SAME trained-model code
@@ -20,7 +20,7 @@ buried in the diff:
     only (no normalize_total) -- exactly script 19's `official_target`.
     There is no HVG1000/HVG50 distinction here (only one 50-gene panel);
     `n_hvg50` is passed as len(genes) (=all genes) so the "hvg50" slice
-    scripts/10's run_ablation always computes is a no-op alias of the
+    src/scripts/10's run_ablation always computes is a no-op alias of the
     full-panel ("hvg1000"-labeled) metrics -- both columns will be
     identical in the output, which is expected, not a bug.
   - pathway (PROGENy14) target: NOT evaluated -- some official-split
@@ -77,6 +77,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import torch
+from scipy.stats import pearsonr
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sts.ablations import ABLATION_GRID
@@ -88,7 +89,7 @@ from sts.utils import load_config, resolve_run_paths, save_json, seed_everything
 
 # `10_run_patient_cv.py` starts with a digit -- not a valid module name for a
 # normal `import` -- loaded via importlib instead, same precedent as
-# scripts/run_genbio_hest_baseline.py's `load_fold_expression` reuse.
+# src/scripts/run_genbio_hest_baseline.py's `load_fold_expression` reuse.
 _S10_PATH = Path(__file__).resolve().parent / "10_run_patient_cv.py"
 _spec = importlib.util.spec_from_file_location("_scripts10_run_patient_cv", _S10_PATH)
 _s10 = importlib.util.module_from_spec(_spec)
@@ -116,6 +117,19 @@ def official_target(expr_path: Path, genes: list[str], barcodes: list[str]) -> n
     sc.pp.log1p(adata)
     x = adata.X
     return x.toarray() if hasattr(x, "toarray") else np.asarray(x)
+
+
+def official_pooled_pearson(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """The official HEST-1k Benchmark metric (mahmoodlab/HEST, src/hest/bench/trainer.py
+    `train_test_reg`): per-gene pearsonr on POOLED test-fold spots (not per-patient), then
+    a plain mean across genes. A0 (constant prediction) correctly yields NaN per gene,
+    dropped before the mean -- matching the official code's `np.isfinite` guard."""
+    corrs = []
+    for g in range(y_true.shape[1]):
+        r, _ = pearsonr(y_true[:, g], y_pred[:, g])
+        if np.isfinite(r):
+            corrs.append(r)
+    return float(np.mean(corrs)) if corrs else float("nan")
 
 
 def get_mpp(adata) -> float:
@@ -259,6 +273,12 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
                                               y_gene_train, y_path_train, y_gene_val, y_path_val, cfg, device)
                        for src in embed_fns}
 
+        # ids_test -> row index, so eval_ids_test (run_ablation's own prediction order --
+        # identity order for A0-A3, per-patient-regrouped for graph ablations A4-A9, see
+        # run_ablation's docstring) can be used to reorder y_gene_test to match preds
+        # without touching src/scripts/10_run_patient_cv.py at all.
+        row_of = {uid: i for i, uid in enumerate(ids_test)}
+
         for spec in ABLATION_GRID:
             src = spec.feature_source if spec.feature_source in x_by_source else "distilled"
             sx_train, sx_val, sx_test = x_by_source[src]["train"], x_by_source[src]["val"], x_by_source[src]["test"]
@@ -268,13 +288,26 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
                 y_gene_val, y_path_val, y_gene_test, y_path_test, spec_patch_head, manifest, cfg, seed, device,
                 n_hvg50=len(genes), pathway_names=["_unused_dummy_pathway"])
             r_metrics = {k: v for k, v in r_metrics.items() if not k.startswith("pathway_")}
+
+            # Official HEST-1k Benchmark metric (see docs/HEST_OFFICIAL_ABLATION_RESULTS.md):
+            # per-gene scipy.stats.pearsonr on pooled test-fold spots, averaged (plain mean)
+            # over the 50 genes -- exactly src/scripts/19_official_hest_benchmark.py's metric,
+            # computed here too so A0-A9 are directly comparable to the official leaderboard
+            # table (GenBio-PathFM etc.), not just to this project's own Fisher-z metric.
+            order = [row_of[u] for u in eval_ids_test]
+            y_true_ord = y_gene_test[order]
+            y_pred = preds["gene"]
+            official_pearson_mean = official_pooled_pearson(y_true_ord, y_pred)
+            r_metrics["official_pooled_pearson_mean"] = official_pearson_mean
+
             row = {"cancer": cancer, "fold": fold, "seed": seed, "ablation": spec.name,
                    "n_train_spots": len(ids_train), "n_val_spots": len(ids_val), "n_test_spots": len(ids_test),
                    "n_train_samples": len(train_ids_s), "n_test_samples": len(test_ids_s), **r_metrics}
             metrics_rows.append(row)
             r_val = r_metrics.get("fisher_z_mean_patient_R")
             print(f"[22_official_hest_ablation_grid] {cancer} fold{fold} {spec.name}: "
-                  f"official50_R={r_val:.4f}" if r_val is not None else "n/a")
+                  f"fisher_z_R={r_val:.4f} official_pooled_R={official_pearson_mean:.4f}"
+                  if r_val is not None else "n/a")
     return metrics_rows
 
 
@@ -320,6 +353,8 @@ def main():
     macro = (metrics_df.groupby("ablation")
              .agg(fisher_z_mean_patient_R_mean=("fisher_z_mean_patient_R", "mean"),
                   fisher_z_mean_patient_R_std=("fisher_z_mean_patient_R", "std"),
+                  official_pooled_pearson_mean_mean=("official_pooled_pearson_mean", "mean"),
+                  official_pooled_pearson_mean_std=("official_pooled_pearson_mean", "std"),
                   n_cells=("fisher_z_mean_patient_R", "count"))
              .reset_index())
     priority = {a.name: a.priority for a in ABLATION_GRID}

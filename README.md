@@ -4,7 +4,7 @@ Abstract — Spatial transcriptomics enables spatially resolved molecular profil
 
 ## Pipeline overview
 
-The `scripts/` are numbered end-to-end and split into two phases: distilling the student encoder on CPTAC, then applying it downstream on HEST spatial transcriptomics.
+The `src/scripts/` are numbered end-to-end and split into two phases: distilling the student encoder on CPTAC, then applying it downstream on HEST spatial transcriptomics.
 
 **Phase 1 — CPTAC distillation**
 

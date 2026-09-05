@@ -123,9 +123,9 @@ as a frozen feature extractor.
 Everything structural (paths, hyperparameters, radii, ablation toggles) is
 config-driven from `configs/base.yaml` (mirrored to `base.json` for nodes
 without PyYAML) — nothing is hard-coded in the scripts. See
-`sts/utils.load_config` / `resolve_run_paths`.
+`src/sts/utils.load_config` / `resolve_run_paths`.
 
-## 4. Module map (`sts/`)
+## 4. Module map (`src/sts/`)
 
 - **Data / patching**: `cptac_select.py` (WSI QC + selection), `wsi_patches.py`
   (patch extraction; dispatches between DICOM (`wsidicom`) and plain
@@ -180,7 +180,7 @@ during training.
 ## 5. Experimental design (why the ablation set exists)
 
 The core hypothesis test needs to rule out confounds, so the ablation grid
-(`sts/ablations.ABLATION_GRID`, A0-A9) includes:
+(`src/sts/ablations.ABLATION_GRID`, A0-A9) includes:
 
 - **S0 / S1 / S2 student variants** (Phase 1): ImageNet-only, GenBio-distilled,
   and random-init-distilled — isolates how much of the student's usefulness
@@ -209,16 +209,16 @@ The core hypothesis test needs to rule out confounds, so the ablation grid
   dose-response curve: performance should degrade monotonically toward the
   patch-only floor as real edges are replaced with random ones, if the
   graph benefit is genuinely spatial.
-- **Fair GenBio-PathFM comparison** (`sts/genbio_pca.py`, separate from the
+- **Fair GenBio-PathFM comparison** (`src/sts/genbio_pca.py`, separate from the
   A-grid above) — a training-fold-only 256-D PCA of the *teacher's* own
   4608-D embeddings + a Ridge baseline, to contextualize how much
   performance the ~300x compression actually costs, run only after the
   A-grid above is locked. Library-level as of this writing; the driver
-  script (`scripts/15_genbio_fair_comparison.py`) rewrite to use it is a
+  script (`src/scripts/15_genbio_fair_comparison.py`) rewrite to use it is a
   follow-up — see `docs/V1_TO_V2_MIGRATION.md`.
 
 Three primary statistical gates (`configs/base.yaml`'s `primary_gates`,
-`scripts/12_primary_hypothesis_test.py`) formalize the central question,
+`src/scripts/12_primary_hypothesis_test.py`) formalize the central question,
 reported both pooled and per-cancer (per-cancer is primary):
 
 | Gate | Comparison |
@@ -231,7 +231,7 @@ Statistics: patient-level Pearson r per gene/pathway, Fisher-z aggregation
 across patients, 10,000-resample bootstrap CIs, Benjamini-Hochberg FDR
 correction (q=0.05) across genes — everything is evaluated at the patient
 level (not spot level) to avoid pseudo-replication. Before any statistic is
-aggregated, `sts/cv_folds.assert_run_completeness` hard-fails on a
+aggregated, `src/sts/cv_folds.assert_run_completeness` hard-fails on a
 mismatch between the expected and completed (cancer, fold, seed, ablation)
 run set — added after PoC_5's own aggregate silently pooled an incomplete
 fold set (see `docs/POC5_RESULTS.md`).
@@ -256,8 +256,8 @@ fold set (see `docs/POC5_RESULTS.md`).
   out of `/home` and `/scratch` (20GB per-user quota) and instead live under
   the `YurovskyGroup-nvwulf` project space — see `docs/RUN_STATUS.md` for
   current paths and job status.
-- V2 migration follow-ups not yet done: `scripts/15_genbio_fair_comparison.py`
-  still needs its `sts/genbio_pca.py`-based rewrite; `sts/pathway_posthoc.py`
+- V2 migration follow-ups not yet done: `src/scripts/15_genbio_fair_comparison.py`
+  still needs its `src/sts/genbio_pca.py`-based rewrite; `src/sts/pathway_posthoc.py`
   and the `pathway_loss_sweep` config aren't yet driven by a script; the
   spatial-destruction dose-response doesn't yet preserve per-scale
   (local/meso/macro) edge counts, only aggregate degree; the primary

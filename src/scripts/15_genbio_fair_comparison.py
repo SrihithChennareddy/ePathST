@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """Extracts GenBio-PathFM (teacher) features on the same HEST patches used
 for the student, cached in the same format so they can be dropped into
-scripts/10_run_patient_cv.py's ablation loop for a like-for-like
+src/scripts/10_run_patient_cv.py's ablation loop for a like-for-like
 teacher-vs-student comparison (same patients/genes/folds/normalization/
 graph/metric). Superseded by the train-fold-only PCA256 comparison in
-sts/genbio_pca.py for the locked final experiment; kept for reference."""
+src/sts/genbio_pca.py for the locked final experiment; kept for reference."""
 from __future__ import annotations
 
 import argparse

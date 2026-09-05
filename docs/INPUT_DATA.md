@@ -24,8 +24,8 @@ resolution proxy (`series_size_MB`, pyramid instance count) — with an
 additional pixel-level QC pass (tissue fraction, focus/Laplacian variance,
 pen-mark/artifact detection, stain-saturation outliers) used to re-verify
 or override that pick where multiple candidates existed. See
-`sts/cptac_select.py` for the QC/selection logic as implemented in this
-repo, and `scripts/01_select_cptac_wsi.py` for how it runs against the
+`src/sts/cptac_select.py` for the QC/selection logic as implemented in this
+repo, and `src/scripts/01_select_cptac_wsi.py` for how it runs against the
 already-downloaded data below.
 
 **On-disk layout** (`paths.cptac_root` / `paths.cptac_metadata` in
@@ -48,7 +48,7 @@ CPTAC_ROOT/{BRCA,COAD,ccRCC}/{patient_id}/*.dcm
 
 Note the cancer-type directory casing on disk (`BRCA`, `COAD`, `ccRCC`) —
 `ccRCC` does not match `configs/base.yaml`'s `cancers.cptac: [BRCA, COAD,
-CCRCC]` casing; `scripts/01_select_cptac_wsi.py`'s `CANCER_DIR_ALIASES`
+CCRCC]` casing; `src/scripts/01_select_cptac_wsi.py`'s `CANCER_DIR_ALIASES`
 handles the mismatch.
 
 **`{CANCER}_selected_WSI_per_patient.txt` columns**:
@@ -79,7 +79,7 @@ since it's the only candidate.
 
 Section 4's hard filters (human / H&E / tumor specimen / readable / mpp
 known / adequate tissue) were applied to all 598 candidates via
-`sts/cptac_select.py`. Full results, for the paper's Data/Methods section:
+`src/sts/cptac_select.py`. Full results, for the paper's Data/Methods section:
 
 | Stage | BRCA | COAD | CCRCC | Total |
 |---|---|---|---|---|
@@ -120,7 +120,7 @@ found) before the final cohort composition is reported in the paper.
 
 Split is **patient-level, 80/10/10, stratified per cancer type**
 (`configs/base.yaml`: `train_frac/val_frac/test_frac`), computed by
-`sts/patient_split.py` *before* any patch is extracted — no patient's
+`src/sts/patient_split.py` *before* any patch is extracted — no patient's
 patches ever cross a split boundary (enforced by
 `assert_no_patch_leakage`). Real counts:
 
@@ -162,7 +162,7 @@ though breast's WSI/ST files themselves live at the `simons_2026` path
 above). `configs/base.yaml`'s `paths.hest_by_cancer` records all three
 locations (`wsi_dir`, `st_dir`, `metadata_csv`) per cancer; the pipeline no
 longer assumes a single shared `hest_root` layout — see
-`scripts/08_prepare_hest_metadata.py`'s `load_hest_raw_metadata`, which
+`src/scripts/08_prepare_hest_metadata.py`'s `load_hest_raw_metadata`, which
 reads each cancer's config entry independently and skips-and-reports any
 cancer with no configured/found source, same fallback behavior as before.
 
@@ -210,7 +210,7 @@ WSI/ST files, 2026-08-29; IDC's 120 vs. 121 oncotree-matched rows reflects
 one sample missing its paired WSI/ST file on disk). 0 excluded by
 `audit_hest_samples`'s mouse/cancer-bucket/duplicate-id filters. Full
 alignment QC + patch extraction across all 202 has not yet been run at
-scale — `scripts/08_prepare_hest_metadata.py` has only been exercised on a
+scale — `src/scripts/08_prepare_hest_metadata.py` has only been exercised on a
 1-2 sample subset for real-data validation so far (see
 `docs/V1_TO_V2_MIGRATION.md`); the full run is future work.
 

@@ -37,13 +37,13 @@ CONFIG=configs/base.yaml
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 log "=== Step 10: full A0-A9 grid, full 5-fold CV, 3 cancers, seed 0 (LOCKED FINAL RUN) ==="
-python3 scripts/10_run_patient_cv.py --config "$CONFIG" --device cuda --feature-seed 0 --seeds 0
+python3 src/scripts/10_run_patient_cv.py --config "$CONFIG" --device cuda --feature-seed 0 --seeds 0
 
 log "=== Step 12: primary hypothesis test (3 gates, per-cancer + pooled) ==="
-python3 scripts/12_primary_hypothesis_test.py --config "$CONFIG" --seeds 0
+python3 src/scripts/12_primary_hypothesis_test.py --config "$CONFIG" --seeds 0
 
 log "=== snapshotting results to experimental_runs/ ==="
-python3 scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4-long \
+python3 src/scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4-long \
   --gpu "1x RTX PRO 6000 Blackwell" --label final_5fold_3cancer_seed0 \
   --stage "LOCKED final 5-fold x 3-cancer x seed-0 primary experiment, post-diagnostic-fix" || \
   log "snapshot failed -- non-fatal, results/cv_ablation_metrics.csv is still the source of truth"

@@ -61,7 +61,7 @@ def load_fold_expression(hest_samples, spot_manifest, hest_root, patients, cfg):
     test patients always span multiple samples, concatenating frames
     indexed by bare spot_id would produce a duplicate-keyed index and every
     downstream `.loc[]` lookup would become ambiguous across patients --
-    see scripts/08_prepare_hest_metadata.py's `spot_uid` column."""
+    see src/scripts/08_prepare_hest_metadata.py's `spot_uid` column."""
     frames, progeny_frames, genes_by_sample = [], [], {}
     net = fetch_and_cache_progeny_net(Path(cfg["paths"]["work_dir"]) / "progeny_net.csv",
                                        cfg["molecular_targets"]["pathway_top_genes"])
@@ -156,7 +156,7 @@ def main():
     # Both encoders' caches must be loaded here (not just "distilled"), each asserted via
     # load_cached_features(expected_encoder_name=...) to only ever serve its own encoder's
     # features -- otherwise A1 ("imagenet") silently gets distilled features too. See
-    # sts/ablations.py and load_feats() below.
+    # src/sts/ablations.py and load_feats() below.
     FEATURE_SOURCES = ("distilled", "imagenet")
     feat_dirs = {src: paths["student_embeddings"] / src for src in FEATURE_SOURCES}
 
@@ -372,7 +372,7 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
         # y_gene_test/y_path_test used in evaluate_predictions below) must be reordered before
         # indexing spot-level metadata downstream. Reordering only ids_test while leaving the
         # targets in original order silently misaligns target vs. prediction for every graph
-        # ablation (A4-A9) -- verified via scripts/debug_idc_pipeline.py to turn a near-perfect
+        # ablation (A4-A9) -- verified via src/scripts/debug_idc_pipeline.py to turn a near-perfect
         # predictor (r~1.0) into r~0.08. This is the single most important correctness
         # invariant in this function; do not "simplify" it away.
         order = np.concatenate([np.where(patient_for(ids_test) == p)[0] for p in np.unique(patient_for(ids_test))])

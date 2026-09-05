@@ -1,6 +1,6 @@
 """Training loop for the residual graph model. Supports three
 interchangeable backends (pna_union / scale_aware / gatv2 -- see
-sts/graph_model.py) through one shared train/eval/predict path. One graph
+src/sts/graph_model.py) through one shared train/eval/predict path. One graph
 per patient/slide; batches of 1-4 graphs per optimizer step."""
 from __future__ import annotations
 

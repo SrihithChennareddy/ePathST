@@ -15,7 +15,7 @@
 # HEST-1k Benchmark protocol (official splits/genes/log1p-only targets),
 # all 3 cancers (IDC/COAD/CCRCC), every official k-fold split (IDC 4,
 # COAD 2, CCRCC 6 -- 12 fold x 9 ablations = 108 trained-model runs total).
-# See scripts/22_official_hest_ablation_grid.py's module docstring for the
+# See src/scripts/22_official_hest_ablation_grid.py's module docstring for the
 # exact protocol/adaptations. Smoke-tested on CPU (COAD fold 0, 2-epoch
 # config) before this real run -- see docs/RUN_STATUS.md.
 
@@ -23,7 +23,7 @@ set -euo pipefail
 cd /lustre/nvwulf/home/schennareddy/cellvit_project/STS_src
 module load pytorch/2.7.1
 
-python3 scripts/22_official_hest_ablation_grid.py --config configs/base.yaml \
+python3 src/scripts/22_official_hest_ablation_grid.py --config configs/base.yaml \
   --bench-root /lustre/nvwulf/scratch/schennareddy/HEST-1k/hest_bench \
   --cancers IDC COAD CCRCC --device cuda --seed 1 --feature-seed 0
 

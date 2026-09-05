@@ -23,7 +23,7 @@ driver under time pressure can stop after the primary block.
 
 The GenBio-teacher-vs-student comparison is a separate, methodologically
 stricter analysis (train-fold-only PCA-256, not raw 4608-D GenBio fed to a
-mismatched head) and is not part of this grid -- see sts/genbio_pca.py,
+mismatched head) and is not part of this grid -- see src/sts/genbio_pca.py,
 run only after the student model matrix above is locked."""
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ ABLATION_GRID = [
     # sts.feature_cache.load_cached_features(expected_encoder_name=...), and train
     # separate patch heads -- otherwise A1's "imagenet" encoder silently never gets
     # consulted and A1 ends up byte-identical to A2 (a real bug this project hit once;
-    # see sts/feature_cache.py). Everything else (patient split, targets, head
+    # see src/sts/feature_cache.py). Everything else (patient split, targets, head
     # architecture, optimizer, evaluation) is identical between A1 and A2.
     AblationSpec("A1_imagenet_patch", "imagenet", "none", "none", "primary",
                  "ImageNet ConvNeXt, no distillation, patch-only"),

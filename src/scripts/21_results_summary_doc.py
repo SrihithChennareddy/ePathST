@@ -169,7 +169,7 @@ def main():
                   f"{fmt(g.pearson_mean)} ({fmt(g.pearson_std)}) | {gap:+.4f} |")
     L.append("\n### 7b. Custom-pipeline GenBio embedding -> trained MLP baseline (B1) -- PARTIAL\n")
     L.append("Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no "
-             "PCA, no Ridge -- `scripts/run_genbio_hest_baseline.py --head ridge` is an available "
+             "PCA, no Ridge -- `src/scripts/run_genbio_hest_baseline.py --head ridge` is an available "
              "but unused alternative), on the SAME HVG1000/HVG50/PROGENy14 targets and fold "
              "structure as the A0-A9 table -- but **fold0/seed0 only, not the full 5-fold design**. "
              "Treat as preliminary; do not compare CI-to-CI against the bootstrapped A0-A9 numbers "

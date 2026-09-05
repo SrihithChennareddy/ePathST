@@ -31,10 +31,10 @@ def main():
     ap.add_argument("--skip-completeness-check", action="store_true",
                      help="only for partial/debug runs -- the real pipeline must never skip this")
     ap.add_argument("--max-folds-per-cancer", type=int, default=None,
-                     help="must match whatever value scripts/10_run_patient_cv.py was run with, so the "
+                     help="must match whatever value src/scripts/10_run_patient_cv.py was run with, so the "
                           "completeness gate compares against the same (trimmed) design it actually ran")
     ap.add_argument("--seeds", type=int, nargs="+", default=None,
-                     help="must match whatever value scripts/10_run_patient_cv.py was run with")
+                     help="must match whatever value src/scripts/10_run_patient_cv.py was run with")
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)

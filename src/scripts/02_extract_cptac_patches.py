@@ -3,7 +3,7 @@
 ~0.5 um/px from every selected CPTAC WSI, written as one HDF5 shard per
 WSI plus a global patch manifest.
 
-Parallel + resumable, same as scripts/01_select_cptac_wsi.py: one process
+Parallel + resumable, same as src/scripts/01_select_cptac_wsi.py: one process
 per WSI, and a WSI whose shard already exists on disk is skipped on rerun."""
 from __future__ import annotations
 

@@ -5,22 +5,22 @@ CNN/GNN distillation) embeds every HEST H&E ST spot once (4608-D CLS
 representation, cached to disk, resumable), then a small trainable
 projection+prediction head (4608 -> 320 -> 128 -> {HVG1000, PROGENy14}) is
 fit on TRAIN-patient spots only, using the EXACT existing seed/fold patient
-split scripts/10_run_patient_cv.py uses. HVG50 is a strict column slice of
+split src/scripts/10_run_patient_cv.py uses. HVG50 is a strict column slice of
 the HVG1000 predictions/targets -- no separate model. GenBio itself is
 never fine-tuned and no graph/GNN is built here: this is a patch-only
 foundation-model baseline for comparison against the CNN/GNN pipeline, not
 a replacement for it.
 
 Reuses (imports, never modifies) sts.teacher_genbio/expression/pathways/
-cv_folds/patch_head/metrics/utils, plus scripts/10_run_patient_cv.py's own
+cv_folds/patch_head/metrics/utils, plus src/scripts/10_run_patient_cv.py's own
 `load_fold_expression` (loaded via importlib since a leading-digit filename
-can't be `import`ed normally -- never copy-pasted). Reads scripts/08's
+can't be `import`ed normally -- never copy-pasted). Reads src/scripts/08's
 outputs (manifests/hest_samples.csv, hest_spot_manifest.csv, hest_patches/)
 read-only. Writes only to its own output locations:
 <persist_dir>/genbio_baseline_embeddings/ and results/genbio_baseline/.
 Never touches student_checkpoints/, student_embeddings/,
 results/cv_ablation_metrics.csv, hest_patches/, or manifests/ -- those
-belong to the concurrently-running CNN/GNN job (scripts/10)."""
+belong to the concurrently-running CNN/GNN job (src/scripts/10)."""
 from __future__ import annotations
 
 import argparse
@@ -48,7 +48,7 @@ GENBIO_EMBED_DIM = 4608
 HIDDEN1, HIDDEN2 = 320, 128
 
 
-# ------------------------------------------------------------------ import scripts/10's
+# ------------------------------------------------------------------ import src/scripts/10's
 # load_fold_expression WITHOUT copy-pasting it and WITHOUT modifying that file --
 # `10_run_patient_cv.py` is not a valid module name for a normal `import`
 # statement (leading digit), so it is loaded by file path instead. The module's
@@ -100,7 +100,7 @@ def _valid_cache(path: Path, expected_n_spots: int) -> bool:
 def extract_genbio_embeddings_for_sample(genbio: GenBioPathFMTeacher, sample_row: pd.Series, spot_manifest: pd.DataFrame,
                                           patch_shard_dir: Path, out_path: Path, batch_size: int) -> dict:
     """Runs the frozen GenBio-PathFM teacher once over every ST spot's
-    already-extracted 224x224@0.5um/px patch (scripts/08's patch shard) and
+    already-extracted 224x224@0.5um/px patch (src/scripts/08's patch shard) and
     caches the 4608-D CLS embedding per spot. Returns timing/throughput
     stats. Resumable at the call site via `_valid_cache`."""
     sample_id = sample_row["sample_id"]
@@ -150,7 +150,7 @@ def load_cached_genbio_features(path: Path) -> dict:
 # ------------------------------------------------------------------------ CSV read w/ retry
 def _read_csv_with_retry(path: Path, retries: int = 5, delay: float = 2.0) -> pd.DataFrame:
     """The HEST manifests are periodically rewritten in full by the
-    concurrently-running scripts/08 job -- a read landing mid-rewrite can
+    concurrently-running src/scripts/08 job -- a read landing mid-rewrite can
     see a truncated/partial CSV. Retries on parse failure rather than
     crashing this independent, read-only job."""
     last_err = None
@@ -163,10 +163,10 @@ def _read_csv_with_retry(path: Path, retries: int = 5, delay: float = 2.0) -> pd
     raise last_err
 
 
-# --------------------------------------------------------------- wait for scripts/08 to finish
+# --------------------------------------------------------------- wait for src/scripts/08 to finish
 def wait_for_hest_manifest_complete(cfg: dict, paths: dict, poll_seconds: float = 60.0,
                                      stable_checks: int = 3, timeout_seconds: float = 20 * 3600) -> None:
-    """scripts/08 rewrites the HEST manifests in full at every checkpoint,
+    """src/scripts/08 rewrites the HEST manifests in full at every checkpoint,
     but partway through its run only a subset of cancers have any QC-passed
     rows yet -- reading before it finishes Step 8 would silently give this
     script an incomplete, single-cancer view. Polls until every configured
@@ -191,7 +191,7 @@ def wait_for_hest_manifest_complete(cfg: dict, paths: dict, poll_seconds: float 
         n = len(eligible)
         missing = expected_cancers - seen_cancers
         stable_streak = stable_streak + 1 if (not missing and n == last_n) else 0
-        print(f"[run_genbio_hest_baseline] waiting for scripts/08 manifest: {n} QC-eligible samples, "
+        print(f"[run_genbio_hest_baseline] waiting for src/scripts/08 manifest: {n} QC-eligible samples, "
               f"cancers seen={sorted(seen_cancers)}, missing={sorted(missing)}, "
               f"stable_streak={stable_streak}/{stable_checks}", flush=True)
         if not missing and stable_streak >= stable_checks:
@@ -208,7 +208,7 @@ def wait_for_hest_manifest_complete(cfg: dict, paths: dict, poll_seconds: float 
 
 # --------------------------------------------------------------------------- CV split reuse
 def load_or_recompute_split(cfg: dict, paths: dict, hest_samples: pd.DataFrame, cancer: str, seed: int, fold: int) -> tuple[dict, str]:
-    """Reuses the EXACT seed/fold patient split scripts/10_run_patient_cv.py
+    """Reuses the EXACT seed/fold patient split src/scripts/10_run_patient_cv.py
     uses -- never regenerates a new random split. Prefers loading the
     persisted manifests/hest_cv_folds.json that script 10 writes; if that
     job hasn't reached its Step 10 yet, falls back to calling the identical
@@ -309,7 +309,7 @@ def main():
     paths = resolve_run_paths(cfg)
     persist_dir = Path(cfg["paths"].get("persist_dir") or cfg["paths"]["work_dir"])
     embed_dir = persist_dir / "genbio_baseline_embeddings"
-    patch_shard_dir = Path(cfg["paths"]["work_dir"]) / "hest_patches"  # read-only: owned by scripts/08
+    patch_shard_dir = Path(cfg["paths"]["work_dir"]) / "hest_patches"  # read-only: owned by src/scripts/08
     # separate results dir per --head so a ridge run never clobbers the mlp run's cached results
     results_dir = paths["results"] / ("genbio_baseline" if args.head == "mlp" else f"genbio_baseline_{args.head}")
     hvg_lists_dir = results_dir / "hvg_lists"
@@ -327,7 +327,7 @@ def main():
     wait_for_hest_manifest_complete(cfg, paths)
     hest_samples = _read_csv_with_retry(paths["manifests"] / "hest_samples.csv")
     spot_manifest = _read_csv_with_retry(paths["manifests"] / "hest_spot_manifest.csv")
-    # "eligible" = passed scripts/08's alignment QC, i.e. has a real patch shard + spot_manifest rows.
+    # "eligible" = passed src/scripts/08's alignment QC, i.e. has a real patch shard + spot_manifest rows.
     eligible_sample_ids = set(spot_manifest["sample_id"].unique())
     hest_samples = hest_samples[hest_samples["sample_id"].isin(eligible_sample_ids)].reset_index(drop=True)
     hest_samples = exclude_targeted_panel_samples(hest_samples)

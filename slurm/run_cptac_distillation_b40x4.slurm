@@ -27,7 +27,7 @@
 # pipeline runs correctly on (97GB VRAM, plenty for these tiny models).
 #
 # Same resumable design as the H200 script (see its comments and
-# scripts/01,02,04,05's docstrings) -- work_dir/persist_dir are shared, so
+# src/scripts/01,02,04,05's docstrings) -- work_dir/persist_dir are shared, so
 # whichever job (this one, or 83715 if/when it eventually starts) runs
 # first does the real work and the other one's reruns just pick up
 # whatever remains. Only ONE Step-1/2 run should be in flight at a time
@@ -76,33 +76,33 @@ RESERVE_SECONDS=$((20 * 60))
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 log "=== Step 1: CPTAC WSI selection/QC (parallel, ${SLURM_CPUS_PER_TASK} workers) ==="
-python3 scripts/01_select_cptac_wsi.py --config "$CONFIG" --workers "${SLURM_CPUS_PER_TASK}"
+python3 src/scripts/01_select_cptac_wsi.py --config "$CONFIG" --workers "${SLURM_CPUS_PER_TASK}"
 
 log "=== Step 2: CPTAC patch extraction (parallel, ${SLURM_CPUS_PER_TASK} workers) ==="
-python3 scripts/02_extract_cptac_patches.py --config "$CONFIG" --workers "${SLURM_CPUS_PER_TASK}"
+python3 src/scripts/02_extract_cptac_patches.py --config "$CONFIG" --workers "${SLURM_CPUS_PER_TASK}"
 
 log "=== Step 3: CPTAC patient split (x3 seeds) ==="
-python3 scripts/03_cptac_patient_split.py --config "$CONFIG"
+python3 src/scripts/03_cptac_patient_split.py --config "$CONFIG"
 
 log "=== Step 4: GenBio-PathFM teacher embedding (single GPU) ==="
-python3 scripts/04_run_teacher_genbio.py --config "$CONFIG" --device cuda --shard-index 0 --num-shards 1
+python3 src/scripts/04_run_teacher_genbio.py --config "$CONFIG" --device cuda --shard-index 0 --num-shards 1
 
 ELAPSED=$((SECONDS - JOB_START))
 REMAINING=$((WALL_CLOCK_SECONDS - ELAPSED - RESERVE_SECONDS))
 REMAINING_HOURS=$(python3 -c "print(max(0.05, $REMAINING / 3600))")
 log "=== Step 5: distillation training, budget ${REMAINING_HOURS}h (S1 seed0 first) ==="
-python3 scripts/05_train_student_distill.py --config "$CONFIG" --device cuda \
+python3 src/scripts/05_train_student_distill.py --config "$CONFIG" --device cuda \
   --seeds 0 1 2 --baselines S1 S2 --time-budget-hours "$REMAINING_HOURS"
 
 log "=== Step 6: distillation evaluation (whatever seeds/baselines finished) ==="
-python3 scripts/06_eval_distillation.py --config "$CONFIG" --device cuda || \
+python3 src/scripts/06_eval_distillation.py --config "$CONFIG" --device cuda || \
   log "Step 6 failed or nothing to evaluate yet -- non-fatal, rerun after more training"
 
 log "=== Step 9: lock student, strip teacher-projection head, save to persist_dir ==="
-python3 scripts/07_lock_student.py --config "$CONFIG" --device cuda --mode A
+python3 src/scripts/07_lock_student.py --config "$CONFIG" --device cuda --mode A
 
 log "=== snapshotting results to experimental_runs/ for later comparison ==="
-python3 scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4 \
+python3 src/scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4 \
   --gpu "1x RTX PRO 6000 Blackwell" --label cptac_distill_b40x4 --stage "end of 8h job"
 
 log "=== DONE (total elapsed: $((SECONDS - JOB_START))s) ==="

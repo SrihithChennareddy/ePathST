@@ -4,7 +4,7 @@ utilities the real experiment uses (sts.metrics) so this tests the actual
 implementation, not a reimplementation of it.
 
 T1 demonstrates and verifies the fix for a target/prediction misalignment
-bug in scripts/10_run_patient_cv.py's run_ablation() that affected every
+bug in src/scripts/10_run_patient_cv.py's run_ablation() that affected every
 graph-based ablation (A4-A9): predict_graph_model() concatenates
 predictions in per-patient-grouped order; ids_test was reassigned to match
 that order, but y_gene_test/y_path_test (the ground-truth arrays passed
@@ -32,7 +32,7 @@ def _fake_cfg():
 
 
 def t1_alignment_bug():
-    """Reproduces the exact shape of scripts/10_run_patient_cv.py's
+    """Reproduces the exact shape of src/scripts/10_run_patient_cv.py's
     run_ablation(): ids_test spans multiple patients NOT already grouped by
     patient (matching the real pipeline's fold-pooling order, which is
     grouped by SAMPLE, not necessarily by PATIENT when the same patient can
@@ -75,7 +75,7 @@ def t1_alignment_bug():
 
     cancer_placeholder = np.array(["IDC"] * n)
 
-    # --- BEFORE FIX: exact pre-fix scripts/10_run_patient_cv.py behavior --
+    # --- BEFORE FIX: exact pre-fix src/scripts/10_run_patient_cv.py behavior --
     # ids_test reassigned to grouped order (as the pre-fix code did)...
     ids_test_buggy = ids_test_original[order]
     pids_buggy = np.array([s.split("::")[0] for s in ids_test_buggy])

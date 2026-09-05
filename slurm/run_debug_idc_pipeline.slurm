@@ -13,9 +13,9 @@
 
 # IDC-only sanity rerun (final-experiment diagnostic, 2026-08-30) after fixing:
 #   1. A1_imagenet_patch restored with its own real feature cache + patch_head
-#      (sts/feature_cache.py metadata + sts/ablations.py + scripts/10).
+#      (src/sts/feature_cache.py metadata + src/sts/ablations.py + src/scripts/10).
 #   2. Target/prediction misalignment bug for every graph ablation (A4-A9)
-#      in scripts/10_run_patient_cv.py's run_ablation().
+#      in src/scripts/10_run_patient_cv.py's run_ablation().
 # Reuses ALL existing caches (patches, distilled+imagenet features, teacher
 # embeddings) -- only re-runs Step 10 (full A0-A9 grid, single 80/20 IDC
 # split, seed 0) + Step 12 (gates) against the fixed code.
@@ -29,11 +29,11 @@ CONFIG=configs/debug_idc_only.json
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 log "=== Step 10 (fixed): full A0-A9 grid, single 80/20 IDC split, seed 0 ==="
-python3 scripts/10_run_patient_cv.py --config "$CONFIG" --device cuda --feature-seed 0 \
+python3 src/scripts/10_run_patient_cv.py --config "$CONFIG" --device cuda --feature-seed 0 \
   --max-folds-per-cancer 1 --seeds 0
 
 log "=== Step 12: primary hypothesis test (3 gates, IDC only) ==="
-python3 scripts/12_primary_hypothesis_test.py --config "$CONFIG" --max-folds-per-cancer 1 --seeds 0
+python3 src/scripts/12_primary_hypothesis_test.py --config "$CONFIG" --max-folds-per-cancer 1 --seeds 0
 
 log "=== copying results to results/debug_idc_pipeline/ ==="
 mkdir -p results/debug_idc_pipeline

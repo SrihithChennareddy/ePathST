@@ -13,7 +13,7 @@
 # CPU-only, no GPU requested. Bridges milestone-checkpoint saving (every
 # 10 completed epochs -> a permanent {baseline}_seed{seed}_epochN.pt) for
 # job 83825 (chain link 1), which already loaded the training code into
-# memory BEFORE sts/distill_train.py was updated to save these natively.
+# memory BEFORE src/sts/distill_train.py was updated to save these natively.
 # Chain links 2 (83826) and 3 (83827) start fresh Python processes and
 # will pick up the code change on their own -- this watcher is only
 # needed for link 1's remaining lifetime. Submitted as a real SLURM job
