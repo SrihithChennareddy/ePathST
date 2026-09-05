@@ -76,6 +76,7 @@ def main():
     manifest_path = paths["manifests"] / "cptac_patch_manifest.csv"
 
     with RunEnvironment("02_extract_cptac_patches", paths["logs"] / "02_extract_cptac_patches_env.json"):
+        # resume from existing manifest
         done_wsi_ids = set()
         existing_rows = []
         if manifest_path.exists():
@@ -89,6 +90,7 @@ def main():
         todo = [row.to_dict() for _, row in selected.iterrows() if row["wsi_id"] not in done_wsi_ids]
         print(f"[02_extract_cptac_patches] {len(todo)} WSIs left to extract, using {args.workers} parallel workers")
 
+        # run extraction in parallel
         manifest_rows = list(existing_rows)
         if todo:
             with mp.get_context("spawn").Pool(args.workers) as pool:
@@ -102,6 +104,7 @@ def main():
                         print(f"[02_extract_cptac_patches] extraction progress: {n_done}/{len(todo)}")
                         pd.DataFrame(manifest_rows).to_csv(manifest_path, index=False)  # incremental checkpoint
 
+        # write final manifest + summary stats
         out_manifest = pd.DataFrame(manifest_rows)
         out_manifest.to_csv(manifest_path, index=False)
 

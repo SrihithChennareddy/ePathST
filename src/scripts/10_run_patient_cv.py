@@ -1,27 +1,9 @@
 #!/usr/bin/env python
-"""The main downstream experiment loop: patient-level cross-validation
-over the A0-A9 ablation grid.
-
-For every cancer's patient-level CV folds x every seed:
-  1. select HVG1000/HVG50 from TRAIN patients only, compute PROGENy14 on
-     the full normalized expression, standardize using train-fold stats
-     (leakage-free);
-  2. train the patch-only molecular bottleneck head -- this defines
-     y_patch,i (gene-only loss by default);
-  3. build the physical multiscale graph;
-  4. for every ablation in pathology_st.ablations.ABLATION_GRID (primary block
-     first -- A1/A2/A5/A6/A7/A8 -- then secondary -- A0/A3/A4/A9), train/
-     evaluate with the same folds, features, targets, and procedure,
-     saving predictions for every test spot. A8 (scale-aware PNA) and A9
-     (GATv2) are graph backends; A5 (shuffled) is the critical negative
-     control.
-  5. before returning, assert every expected (cancer, fold, seed,
-     ablation) run actually completed -- see docs/POC5_RESULTS.md for the
-     aggregation-completeness bug this guards against.
-
-The GenBio-teacher PCA256 baseline and the destruction dose-response are
-separate scripts that reuse the exact fold/target artifacts written here.
-"""
+"""The main downstream experiment loop: for every cancer's patient-level CV
+folds x every seed, build leakage-free HVG/pathway targets, train the
+patch-only molecular bottleneck head, then train/evaluate every ablation
+in pathology_st.ablations.ABLATION_GRID (A0-A9), asserting full
+(cancer, fold, seed, ablation) run completeness before returning."""
 from __future__ import annotations
 
 import argparse
@@ -103,6 +85,7 @@ def train_patch_head(x_train, x_val, y_gene_train, y_path_train, y_gene_val, y_p
     patch_head = build_patch_head(cfg, x_train.shape[1], y_gene_train.shape[1], y_path_train.shape[1]).to(device)
     opt = torch.optim.AdamW(patch_head.parameters(), lr=cfg["patch_head"]["lr"],
                              weight_decay=cfg["patch_head"]["weight_decay"])
+
     best_val, patience_ctr, best_state = float("inf"), 0, None
     for epoch in range(cfg["patch_head"]["max_epochs"]):
         patch_head.train()
@@ -115,6 +98,7 @@ def train_patch_head(x_train, x_val, y_gene_train, y_path_train, y_gene_val, y_p
         loss["loss"].backward()
         opt.step()
 
+        # validate, early-stop
         patch_head.eval()
         with torch.no_grad():
             xv = torch.tensor(x_val, dtype=torch.float32, device=device)
@@ -160,6 +144,7 @@ def main():
     FEATURE_SOURCES = ("distilled", "imagenet")
     feat_dirs = {src: paths["student_embeddings"] / src for src in FEATURE_SOURCES}
 
+    # build CV grid
     patients_by_cancer = {c: hest_samples[hest_samples["cancer"] == c]["patient_id"].unique().tolist()
                            for c in cfg["cancers"]["hest"]}
     cv_grid = build_cv_grid(patients_by_cancer, cfg)
@@ -185,6 +170,7 @@ def main():
                     train_p, val_p = carve_validation_from_train(fold["train_patients"], 0.15, seed)
                     test_p = fold["test_patients"]
 
+                    # select HVGs + fit standardizers on TRAIN only
                     train_expr, train_progeny, genes_by_sample, net = load_fold_expression(
                         hest_samples, spot_manifest, hest_root, train_p, cfg)
                     common_genes = sorted(set.intersection(*genes_by_sample.values())) if genes_by_sample else []
@@ -200,6 +186,7 @@ def main():
                         path_t = path_std.transform(progeny.reindex(columns=net["source"].unique()).values)
                         return gene_t, path_t, expr.index.astype(str)
 
+                    # standardized targets per split
                     y_gene_train, y_path_train, ids_train = build_targets(train_p)
                     y_gene_val, y_path_val, ids_val = build_targets(val_p)
                     y_gene_test, y_path_test, ids_test = build_targets(test_p)
@@ -232,6 +219,7 @@ def main():
                         x_by_source["distilled"]["test"]
                     patch_head = patch_heads["distilled"]  # the anchor y_patch,i (A2) / graph-ablation base
 
+                    # save patch-head checkpoints
                     ckpt_dir = paths["student_checkpoints"] / "patch_head" / cancer / f"fold{fold['fold']}"
                     ckpt_dir.mkdir(parents=True, exist_ok=True)
                     for src, ph in patch_heads.items():

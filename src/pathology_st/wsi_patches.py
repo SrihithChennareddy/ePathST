@@ -228,6 +228,7 @@ def sample_patch_grid(reader: OpenSlideReader, tissue_mask_thumb: np.ndarray, cf
     th, tw = tissue_mask_thumb.shape
     scale_x, scale_y = tw / w0, th / h0
 
+    # lay a regular grid, keep points overlapping tissue
     xs = np.arange(0, w0 - stride_px, stride_px)
     ys = np.arange(0, h0 - stride_px, stride_px)
     candidates = []
@@ -240,6 +241,7 @@ def sample_patch_grid(reader: OpenSlideReader, tissue_mask_thumb: np.ndarray, cf
             if patch_tissue.size and patch_tissue.mean() >= patching["min_tissue_fraction"]:
                 candidates.append((int(x + stride_px // 2), int(y + stride_px // 2)))
 
+    # subsample down to the target patch-count range
     lo, hi = patching["target_patches_per_wsi"]
     rng = np.random.RandomState(rng_seed)
     if len(candidates) > hi:

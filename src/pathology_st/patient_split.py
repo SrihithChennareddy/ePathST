@@ -24,6 +24,8 @@ def cptac_patient_split(manifest: pd.DataFrame, cfg: dict, seed: int) -> pd.Data
         n_train = min(n_train, n)
         n_val = min(n_val, n - n_train)
         train, val, test = pids[:n_train], pids[n_train:n_train + n_val], pids[n_train + n_val:]
+
+        # flatten into rows
         for pid in train:
             rows.append({"patient_id": pid, "cancer_type": cancer, "split": "train"})
         for pid in val:

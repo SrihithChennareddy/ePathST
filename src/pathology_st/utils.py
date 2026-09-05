@@ -147,6 +147,7 @@ class RunEnvironment:
             "package_versions": _package_versions(),
         }
         record.update(_gpu_record())
+
         save_json(record, self.out_path)
         return False  # never swallow exceptions -- failures must surface
 

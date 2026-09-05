@@ -21,10 +21,13 @@ def extract_student_features(encoder, patches_uint8: np.ndarray, device: str, ba
     encoder.eval()
     outs = []
     for i in range(0, len(patches_uint8), batch_size):
+        # normalize batch
         batch = patches_uint8[i:i + batch_size].astype(np.float32) / 255.0
         batch = (batch - IMAGENET_MEAN) / IMAGENET_STD
         batch = np.transpose(batch, (0, 3, 1, 2)).astype(np.float32)
         x = torch.from_numpy(batch).to(device)
+
+        # run encoder
         with torch.no_grad():
             feat = encoder(x)
             if downstream_proj is not None:

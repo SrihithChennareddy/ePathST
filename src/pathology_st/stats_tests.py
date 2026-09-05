@@ -13,6 +13,7 @@ def patient_bootstrap_ci(deltas: np.ndarray, n_iterations: int = 10000, seed: in
     n = len(deltas)
     boot_means = np.empty(n_iterations)
     for i in range(n_iterations):
+        # resample with replacement
         idx = rng.randint(0, n, size=n)
         boot_means[i] = np.mean(deltas[idx])
     return {
@@ -31,6 +32,7 @@ def paired_sign_flip_test(deltas: np.ndarray, n_iterations: int = 10000, seed: i
     observed = float(np.mean(deltas))
     null = np.empty(n_iterations)
     for i in range(n_iterations):
+        # random sign flips under H0
         flips = rng.choice([-1.0, 1.0], size=n)
         null[i] = np.mean(deltas * flips)
     p = (1 + np.sum(null >= observed)) / (1 + n_iterations)
@@ -47,6 +49,8 @@ def bh_fdr(pvalues: np.ndarray, q_threshold: float = 0.05) -> tuple[np.ndarray, 
 
     idx = np.where(valid)[0]
     pv = p[idx]
+
+    # BH step-up: rank p-values, compute raw q, enforce monotonicity
     order = np.argsort(pv)
     ranked = pv[order]
     m = len(ranked)
@@ -54,6 +58,7 @@ def bh_fdr(pvalues: np.ndarray, q_threshold: float = 0.05) -> tuple[np.ndarray, 
     raw_q = np.minimum.accumulate(raw_q[::-1])[::-1]
     raw_q = np.clip(raw_q, 0, 1)
 
+    # unsort back to original order
     q_full = np.empty(m)
     q_full[order] = raw_q
     q[idx] = q_full

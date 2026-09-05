@@ -1,17 +1,9 @@
 #!/usr/bin/env python
-"""Capture a point-in-time snapshot of the current run's results/ into
-experimental_runs/<run_id>/ for later cross-run comparison (see
-experimental_runs/README.md). Never fabricates numbers -- only copies
-whatever the run has actually produced so far, and records which files
-were present/absent so a partial snapshot (e.g. taken mid-training) is
-never mistaken for a complete one.
-
-Usage (typically called from a SLURM script right after a stage
-completes, or by hand):
-    python3 src/scripts/snapshot_experiment.py --config configs/base.yaml \\
-        --job-id 83723 --partition b40x4 --gpu "1x RTX PRO 6000 Blackwell" \\
-        --label cptac_distill_b40x4 --stage "step1-2 complete"
-"""
+"""Captures a point-in-time snapshot of the current run's results/ into
+experimental_runs/<run_id>/ for later cross-run comparison -- never
+fabricates numbers, only copies what the run has actually produced and
+records which files were present/absent so a partial snapshot is never
+mistaken for a complete one."""
 from __future__ import annotations
 
 import argparse
@@ -96,6 +88,7 @@ def main():
     out_dir = Path(__file__).resolve().parents[1] / "experimental_runs" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # copy results/figures
     copied = {}
     for src_name, dst_name in [("results", "results"), ("figures", "figures")]:
         src = paths[src_name]
@@ -108,11 +101,13 @@ def main():
         else:
             copied[dst_name] = []
 
+    # snapshot config
     config_snapshot_path = out_dir / "config_used.json"
     config_json = Path(args.config).with_suffix(".json")
     if config_json.exists():
         shutil.copy(config_json, config_snapshot_path)
 
+    # build manifest
     manifest = {
         "run_id": run_id,
         "captured_at": today,
@@ -126,13 +121,16 @@ def main():
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
+    # write notes
     notes_path = out_dir / "notes.md"
     if not notes_path.exists():
         notes_path.write_text(f"# {run_id}\n\nStage: {args.stage or '(unspecified)'}\n\n"
                                f"(add free-text observations about this snapshot here)\n")
 
+    # compute headline
     headline = _headline_metric(out_dir / "results") if (out_dir / "results").exists() else "N/A"
 
+    # append to index
     index_path = Path(__file__).resolve().parents[1] / "experimental_runs" / "INDEX.csv"
     is_new = not index_path.exists()
     with open(index_path, "a", newline="") as f:

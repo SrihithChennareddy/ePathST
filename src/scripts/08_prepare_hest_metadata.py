@@ -129,6 +129,7 @@ def main():
               f"reported by load_hest_raw_metadata below", file=sys.stderr)
 
     with RunEnvironment("08_prepare_hest_metadata", paths["logs"] / "08_prepare_hest_metadata_env.json"):
+        # audit metadata
         raw_meta = load_hest_raw_metadata(cfg)
         clean, report = audit_hest_samples(raw_meta, cfg)
         clean = enforce_patient_section_grouping(clean)
@@ -136,6 +137,7 @@ def main():
         print(f"[08_prepare_hest_metadata] {report['n_initial_samples']} -> {report['n_final_samples']} samples; "
               f"by cancer: {report['by_cancer']}")
 
+        # resume from prior run
         patch_shard_dir = paths["work_dir"] / "hest_patches"
         patch_shard_dir.mkdir(parents=True, exist_ok=True)
         qc_path = paths["qc"] / "hest_alignment_qc.json"
@@ -158,6 +160,7 @@ def main():
         # collide heavily across samples. Anything that pools multiple samples' spots (e.g. script
         # 10's per-fold tables) must join on `spot_uid` (built the same way in `_process_one_sample`
         # above), never bare `spot_id`, or it silently misattributes data across patients.
+        # alignment QC + patch extraction, in parallel
         pending = [row.to_dict() for _, row in clean.iterrows() if row["sample_id"] not in done_samples]
         n_since_checkpoint = 0
         with ProcessPoolExecutor(max_workers=args.sample_workers) as executor:

@@ -1,15 +1,8 @@
 #!/usr/bin/env python
 """Aggregates results/cv_ablation_metrics.csv, verifies completeness, then
-runs the three primary statistical gates:
-
-    Gate 1 (distillation):    R_A2_distilled_patch  > R_A1_imagenet_patch
-    Gate 2 (spatial context): R_A8_scale_aware_pna   > R_A2_distilled_patch
-    Gate 3 (true topology):   R_A8_scale_aware_pna   > R_A5_shuffled_graph
-
-Gate 3 is the decisive "real graph vs. degree-preserving shuffled graph"
-negative control, run against A8 (scale-aware, the proposed final model).
-Reported per cancer (the primary analysis unit) with pooled-across-cancers
-as a secondary summary."""
+runs the three primary statistical gates (1: distillation A2>A1, 2: spatial
+context A8>A2, 3: true topology A8>A5 -- the decisive shuffled-graph
+negative control), reported per cancer with a pooled summary."""
 from __future__ import annotations
 
 import argparse
@@ -41,9 +34,11 @@ def main():
     if args.seeds is not None:
         cfg["cross_validation"]["seeds"] = args.seeds
 
+    # load aggregated metrics
     df = pd.read_csv(paths["results"] / "cv_ablation_metrics.csv")
     stats_cfg = cfg["statistics"]
 
+    # completeness gate
     # Refuse to compute any statistic over a run set that doesn't match
     # what the CV design actually calls for.
     if not args.skip_completeness_check:
@@ -84,8 +79,10 @@ def main():
     gates_cfg = cfg["primary_gates"]
     gate_names = {"gate1_distillation": "Gate 1: Distillation (A2 > A1)",
                   "gate2_spatial_context": "Gate 2: Spatial context (A8 > A2)",
+                  # A5 is the degree-preserving shuffled-graph negative control (see pathology_st.ablations)
                   "gate3_true_topology": "Gate 3: True topology (A8 > A5, THE decisive test)"}
 
+    # run the 3 primary gates, pooled + per cancer
     results = {"pooled": {}, "per_cancer": {}}
     for gate_key, spec in gates_cfg.items():
         results["pooled"][gate_key] = gate_test(spec["better"], spec["worse"])
@@ -96,7 +93,8 @@ def main():
 
     save_json(results, paths["results"] / "primary_hypothesis_test.json")
 
-    # Secondary comparisons (V2 Phase 22 doesn't remove these, only reprioritizes the 3 gates above)
+    # run secondary comparisons
+    # (V2 Phase 22 doesn't remove these, only reprioritizes the 3 gates above)
     secondary = {}
     for name, (a, b) in {
         "scale_aware_vs_local": ("A8_scale_aware_pna", "A6_local_pna"),

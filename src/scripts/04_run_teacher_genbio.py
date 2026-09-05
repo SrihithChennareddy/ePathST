@@ -1,18 +1,9 @@
 #!/usr/bin/env python
-"""Step 4: run the frozen 1.1B-parameter GenBio-PathFM teacher ONCE over
-every selected CPTAC patch, cache FP16 embeddings to the persistent
-teacher_embeddings store, and verify the cache (no NaNs, correct dim,
-sensible norms, correct patch<->embedding alignment). The teacher must
-never be re-run per distillation epoch -- this script is what makes that
-possible.
-
-- Idempotent/resumable: patch_ids already in the canonical cache are
-  skipped, so a rerun after a SLURM time-limit kill never re-embeds.
-- GPU-shardable via --shard-index/--num-shards to split the workload
-  across multiple GPUs in one job; each shard writes its own temp file
-  (no concurrent writers to the canonical cache), and --merge-shards folds
-  every shard into the canonical cache afterward.
-"""
+"""Step 4: run the frozen GenBio-PathFM teacher ONCE over every selected
+CPTAC patch, cache FP16 embeddings to the persistent teacher_embeddings
+store, and verify the cache -- resumable and GPU-shardable via
+--shard-index/--num-shards, with --merge-shards folding shards back
+together afterward."""
 from __future__ import annotations
 
 import argparse
@@ -66,8 +57,11 @@ def main():
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
 
+    # the teacher must never be re-run per distillation epoch -- this script (run
+    # once, cached here) is what makes that possible
     canonical_path = paths["teacher_embeddings"] / "cptac_teacher_embeddings.h5"
 
+    # merge-only mode: fold shards into canonical cache, verify, exit
     if args.merge_shards:
         shard_paths = [paths["teacher_embeddings"] / f"_shard{i}_of_{args.num_shards}.h5"
                         for i in range(args.num_shards)]
@@ -85,6 +79,8 @@ def main():
     patch_manifest = pd.read_csv(paths["manifests"] / "cptac_patch_manifest.csv")
     shard_dir = paths["work_dir"] / "cptac_patches"
 
+    # each shard writes its own temp file (no concurrent writers to the canonical
+    # cache); --merge-shards folds every shard into the canonical cache afterward
     out_path = (paths["teacher_embeddings"] / f"_shard{args.shard_index}_of_{args.num_shards}.h5"
                 if args.num_shards > 1 else canonical_path)
 
@@ -106,9 +102,11 @@ def main():
 
     stage = f"04_run_teacher_genbio_shard{args.shard_index}"
     with RunEnvironment(stage, paths["logs"] / f"{stage}_env.json"):
+        # load teacher
         teacher = GenBioPathFMTeacher(cfg, device=args.device)
         print(f"[04_run_teacher_genbio] GenBio-PathFM loaded: {teacher.n_parameters:,} parameters")
 
+        # run inference, batched per WSI
         bs = cfg["teacher"]["batch_size"]
         n_embedded = 0
         for wsi_id, group in tqdm(todo.groupby("wsi_id"), desc=f"WSIs (shard {args.shard_index})"):
@@ -129,6 +127,7 @@ def main():
 
         print(f"[04_run_teacher_genbio] shard {args.shard_index} embedded {n_embedded} new patches -> {out_path}")
 
+        # verify cache (single-shard runs only; multi-shard verifies after --merge-shards)
         if args.num_shards == 1:
             report = verify_teacher_cache(out_path, cfg["teacher"]["embedding_dim"])
             save_json(report, paths["qc"] / "teacher_embedding_verification.json")

@@ -25,8 +25,9 @@ def main():
     patch_manifest = pd.read_csv(paths["manifests"] / "cptac_patch_manifest.csv")
 
     for seed in cfg["seeds"]:
-        split_df = cptac_patient_split(selected, cfg, seed)
-        assert_no_patch_leakage(patch_manifest, split_df)
+        split_df = cptac_patient_split(selected, cfg, seed)  # stratified 80/10/10 split
+        assert_no_patch_leakage(patch_manifest, split_df)  # leakage check
+
         out_path = paths["manifests"] / f"cptac_split_seed{seed}.csv"
         split_df.to_csv(out_path, index=False)
         counts = split_df.groupby(["cancer_type", "split"]).size().unstack(fill_value=0)

@@ -1,30 +1,7 @@
-"""The A0-A9 ablation grid. Each ablation is a (feature_source,
-graph_source, backend) triple so the CV driver can loop over them with
-exactly the same patient folds, training procedure, and evaluation code --
-only the inputs/backend differ.
-
-    A0  mean-expression baseline           (no model)
-    A1  ImageNet ConvNeXt patch-only       features=imagenet,  graph=none
-    A2  GenBio-distilled ConvNeXt patch    features=distilled, graph=none   <- y_patch,i
-    A3  parameter-matched MLP              features=distilled, graph=none, wider MLP (no neighbors)
-    A4  random graph residual PNA          features=distilled, graph=random,   backend=pna_union
-    A5  degree-shuffled residual PNA       features=distilled, graph=shuffled, backend=pna_union   <- CRITICAL negative control
-    A6  real LOCAL residual PNA            features=distilled, graph=local,    backend=pna_union
-    A7  real UNION MULTISCALE residual PNA features=distilled, graph=multiscale, backend=pna_union
-    A8  SCALE-AWARE multiscale residual PNA (PROPOSED FINAL MODEL)
-                                            features=distilled, graph=multiscale, backend=scale_aware
-    A9  multiscale residual GATv2 (architecture control, not the main model)
-                                            features=distilled, graph=multiscale, backend=gatv2
-
-`ABLATION_GRID` is ordered primary block first (A1, A2, A5, A6, A7, A8),
-secondary controls after (A0, A3, A4, A9), so the scientifically essential
-results land before GPU time is spent on lower-priority controls -- a
-driver under time pressure can stop after the primary block.
-
-The GenBio-teacher-vs-student comparison is a separate, methodologically
-stricter analysis (train-fold-only PCA-256, not raw 4608-D GenBio fed to a
-mismatched head) and is not part of this grid -- see src/pathology_st/genbio_pca.py,
-run only after the student model matrix above is locked."""
+"""Defines the A0-A9 ablation grid (feature_source, graph_source, backend
+triples, see `ABLATION_GRID`) so the CV driver can loop over every ablation
+with identical patient folds, training procedure, and evaluation code, plus
+helpers to build each ablation's graph, edge features, and matched-MLP width."""
 from __future__ import annotations
 
 from dataclasses import dataclass

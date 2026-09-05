@@ -48,7 +48,7 @@ def main():
     paths = resolve_run_paths(cfg)
 
     results = {}
-    x, coords, gene, pathway = synthetic_toy_data(cfg)
+    x, coords, gene, pathway = synthetic_toy_data(cfg)  # build synthetic graph
     gene_names = [f"gene_{i}" for i in range(gene.shape[1])]
 
     # S1: two forward passes through the frozen patch head reproduce the same predictions.

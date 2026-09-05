@@ -1,16 +1,7 @@
-"""Select one high-quality CPTAC WSI per patient.
-
-Design: first apply hard exclusions, then rank remaining candidates per
-patient by the deterministic composite score
-
-    Q = 0.35*usable_tissue + 0.25*focus + 0.20*artifact_free
-        + 0.10*stain_quality + 0.10*representativeness
-
-computed from a low-res thumbnail (global tissue/stain QC) plus a sample of
-50-100 ~20x tissue tiles (focus/artifact QC). Everything here is
-torch-free/openslide-only so it can run on a CPU QC node ahead of any GPU
-distillation work.
-"""
+"""Selects one high-quality CPTAC WSI per patient: applies hard exclusions,
+then ranks remaining candidates by a deterministic composite quality score
+computed from a thumbnail plus a sample of ~20x tissue tiles. Torch-free/
+openslide-only so it can run on a CPU QC node ahead of any GPU work."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -104,6 +95,7 @@ def compute_wsi_qc(wsi_path: str, cfg: dict, reader) -> dict:
     here) so this module stays importable without openslide for unit
     tests -- see pathology_st.wsi_patches.OpenSlideReader for the real
     implementation."""
+    # global tissue/stain QC from the thumbnail
     thumb = reader.get_thumbnail(cfg["wsi_selection"]["thumbnail_max_dim"])
     tissue_mask = tissue_mask_from_thumbnail(thumb)
     tissue_fraction = float(tissue_mask.mean())
@@ -113,6 +105,7 @@ def compute_wsi_qc(wsi_path: str, cfg: dict, reader) -> dict:
     px_area_mm2 = (mpp or 0.25) ** 2 * 1e-6  # um^2 -> mm^2 per level-0 pixel
     tissue_area_mm2 = tissue_fraction * width * height * px_area_mm2
 
+    # sample and read tissue tiles for focus/artifact QC
     tile_px = cfg["wsi_selection"]["qc_tile_px"]
     n_tiles = cfg["wsi_selection"]["n_qc_tiles"]
     coords = reader.sample_tissue_tile_coords(tissue_mask, n_tiles, tile_px)
@@ -221,6 +214,7 @@ def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list
     """Applies hard filters, computes cohort-relative Q per cancer type,
     then selects the max-Q WSI per patient. Returns (selected_records,
     report) with the exclusion/count summary."""
+    # hard exclusions
     for r in all_records:
         excluded, reason = apply_hard_filters(r, cfg)
         r["excluded"], r["exclusion_reason"] = excluded, reason
@@ -230,11 +224,13 @@ def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list
     for r in kept:
         by_cancer.setdefault(r["cancer_type"], []).append(r)
 
+    # cohort-relative Q score per cancer type
     for cancer, recs in by_cancer.items():
         stats = compute_cohort_stats(recs)
         for r in recs:
             r["qc_score"] = compute_q_score(r, cfg, stats)
 
+    # best WSI per patient
     selected = []
     by_patient: dict[str, list[dict]] = {}
     for r in kept:
@@ -264,6 +260,7 @@ def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list
             capped.extend(recs_sorted[:cancer_target])
         selected = capped
 
+    # summary report
     exclusion_counts: dict[str, int] = {}
     for r in all_records:
         if r["excluded"]:

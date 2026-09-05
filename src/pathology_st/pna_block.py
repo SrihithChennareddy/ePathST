@@ -16,12 +16,15 @@ def compute_degree_histogram(edge_indices: list[torch.Tensor], num_nodes_list: l
     of the TRAINING graphs. Computed once from the training fold and reused
     for val/test -- a fixed normalization constant, not fit per-graph, so
     it introduces no leakage."""
+    # first pass: find max degree across all graphs
     max_degree = 0
     for edge_index, n in zip(edge_indices, num_nodes_list):
         if edge_index.numel() == 0:
             continue
         d = degree(edge_index[1], num_nodes=n, dtype=torch.long)
         max_degree = max(max_degree, int(d.max()))
+
+    # second pass: accumulate degree histogram
     deg = torch.zeros(max_degree + 1, dtype=torch.long)
     for edge_index, n in zip(edge_indices, num_nodes_list):
         if edge_index.numel() == 0:

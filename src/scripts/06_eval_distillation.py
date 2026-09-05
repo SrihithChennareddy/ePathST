@@ -46,6 +46,7 @@ def main():
 
     all_results = {}
     for seed in cfg["seeds"]:
+        # build held-out test set for this seed
         split_df = pd.read_csv(paths["manifests"] / f"cptac_split_seed{seed}.csv")
         merged = patch_manifest.merge(split_df[["patient_id", "split", "cancer_type"]], on="patient_id",
                                        suffixes=("", "_split"))
@@ -56,15 +57,19 @@ def main():
             ckpt = paths["student_checkpoints"] / f"{baseline}_seed{seed}_best.pt"
             if baseline != "S0" and not ckpt.exists():
                 continue
+
+            # load checkpoint
             pretrained = "imagenet" if baseline in ("S0", "S1") else None
             model = DistillationStudent(cfg, pretrained=pretrained).to(args.device)
             if baseline != "S0":
                 state = torch.load(ckpt, map_location=args.device)
                 model.load_state_dict(state["model_state_dict"])
 
+            # run inference
             proj, teacher, pids = project_all(model, test_ds, args.device)
             cancer_types = test_pm.set_index("patch_id").loc[pids, "cancer_type"].values
 
+            # compute metrics
             report = evaluate_distillation(proj, teacher, cancer_types, cfg)
             probe = linear_probe_sanity(proj, cancer_types)
             report["linear_probe_cancer_type"] = probe
@@ -72,6 +77,7 @@ def main():
             print(f"[06_eval_distillation] {baseline} seed{seed}: overall mean cosine = "
                   f"{report['overall']['cosine_similarity']['mean']:.4f}")
 
+            # save UMAP for one representative seed
             if seed == cfg["seeds"][0]:
                 umap_xy = umap_embedding(proj, seed=seed)
                 np.savez(paths["figures"] / f"umap_{baseline}_seed{seed}.npz", xy=umap_xy, cancer=cancer_types)

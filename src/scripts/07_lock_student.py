@@ -42,10 +42,12 @@ def main():
                 continue
         with RunEnvironment(f"07_lock_student_seed{seed}", paths["logs"] / f"07_lock_student_seed{seed}_env.json"):
             if args.mode == "A":
+                # keep validated checkpoint
                 state = torch.load(ckpt_path, map_location=args.device)
                 model = DistillationStudent(cfg, pretrained="imagenet")
                 model.load_state_dict(state["model_state_dict"])
             else:
+                # retrain on all patients
                 train_ds = CPTACDistillDataset(patch_manifest, teacher_h5, shard_dir, train=True, cfg=cfg)
                 val_pm = patch_manifest.sample(frac=0.05, random_state=seed)  # small holdout purely for checkpoint selection
                 val_ds = CPTACDistillDataset(val_pm, teacher_h5, shard_dir, train=False, cfg=cfg)
@@ -54,6 +56,7 @@ def main():
                 model = DistillationStudent(cfg, pretrained="imagenet")
                 model.load_state_dict(state["model_state_dict"])
 
+            # strip to encoder, save
             encoder_state = model.strip_to_encoder()
             out_path = paths["student_checkpoints"] / f"locked_encoder_seed{seed}.pt"
             torch.save({"encoder_state_dict": encoder_state, "seed": seed, "mode": args.mode,

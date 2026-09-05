@@ -29,6 +29,7 @@ def main():
 
     report = {}
     with RunEnvironment("14_model_efficiency", paths["logs"] / "14_model_efficiency_env.json"):
+        # load locked student checkpoint
         student = load_locked_encoder(
             torch.load(paths["student_checkpoints"] / f"locked_encoder_seed{args.seed}.pt",
                        map_location=args.device)["encoder_state_dict"], args.device)
@@ -39,6 +40,7 @@ def main():
             "stored_embedding_bytes_per_patch": stored_embedding_size_bytes(1, cfg["student"]["backbone_dim"]),
         }
 
+        # best-effort teacher param count
         try:
             teacher = GenBioPathFMTeacher(cfg, device=args.device)
             teacher_params = {"total_parameters": teacher.n_parameters, "trainable_parameters": 0}

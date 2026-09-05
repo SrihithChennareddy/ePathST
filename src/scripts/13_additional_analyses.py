@@ -24,6 +24,7 @@ def main():
 
     df = pd.read_csv(paths["results"] / "cv_ablation_metrics.csv")
 
+    # per-cancer consistency
     by_cancer = {}
     for cancer, sub in df.groupby("cancer"):
         by_cancer[cancer] = {
@@ -36,7 +37,7 @@ def main():
     consistency_df.to_csv(paths["results"] / "per_cancer_consistency.csv", index=False)
     print(f"[13_additional_analyses] per-cancer consistency:\n{consistency_df}")
 
-    # local vs multiscale delta, pooled across cancers
+    # local vs. multiscale delta, pooled across cancers
     local_mean = df[df["ablation"] == "A6_local_pna"]["fisher_z_mean_patient_R"].mean()
     multi_mean = df[df["ablation"] == "A7_multiscale_pna"]["fisher_z_mean_patient_R"].mean()
     summary = {

@@ -44,6 +44,7 @@ def measure_inference_throughput(model, patches_uint8: np.ndarray, device: str, 
     """CNN feature-extraction time and patches/sec."""
     model.eval()
     n = len(patches_uint8)
+    # warmup batches, excluded from the timed measurement
     for i in range(min(n_warmup, n // batch_size or 1)):
         batch = patches_uint8[i * batch_size:(i + 1) * batch_size]
         if len(batch) == 0:
@@ -53,6 +54,7 @@ def measure_inference_throughput(model, patches_uint8: np.ndarray, device: str, 
     if device.startswith("cuda"):
         torch.cuda.synchronize()
 
+    # timed inference pass
     t0 = time.time()
     for i in range(0, n, batch_size):
         batch = patches_uint8[i:i + batch_size]

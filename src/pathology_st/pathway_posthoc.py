@@ -1,14 +1,7 @@
-"""Pathway activity computed POST HOC from PREDICTED gene expression, as an
-alternative/complement to the direct pathway head. This is scientifically
-cleaner than a direct head: it tests biological consistency (do predicted
-genes imply the right pathway activity?) rather than giving the model the
-answer through an auxiliary objective.
-
-Purely an evaluation-time analysis (no gradients flow through this module):
-take a model's HVG1000 gene predictions, run the same PROGENy scoring used
-for ground truth, and compare the resulting pathway score to (a) the
-ground-truth PROGENy score and (b) the model's own direct pathway head
-output (if it has one)."""
+"""Evaluation-time-only analysis: scores a model's predicted gene expression
+with the same PROGENy pipeline used for ground truth, then compares those
+post-hoc pathway scores to ground truth and to the model's direct pathway
+head (if any)."""
 from __future__ import annotations
 
 import numpy as np

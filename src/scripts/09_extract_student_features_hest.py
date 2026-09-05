@@ -40,6 +40,7 @@ def main():
     hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
     patch_shard_dir = paths["work_dir"] / "hest_patches"
 
+    # load both encoders
     distilled_checkpoint = paths["student_checkpoints"] / f"locked_encoder_seed{args.seed}.pt"
     encoders = {
         "distilled": load_locked_encoder(
@@ -64,11 +65,13 @@ def main():
                     shard_patches = f["patches"][:]
                 group = group.set_index("spot_id").loc[shard_pids].reset_index()
 
+                # run inference, cache features
                 feats = extract_student_features(encoder, shard_patches, args.device)
                 coords = group[["x_um", "y_um"]].values
                 cache_features(out_path, shard_pids.tolist(), feats, coords, encoder_name=feat_name,
                                 checkpoint_source=checkpoint_sources[feat_name], sample_id=sample_id)
 
+                # verify alignment against expression index
                 expr_idx = load_expression_index(sample_id, Path(cfg["paths"]["hest_root"]), hest_samples)
                 assert_full_alignment(shard_pids.tolist(), feats, coords, pd.DataFrame(index=expr_idx))
 

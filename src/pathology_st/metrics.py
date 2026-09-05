@@ -87,10 +87,12 @@ def morans_i(values: np.ndarray, coords_um: np.ndarray, k: int = 6) -> float:
     v = values.copy()
     v[~valid] = np.nanmean(values)
 
+    # k-NN neighbor graph
     tree = cKDTree(coords_um)
     _, idx = tree.query(coords_um, k=k + 1)
     neighbors = idx[:, 1:]
 
+    # accumulate weighted cross-products
     x = v - v.mean()
     num, w_sum = 0.0, 0.0
     for i in range(n):
@@ -110,9 +112,11 @@ def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray, patient_ids: np
     min_regions = cfg["evaluation"]["min_regions_per_patient"]
     thresholds = tuple(cfg["evaluation"]["gene_r_thresholds"])
     out = {}
+    # overall + per-cancer subgroups
     groups = {"overall": np.ones(len(patient_ids), dtype=bool)}
     for c in np.unique(cancer_types):
         groups[c] = cancer_types == c
+
     for name, mask in groups.items():
         if mask.sum() == 0:
             continue

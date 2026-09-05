@@ -157,15 +157,17 @@ class SampleCache:
     def get(self, sample_id: str, patches_path: str, expr_path: str) -> dict:
         if sample_id in self._cache:
             return self._cache[sample_id]
-        with h5py.File(self.cancer_root / patches_path, "r") as f:
+
+        with h5py.File(self.cancer_root / patches_path, "r") as f:  # load patches
             imgs = f["img"][:]
             barcodes = _decode_barcodes(f["barcode"][:])
             coords_px = f["coords"][:].astype(np.float64)
-        adata = ad.read_h5ad(self.cancer_root / expr_path)
+
+        adata = ad.read_h5ad(self.cancer_root / expr_path)  # load expression
         mpp = get_mpp(adata)
         coords_um = coords_px * mpp
         y = official_target(self.cancer_root / expr_path, self.genes, barcodes)
-        feats = {src: fn(imgs) for src, fn in self.embed_fns.items()}
+        feats = {src: fn(imgs) for src, fn in self.embed_fns.items()}  # embed all sources
         entry = {"barcodes": barcodes, "coords_um": coords_um, "y": y, "feats": feats}
         self._cache[sample_id] = entry
         print(f"[22_official_hest_ablation_grid] embedded+targeted {sample_id}: "
@@ -325,6 +327,7 @@ def main():
     bench_root = Path(args.bench_root)
     seed_everything(args.seed)
 
+    # load frozen encoders
     distilled = load_locked_encoder(
         torch.load(paths["student_checkpoints"] / f"locked_encoder_seed{args.feature_seed}.pt",
                    map_location=args.device)["encoder_state_dict"], args.device)
@@ -341,8 +344,9 @@ def main():
     all_rows = []
     for cancer in args.cancers:
         all_rows.extend(run_one_cancer(bench_root, cancer, embed_fns, cfg, args.seed, args.device,
-                                        args.max_folds_per_cancer))
+                                        args.max_folds_per_cancer))  # run ablation grid per cancer
 
+    # save results
     out_dir = paths["results"] / "official_hest_ablation_grid"
     out_dir.mkdir(parents=True, exist_ok=True)
     metrics_df = pd.DataFrame(all_rows)

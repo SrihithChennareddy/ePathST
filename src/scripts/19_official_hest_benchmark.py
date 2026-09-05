@@ -1,38 +1,10 @@
 #!/usr/bin/env python
-"""Official HEST-Benchmark reproduction -- answers a different question
-than src/scripts/10's custom three-cancer patient-held-out experiment: how
-strong is this representation under the standard, published HEST-Benchmark
-protocol, using the official data/splits/genes/metric from
-https://huggingface.co/datasets/MahmoodLab/hest-bench.
-
-Protocol matches the official mahmoodlab/HEST repo
-(src/hest/bench/{benchmark,trainer,st_dataset}.py), not reimplemented from
-memory of the paper:
-
-  - gene target: the 50 genes in `<cancer>/var_50genes.json` (not
-    mean_50genes.json, which the official code never reads for evaluation).
-  - target preprocessing: subset raw counts to those 50 genes, then
-    `sc.pp.log1p` only -- no `sc.pp.normalize_total` (this differs from
-    this project's own `pathology_st.expression.normalize_log1p_slide`, which does
-    apply normalize_total; that's intentional, this script exists
-    specifically to not use our own convention here).
-  - features: Pipeline(StandardScaler -> PCA(n_components=256,
-    random_state=seed)), fit on pooled train-split patches only.
-  - head: Ridge(solver='lsqr', alpha=100/(n_pca_components * n_genes),
-    fit_intercept=False, random_state=seed) -- alpha is not a free
-    hyperparameter, it's a fixed function of feature/target dimensionality.
-  - metric: per-gene scipy.stats.pearsonr on pooled test-split spots;
-    per-fold pearson_mean = mean over the 50 genes; final pearson_mean =
-    mean over folds. seed=1 (the official BenchmarkConfig default) is used
-    here for fidelity, not this project's usual seed=0.
-  - k-fold split: whatever train_N.csv/test_N.csv pairs exist under
-    <cancer>/splits/ in the official hest-bench data (patient/sample-level
-    leave-N-out, not re-derived from this project's own patient split).
-
-Only the encoders differ from the official protocol's own `trident`-based
-patch encoders: this script embeds the same official patches with this
-project's own frozen GenBio-PathFM teacher and frozen distilled ConvNeXt
-V2-Atto, reusing the existing encoder implementations."""
+"""Reproduces the official HEST-Benchmark protocol (official splits/genes/
+log1p-only targets, PCA256+Ridge head, from
+https://huggingface.co/datasets/MahmoodLab/hest-bench, matching
+mahmoodlab/HEST's own benchmark/trainer/st_dataset code) to measure this
+project's frozen teacher/student encoders under the standard published
+protocol, as distinct from script 10's custom three-cancer experiment."""
 from __future__ import annotations
 
 import argparse
@@ -88,7 +60,7 @@ def embed_official_patches(patches_h5: Path, embed_fn) -> tuple[list[str], np.nd
 def run_one_cancer_one_encoder(bench_root: Path, cancer: str, encoder_name: str, embed_fn, seed: int = 1,
                                 latent_dim: int = 256) -> dict:
     cancer_root = bench_root / cancer
-    genes = json.loads((cancer_root / "var_50genes.json").read_text())["genes"]
+    genes = json.loads((cancer_root / "var_50genes.json").read_text())["genes"]  # not mean_50genes.json -- official code never reads that one for eval
     split_dir = cancer_root / "splits"
     n_splits = len(list(split_dir.glob("train_*.csv")))
     assert n_splits > 0, f"no official splits found under {split_dir}"
@@ -114,15 +86,18 @@ def run_one_cancer_one_encoder(bench_root: Path, cancer: str, encoder_name: str,
         X_train, y_train = load_split(train_df)
         X_test, y_test = load_split(test_df)
 
+        # fit PCA on train only
         pipe = Pipeline([("scaler", StandardScaler()), ("pca", PCA(n_components=latent_dim, random_state=seed))])
         X_train_p = pipe.fit_transform(X_train)
         X_test_p = pipe.transform(X_test)
 
+        # fit ridge head -- alpha is fixed by dim, not a free hyperparameter
         alpha = 100.0 / (X_train_p.shape[1] * y_train.shape[1])
         reg = Ridge(solver="lsqr", alpha=alpha, random_state=seed, fit_intercept=False, max_iter=1000)
         reg.fit(X_train_p, y_train)
         preds = reg.predict(X_test_p)
 
+        # per-gene pearson
         gene_corrs = []
         for g, gene in enumerate(genes):
             r, _ = pearsonr(y_test[:, g], preds[:, g])
@@ -153,6 +128,7 @@ def main():
     paths = resolve_run_paths(cfg)
     bench_root = Path(args.bench_root)
 
+    # load frozen encoders
     distilled = load_locked_encoder(
         torch.load(paths["student_checkpoints"] / f"locked_encoder_seed{args.feature_seed}.pt",
                    map_location=args.device)["encoder_state_dict"], args.device)
@@ -175,6 +151,7 @@ def main():
             print(f"[19_official_hest_benchmark] {cancer}/{encoder_name}: "
                   f"pearson_mean={res['pearson_mean']:.4f} +/- {res['pearson_std']:.4f} over {res['n_folds']} folds")
 
+    # save results
     out_dir = paths["results"] / "official_hest_benchmark"
     out_dir.mkdir(parents=True, exist_ok=True)
     save_json(all_results, out_dir / "official_hest_benchmark_full.json")

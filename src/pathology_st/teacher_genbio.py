@@ -94,9 +94,11 @@ def cache_teacher_embeddings(out_path: str | Path, patch_ids: list[str], embeddi
     str_dtype = h5py.string_dtype(encoding="utf-8")
     with h5py.File(out_path, "a") as f:
         if "teacher_embedding" not in f:
+            # first write: create datasets
             f.create_dataset("teacher_embedding", data=embeddings.astype(np.float16), maxshape=(None, embeddings.shape[1]))
             f.create_dataset("patch_id", data=np.array(patch_ids, dtype=object), dtype=str_dtype, maxshape=(None,))
         else:
+            # append to existing datasets
             n0 = f["teacher_embedding"].shape[0]
             n1 = n0 + len(patch_ids)
             f["teacher_embedding"].resize(n1, axis=0)
@@ -111,6 +113,7 @@ def verify_teacher_cache(path: str | Path, expected_dim: int) -> dict:
     with h5py.File(path, "r") as f:
         emb = f["teacher_embedding"][:].astype(np.float32)
         pids = f["patch_id"][:].astype(str)
+
     n_nan = int(np.isnan(emb).sum())
     norms = np.linalg.norm(emb, axis=1)
     report = {

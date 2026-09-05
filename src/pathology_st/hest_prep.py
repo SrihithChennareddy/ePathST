@@ -20,15 +20,18 @@ def audit_hest_samples(raw_meta: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame,
     n0 = len(df)
     reasons = {}
 
+    # drop mouse samples
     mouse_mask = df["species"].str.lower().eq("mouse") if "species" in df else pd.Series(False, index=df.index)
     reasons["mouse"] = int(mouse_mask.sum())
     df = df[~mouse_mask]
 
+    # keep only target cancers
     target_cancers = set(cfg["cancers"]["hest"])
     cancer_mask = df["cancer"].isin(target_cancers)
     reasons["cancer_not_in_target_set"] = int((~cancer_mask).sum())
     df = df[cancer_mask]
 
+    # drop duplicate samples
     dup_mask = df.duplicated(subset=["sample_id"], keep="first")
     reasons["duplicate_sample_id"] = int(dup_mask.sum())
     df = df[~dup_mask]
@@ -59,6 +62,7 @@ def alignment_qc_sample(he_reader, spot_coords_px: np.ndarray, spot_ids: list[st
     rng = np.random.RandomState(seed)
     idx = rng.choice(len(spot_ids), size=min(n, len(spot_ids)), replace=False)
 
+    # extract + score each sampled spot
     rows = []
     for i in idx:
         patch = he_reader.read_region_at_mpp(

@@ -31,7 +31,7 @@ def main():
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
 
-    df = pd.read_csv(paths["results"] / "cv_ablation_metrics.csv")
+    df = pd.read_csv(paths["results"] / "cv_ablation_metrics.csv")  # load ablation metrics
 
     def summarize(vals):
         vals = np.asarray(vals, dtype=float)
@@ -76,6 +76,7 @@ def main():
         figures.fig4_ablation_bars(valid.rename(columns={"hvg1000_r_mean": "fisher_z_mean_patient_R"}),
                                     paths["figures"] / "fig4_ablation_comparison.png")
 
+    # figure 5: dose-response (optional)
     dose = paths["results"] / "spatial_destruction_dose_response.json"
     if dose.exists():
         r_per_q = json.load(open(dose))
@@ -83,6 +84,7 @@ def main():
         rs = [r_per_q[str(q)] if str(q) in r_per_q else r_per_q[q] for q in qs]
         figures.fig5_destruction_dose_response(qs, rs, rs, rs, paths["figures"] / "fig5_dose_response.png")
 
+    # figure 7: efficiency vs performance (optional)
     eff = paths["results"] / "model_efficiency.json"
     if eff.exists():
         e = json.load(open(eff))

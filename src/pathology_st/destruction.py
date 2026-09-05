@@ -48,6 +48,8 @@ def degree_preserving_rewire(edge_index: np.ndarray, seed: int, n_swap_multiplie
     edges = [tuple(p) for p in pairs]
     n_attempts = n_swap_multiplier * max(1, len(edges))
 
+    # double-edge swaps: (a,b),(c,d) -> (a,d),(c,b), rejecting swaps that
+    # would create a duplicate or self-loop edge
     for _ in range(n_attempts):
         if len(edges) < 2:
             break
@@ -82,6 +84,7 @@ def partial_edge_replacement(edge_index: np.ndarray, n_nodes: int, fraction: flo
     n_edges = len(real_pairs)
     n_replace = int(round(fraction * n_edges))
 
+    # remember real distances so kept edges can carry them into the output
     real_dist_by_pair = {}
     if distance_um is not None:
         src, dst = edge_index[0], edge_index[1]
@@ -93,9 +96,11 @@ def partial_edge_replacement(edge_index: np.ndarray, n_nodes: int, fraction: flo
         return {"edge_index": edge_index.copy(),
                 "distance_um": distance_um.copy() if distance_um is not None else None}
 
+    # drop a random subset of real edges, keep the rest
     keep_idx = rng.choice(n_edges, size=n_edges - n_replace, replace=False)
     kept = {tuple(p) for p in real_pairs[keep_idx]}
 
+    # top back up to the original edge count with random replacement edges
     max_possible = n_nodes * (n_nodes - 1) // 2
     target_total = min(n_edges, len(kept) + max_possible - len(kept))
     while len(kept) < target_total:
@@ -107,6 +112,7 @@ def partial_edge_replacement(edge_index: np.ndarray, n_nodes: int, fraction: flo
     pairs = np.array(sorted(kept), dtype=np.int64)
     out_edge_index = _symmetrize(pairs)
 
+    # look up distance for kept real edges; placeholder for replacement edges
     out_distance = None
     if distance_um is not None:
         out_distance = np.array([

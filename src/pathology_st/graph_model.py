@@ -1,33 +1,7 @@
-"""PNA / Scale-Aware PNA / GATv2 graph models, all wrapped in the same
-RESIDUAL correction on top of the (frozen) patch-only predictor:
-
-    y_patch,i  = patch_predictor(h_i)          [frozen]
-    dy_graph,i = GNN(h_i, neighborhood_i)      [this module]
-    y_final,i  = y_patch,i + dy_graph,i
-
-The graph correction heads are zero-initialized so y_final == y_patch at
-init -- this is what makes the A0-A9 grid interpretable as "how much does
-spatial context add," rather than the graph model re-deriving everything
-from scratch. PoC_5 once regressed below patch-only performance because
-this wasn't enforced; `assert_zero_residual_at_init` below is the
-init-time check that now guards against that class of bug on every
-graph-training call.
-
-Three interchangeable graph-correction backends, all producing the same
-{"latent", "gene_delta", "pathway_delta"} output so `ResidualGraphPredictor`
-is backend-agnostic:
-  - `GraphCorrectionModel` -- union multiscale PNA (A4/A5/A6/A7): one PNA
-    sees all edges (of possibly mixed scale) at once, 20-D union edge
-    features (pathology_st.graph_builder.union_edge_features).
-  - `ScaleAwareGraphCorrectionModel` -- the proposed final model (A8):
-    three independent PNA branches (local/meso/macro), each over ONLY its
-    own scale's edges (17-D per_scale_edge_features), fused by a learned
-    softmax gate.
-  - `GATv2CorrectionModel` -- architecture control (A9): identical to
-    GraphCorrectionModel except the message-passing layer is GATv2
-    instead of PNA -- same input, edge features, head, and residual
-    formulation.
-"""
+"""PNA / Scale-Aware PNA / GATv2 graph-correction models, each wrapped as a
+zero-initialized RESIDUAL on top of the frozen patch-only predictor
+(y_final = y_patch + GNN(h, neighborhood)), so spatial context is added
+rather than re-derived from scratch."""
 from __future__ import annotations
 
 import torch
@@ -210,7 +184,8 @@ def assert_zero_residual_at_init(model: ResidualGraphPredictor, x: torch.Tensor,
     """Run before every graph-training call: with the graph correction
     heads freshly zero-initialized, y_final must exactly equal y_patch.
     Guards against the graph model silently starting out worse than
-    patch-only (the PoC_5 failure mode this module's docstring describes)."""
+    patch-only (PoC_5 once regressed below patch-only performance before
+    this check existed)."""
     model.eval()
     with torch.no_grad():
         out = model(x, *graph_args)

@@ -66,6 +66,7 @@ def train_graph_model(patch_head, train_graphs: list[Data], val_graphs: list[Dat
     p = cfg["pna"]
     edge_dim = train_graphs[0].edge_attr.shape[1] if train_graphs[0].edge_attr.numel() else 20
 
+    # build model
     in_dim = train_graphs[0].x.shape[1]
     gene_dim = train_graphs[0].y_gene.shape[1]
     pathway_dim = train_graphs[0].y_pathway.shape[1]
@@ -82,6 +83,7 @@ def train_graph_model(patch_head, train_graphs: list[Data], val_graphs: list[Dat
     history = []
     rng = np.random.RandomState(seed)
 
+    # train loop
     for epoch in range(p["max_epochs"]):
         model.train()
         order = rng.permutation(len(train_graphs))
@@ -99,6 +101,7 @@ def train_graph_model(patch_head, train_graphs: list[Data], val_graphs: list[Dat
         val_loss = _eval_loss(model, val_graphs, cfg, device, backend)
         history.append({"epoch": epoch, "train_loss": float(np.mean(epoch_losses)), "val_loss": val_loss})
 
+        # checkpoint on improvement, else count toward early stop
         if val_loss < best_val:
             best_val, best_epoch, patience_ctr = val_loss, epoch, 0
             torch.save({"graph_correction_state_dict": model.graph_correction.state_dict(),
@@ -108,6 +111,7 @@ def train_graph_model(patch_head, train_graphs: list[Data], val_graphs: list[Dat
         if patience_ctr >= p["early_stop_patience"]:
             break
 
+    # save history
     save_json({"history": history, "best_epoch": best_epoch, "best_val_loss": best_val, "backend": backend},
               str(out_path).replace(".pt", "_history.json"))
     return {"checkpoint": str(out_path), "best_epoch": best_epoch, "best_val_loss": best_val, "backend": backend}
@@ -147,6 +151,8 @@ def predict_graph_model(model, graphs: list[Data], device: str, backend: str = "
         out["pathway_patch_only"].append(pred["pathway_patch_only"].cpu().numpy())
         if "scale_weights" in pred:
             scale_weights.append(pred["scale_weights"].cpu().numpy())
+
+    # stack per-graph blocks
     for k in ("gene_pred", "pathway_pred", "gene_patch_only", "pathway_patch_only"):
         out[k] = np.concatenate(out[k], axis=0)
     out["patient_id"] = np.array(out["patient_id"])

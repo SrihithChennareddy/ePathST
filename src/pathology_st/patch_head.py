@@ -22,6 +22,7 @@ class MolecularBottleneckHead(nn.Module):
     def __init__(self, in_dim: int, bottleneck_dims: list[int], gene_dim: int, pathway_dim: int,
                  dropout: float = 0.1):
         super().__init__()
+        # first (widest) layer gets LayerNorm + Dropout, remaining layers do not
         dims = [in_dim] + list(bottleneck_dims[1:])
         layers = [nn.Linear(dims[0], dims[1]), nn.LayerNorm(dims[1]), nn.GELU(), nn.Dropout(dropout)]
         for d_in, d_out in zip(dims[1:-1], dims[2:]):
@@ -40,10 +41,12 @@ def patch_head_loss(pred: dict, gene_target: torch.Tensor, pathway_target: torch
                      pathway_weight: float = 0.0) -> dict:
     """Primary loss is gene-only (pathway_weight=0.0 by default); pass a
     nonzero pathway_weight for the post-lock ablation sweep."""
+    # mask missing targets, zero-fill so they don't contribute to the loss
     gene_mask = ~torch.isnan(gene_target)
     path_mask = ~torch.isnan(pathway_target)
     g_t = torch.where(gene_mask, gene_target, torch.zeros_like(gene_target))
     p_t = torch.where(path_mask, pathway_target, torch.zeros_like(pathway_target))
+
     mse_gene = (((pred["gene"] - g_t) ** 2) * gene_mask).sum() / gene_mask.sum().clamp(min=1)
     mse_pathway = (((pred["pathway"] - p_t) ** 2) * path_mask).sum() / path_mask.sum().clamp(min=1)
     total = mse_gene + pathway_weight * mse_pathway

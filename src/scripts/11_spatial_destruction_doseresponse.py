@@ -49,6 +49,7 @@ def main():
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
 
+    # load fold artifacts + frozen patch head
     data = np.load(args.fold_artifacts, allow_pickle=True)
     x_train, coords_train, pat_train = data["x_train"], data["coords_train"], data["pat_train"]
     x_test, coords_test, pat_test = data["x_test"], data["coords_test"], data["pat_test"]
@@ -65,11 +66,15 @@ def main():
     r_per_q = {}
     with RunEnvironment("11_spatial_destruction_doseresponse", paths["logs"] / "11_dose_response_env.json"):
         for q in q_values:
+            # build graphs with q% of edges randomly replaced
             graphs_train = build_graphs_at_q(x_train, coords_train, pat_train, y_gene_train, y_path_train, q, cfg, seed)
             graphs_test = build_graphs_at_q(x_test, coords_test, pat_test, y_gene_test, y_path_test, q, cfg, seed)
+
+            # train graph correction model
             ckpt = paths["student_checkpoints"] / f"dose_q{int(q*100)}_seed{seed}.pt"
             train_graph_model(patch_head, graphs_train, graphs_train, cfg, ckpt, seed, args.device)
 
+            # run inference
             deg = compute_degree_histogram([g.edge_index for g in graphs_train], [g.num_nodes for g in graphs_train])
             edge_dim = graphs_train[0].edge_attr.shape[1]
             gc = GraphCorrectionModel(x_train.shape[1], cfg, deg, edge_dim, y_gene_train.shape[1], y_path_train.shape[1])
@@ -77,6 +82,7 @@ def main():
             model = ResidualGraphPredictor(patch_head, gc).to(args.device)
             preds = predict_graph_model(model, graphs_test, args.device)
 
+            # compute metrics
             met = evaluate_predictions(y_gene_test, preds["gene_pred"], preds["patient_id"],
                                         np.array(["pooled"] * len(preds["patient_id"])),
                                         [str(i) for i in range(y_gene_test.shape[1])], cfg)

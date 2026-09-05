@@ -41,15 +41,17 @@ def main():
     baseline_order = args.baselines if args.baselines is not None else ["S1", "S2"]
     enabled_map = {"S1": cfg["baselines"]["S1_genbio_distilled"], "S2": cfg["baselines"]["S2_random_init_distilled"]}
     runs = [(b, s) for s in seeds for b in baseline_order if enabled_map.get(b)]
-
     deadline = time.time() + args.time_budget_hours * 3600 if args.time_budget_hours else None
+
     results = {}
     for baseline, seed in runs:
+        # respect time budget
         if deadline is not None and time.time() >= deadline:
             print(f"[05_train_student_distill] time budget exhausted before starting {baseline} seed{seed} -- skipping")
             continue
         remaining = (deadline - time.time()) if deadline is not None else None
 
+        # build train/val datasets for this seed's split
         split_df = pd.read_csv(paths["manifests"] / f"cptac_split_seed{seed}.csv")
         merged = patch_manifest.merge(split_df[["patient_id", "split"]], on="patient_id", how="inner")
         train_pm = merged[merged["split"] == "train"]
@@ -57,6 +59,7 @@ def main():
         train_ds = CPTACDistillDataset(train_pm, teacher_h5, shard_dir, train=True, cfg=cfg)
         val_ds = CPTACDistillDataset(val_pm, teacher_h5, shard_dir, train=False, cfg=cfg)
 
+        # train student
         stage = f"05_train_student_{baseline}_seed{seed}"
         with RunEnvironment(stage, paths["logs"] / f"{stage}_env.json"):
             res = train_student(baseline, train_ds, val_ds, cfg, paths["student_checkpoints"], seed, args.device,

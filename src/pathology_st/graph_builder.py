@@ -1,16 +1,6 @@
-"""Physical multiscale graph construction. One graph per tissue section
-(never edges across WSIs). Nodes are ST spots with the GenBio-distilled
-ConvNeXt embedding as their only feature. Edges are physical-distance
-buckets (local/meso/macro), each capped at its own max-neighbor count.
-Raw absolute (x, y) node coordinates are never used as a feature.
-
-Two edge-feature variants:
-  - `union_edge_features` (20-D: 1 normalized distance + 16 RBF + 3-D
-    one-hot scale) for any model where one PNA sees edges from all three
-    scales at once (A4/A5/A6/A7).
-  - `per_scale_edge_features` (17-D: 1 normalized distance + 16 RBF, no
-    one-hot) for the scale-aware model (A8), where branch identity
-    already encodes scale."""
+"""Physical multiscale graph construction: one graph per tissue section, with
+ST-spot nodes (GenBio-distilled embedding as the only feature) connected by
+physical-distance-bucketed edges (local/meso/macro, each capped per scale)."""
 from __future__ import annotations
 
 import numpy as np
@@ -26,12 +16,16 @@ def build_multiscale_edges(coords_um: np.ndarray, local_radius_um: float, meso_r
     string array in SCALE_NAMES. Edges are directed both ways so message
     passing is symmetric."""
     n = coords_um.shape[0]
+    # coords_um is used only to compute edge distance/bucket -- never used as a node feature
+    # find all pairs within the widest (macro) radius
     tree = cKDTree(coords_um)
     pairs = tree.query_pairs(r=macro_radius_um, output_type="ndarray")
 
     src_list, dst_list, dist_list, scale_list = [], [], [], []
     if len(pairs) > 0:
         d = np.linalg.norm(coords_um[pairs[:, 0]] - coords_um[pairs[:, 1]], axis=1)
+
+        # bucket by distance, cap degree per scale
         for scale_name, lo, hi, cap in (
             ("local", 0.0, local_radius_um, max_local),
             ("meso", local_radius_um, meso_radius_um, max_meso),
@@ -43,6 +37,7 @@ def build_multiscale_edges(coords_um: np.ndarray, local_radius_um: float, meso_r
                 continue
             kept = _cap_degree(bucket_pairs, bucket_d, n, cap)
             for (i, j), dij in kept:
+                # add both directions so message passing is symmetric
                 src_list += [i, j]
                 dst_list += [j, i]
                 dist_list += [dij, dij]

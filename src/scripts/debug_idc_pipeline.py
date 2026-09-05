@@ -1,18 +1,9 @@
 #!/usr/bin/env python
-"""Standalone diagnostic for the HEST pipeline. Imports the same project
-utilities the real experiment uses (pathology_st.metrics) so this tests the actual
-implementation, not a reimplementation of it.
-
-T1 demonstrates and verifies the fix for a target/prediction misalignment
-bug in src/scripts/10_run_patient_cv.py's run_ablation() that affected every
-graph-based ablation (A4-A9): predict_graph_model() concatenates
-predictions in per-patient-grouped order; ids_test was reassigned to match
-that order, but y_gene_test/y_path_test (the ground-truth arrays passed
-into evaluate_predictions) were not reordered to match -- silently
-misaligning every graph ablation's reported metric.
-
-Output: results/debug_idc_pipeline/T1_alignment_bug.json (before/after
-demonstration of the bug and fix)."""
+"""Standalone diagnostic reproducing and verifying the fix for a real
+target/prediction misalignment bug in src/scripts/10_run_patient_cv.py's
+run_ablation() (affected graph ablations A4-A9); uses the actual
+pathology_st.metrics implementation rather than a reimplementation. Writes
+results/debug_idc_pipeline/T1_alignment_bug.json."""
 from __future__ import annotations
 
 import json

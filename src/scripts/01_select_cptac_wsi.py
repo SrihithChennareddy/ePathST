@@ -1,15 +1,7 @@
 #!/usr/bin/env python
-"""Step 1: inspect CPTAC_ROOT/CPTAC_METADATA, compute per-WSI QC, apply hard
-filters + Q-score ranking, select one WSI per patient, and write
-manifests/cptac_selected_wsi.csv.
-
-Directory layout is discovered at runtime rather than assumed, since the
-scratch download's structure can vary.
-
-QC is CPU/IO-bound (thumbnail + ~80 tile reads per slide) and runs in a
-process pool. Each completed WSI's QC record is appended to
-qc/wsi_qc_cache.jsonl immediately, so a killed/time-limited SLURM job
-resumes from where it left off instead of recomputing everything."""
+"""Step 1: inspect CPTAC_ROOT/CPTAC_METADATA, compute per-WSI QC in a
+resumable process pool, apply hard filters + Q-score ranking, select one
+WSI per patient, and write manifests/cptac_selected_wsi.csv."""
 from __future__ import annotations
 
 import argparse
@@ -101,6 +93,7 @@ def main():
     paths = resolve_run_paths(cfg)
     cptac_root, cptac_meta = Path(cfg["paths"]["cptac_root"]), Path(cfg["paths"]["cptac_metadata"])
 
+    # bail out early if the scratch download hasn't landed yet
     if not cptac_root.exists():
         print(f"[01_select_cptac_wsi] CPTAC_ROOT does not exist yet: {cptac_root}\n"
               f"This is expected while the scratch download is in progress -- rerun this script once data lands.",
@@ -108,10 +101,13 @@ def main():
         sys.exit(2)
 
     with RunEnvironment("01_select_cptac_wsi", paths["logs"] / "01_select_cptac_wsi_env.json"):
+        # discover candidate WSIs; directory layout is discovered at runtime rather
+        # than assumed, since the scratch download's structure can vary
         candidates = discover_candidates(cptac_root, cptac_meta, cfg["cancers"]["cptac"])
         print(f"[01_select_cptac_wsi] discovered {len(candidates)} candidate WSI rows across "
               f"{candidates['patient_id'].nunique() if len(candidates) else 0} patients")
 
+        # load QC cache, resume
         cache_path = paths["qc"] / "wsi_qc_cache.jsonl"
         cached: dict[str, dict] = {}
         if cache_path.exists():
@@ -127,6 +123,9 @@ def main():
         todo = [row.to_dict() for _, row in candidates.iterrows() if row["wsi_id"] not in cached]
         print(f"[01_select_cptac_wsi] {len(todo)} WSIs left to QC, using {args.workers} parallel workers")
 
+        # run QC in parallel; QC is CPU/IO-bound (thumbnail + ~80 tile reads/slide),
+        # so each completed record is appended below immediately -- a killed/time-limited
+        # SLURM job resumes from the cache instead of recomputing everything
         if todo:
             with open(cache_path, "a") as cache_f, mp.get_context("spawn").Pool(args.workers) as pool:
                 results_iter = pool.imap_unordered(_qc_one_star, [(rec, cfg) for rec in todo], chunksize=1)
@@ -139,6 +138,7 @@ def main():
                     if n_done % 25 == 0 or n_done == len(todo):
                         print(f"[01_select_cptac_wsi] QC progress: {n_done}/{len(todo)}")
 
+        # select + write manifest
         records = list(cached.values())
         selected, report = select_one_wsi_per_patient(records, cfg)
         manifest_rows = to_manifest_rows(selected)

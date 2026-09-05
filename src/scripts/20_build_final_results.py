@@ -1,27 +1,11 @@
 #!/usr/bin/env python
 """Assembles results/final/ -- the single consolidated, submission-ready
 output directory for the LOCKED final 5-fold x 3-cancer x seed-0
-experiment (job 84871, 2026-08-31). Pure aggregation over files scripts
-10/12/17/19 and the GenBio baseline already wrote to disk -- never
-re-derives a number by any means other than reading it back out of one of
-those files (no re-fitting, no estimation, no extrapolation).
-
-Per the FINAL STOP RULE: every number here is either (a) a real measured
-result from a completed run, or (b) explicitly labeled NOT MEASURED /
-PARTIAL / SEPARATE PROTOCOL -- never silently omitted or fabricated.
-
-Writes, under results/final/:
-    tables/model_comparison_macro.csv          -- all 10 ablations x {hvg50,hvg1000,pathway}, pooled 3-cancer bootstrap CI
-    tables/model_comparison_per_cancer.csv     -- same, broken out per cancer (5-fold bootstrap CI within cancer)
-    tables/gate_summary.csv                    -- the 3 primary gates, pooled + per-cancer, verdicts
-    tables/secondary_comparisons.csv           -- the 5 secondary A8-vs-X comparisons (pooled)
-    tables/pathway_progeny_results.csv         -- pathway-only view (macro + per-cancer)
-    tables/official_hest_benchmark.csv         -- SEPARATE official-protocol numbers (never mixed with the above)
-    tables/genbio_embedding_mlp_baseline_B1.csv -- PARTIAL (fold0-only), GenBio embedding -> trained MLP
-    tables/efficiency.csv                      -- real measured params + compression ratio; unmeasured rows flagged
-    folds/cv_folds_used.csv                    -- exact (cancer, fold, split, patient_id) used, for audit
-    FINAL_RESULTS.md                           -- narrative: Q1-Q5 answered, tables inlined, honest limitations
-"""
+experiment (job 84871, 2026-08-31), by pure aggregation over files scripts
+10/12/17/19 and the GenBio baseline already wrote to disk (no re-fitting,
+estimation, or extrapolation). Per the FINAL STOP RULE, every number here
+is either a real measured result or explicitly labeled NOT MEASURED /
+PARTIAL / SEPARATE PROTOCOL -- never silently omitted or fabricated."""
 from __future__ import annotations
 
 import json

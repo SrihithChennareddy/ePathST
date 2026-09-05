@@ -1,17 +1,8 @@
-"""Fair GenBio-vs-student comparison via training-fold-only PCA: feeding the
-raw 4608-D GenBio embedding into the same downstream head as the 320-D
-student would be an unfair comparison, so GenBio is first reduced
-4608-D -> training-only PCA -> 256-D, matching the student's own 320->256
-projection dimensionality and HEST-Benchmark's own PCA-256+Ridge
-convention. PCA must be fit on training patients only -- fitting on
-pooled train+test data would leak test-set structure into the basis.
-
-Produces a three-head x two-encoder comparison:
-    1. GenBio PCA256 -> Ridge                    vs.  Student 256 -> Ridge
-    2. GenBio PCA256 -> molecular MLP             vs.  Student 256 -> molecular MLP
-    3. GenBio PCA256 -> residual multiscale PNA   vs.  Student 256 -> residual multiscale PNA
-Run only AFTER the student model matrix (A0-A9) is locked -- never used to
-retune CPTAC distillation or the downstream architecture."""
+"""Fair GenBio-teacher-vs-student comparison: reduces the raw 4608-D GenBio
+embedding via training-fold-only PCA to 256-D (matching the student's own
+320->256 projection) so both feed the same three downstream heads (Ridge,
+molecular MLP, residual multiscale PNA); run only after the A0-A9 student
+model matrix is locked."""
 from __future__ import annotations
 
 import numpy as np
@@ -29,6 +20,7 @@ class TrainOnlyPCA:
         self._fit_ids: set = set()
 
     def fit(self, X_train: np.ndarray, ids=None) -> "TrainOnlyPCA":
+        # train only -- fitting on pooled train+test would leak test-set structure into the basis
         self.pca.fit(X_train)
         if ids is not None:
             self._fit_ids = set(ids)

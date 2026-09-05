@@ -1,26 +1,10 @@
 #!/usr/bin/env python
 """Standalone GenBio-PathFM patch-only baseline for the HEST IDC/COAD/CCRCC
-downstream experiment: frozen GenBio-PathFM (the same teacher used for
-CNN/GNN distillation) embeds every HEST H&E ST spot once (4608-D CLS
-representation, cached to disk, resumable), then a small trainable
-projection+prediction head (4608 -> 320 -> 128 -> {HVG1000, PROGENy14}) is
-fit on TRAIN-patient spots only, using the EXACT existing seed/fold patient
-split src/scripts/10_run_patient_cv.py uses. HVG50 is a strict column slice of
-the HVG1000 predictions/targets -- no separate model. GenBio itself is
-never fine-tuned and no graph/GNN is built here: this is a patch-only
-foundation-model baseline for comparison against the CNN/GNN pipeline, not
-a replacement for it.
-
-Reuses (imports, never modifies) pathology_st.teacher_genbio/expression/pathways/
-cv_folds/patch_head/metrics/utils, plus src/scripts/10_run_patient_cv.py's own
-`load_fold_expression` (loaded via importlib since a leading-digit filename
-can't be `import`ed normally -- never copy-pasted). Reads src/scripts/08's
-outputs (manifests/hest_samples.csv, hest_spot_manifest.csv, hest_patches/)
-read-only. Writes only to its own output locations:
-<persist_dir>/genbio_baseline_embeddings/ and results/genbio_baseline/.
-Never touches student_checkpoints/, student_embeddings/,
-results/cv_ablation_metrics.csv, hest_patches/, or manifests/ -- those
-belong to the concurrently-running CNN/GNN job (src/scripts/10)."""
+downstream experiment: the frozen teacher embeds every ST spot once
+(cached, resumable), then a small trainable head is fit on the exact
+train/fold patient split src/scripts/10_run_patient_cv.py uses, for
+comparison against the CNN/GNN pipeline (never fine-tunes GenBio, builds
+no graph, and never writes to that job's own output locations)."""
 from __future__ import annotations
 
 import argparse
@@ -306,6 +290,9 @@ def main():
 
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
+    # writes only under embed_dir/results_dir below -- never touches student_checkpoints/,
+    # student_embeddings/, results/cv_ablation_metrics.csv, hest_patches/, or manifests/,
+    # which belong to the concurrently-running CNN/GNN job (src/scripts/10)
     persist_dir = Path(cfg["paths"].get("persist_dir") or cfg["paths"]["work_dir"])
     embed_dir = persist_dir / "genbio_baseline_embeddings"
     patch_shard_dir = Path(cfg["paths"]["work_dir"]) / "hest_patches"  # read-only: owned by src/scripts/08
@@ -336,7 +323,7 @@ def main():
     print("[run_genbio_hest_baseline] loading frozen GenBio-PathFM teacher "
           f"({cfg['teacher']['hf_repo']}, dtype={cfg['teacher']['dtype']}, embedding_dim={cfg['teacher']['embedding_dim']}) ...")
     torch.cuda.reset_peak_memory_stats() if device == "cuda" else None
-    genbio = GenBioPathFMTeacher(cfg, device=device)
+    genbio = GenBioPathFMTeacher(cfg, device=device)  # load frozen teacher
     assert cfg["teacher"]["embedding_dim"] == GENBIO_EMBED_DIM
     for p in genbio.model.parameters():
         assert not p.requires_grad, "GenBio-PathFM must be fully frozen"
@@ -395,6 +382,7 @@ def main():
             pathway_metric_rows.extend(cached["pathway_metrics"])
             continue
 
+        # load CV split
         fold_info, split_source = load_or_recompute_split(cfg, paths, hest_samples, cancer, args.seed, args.fold)
         train_patients_all, test_patients = fold_info["train_patients"], fold_info["test_patients"]
         assert set(train_patients_all).isdisjoint(test_patients), \
@@ -415,11 +403,13 @@ def main():
                                                                                    hest_root, patients, cfg)
             return expr, progeny, genes_by_sample, net
 
+        # load train expression
         train_expr, train_progeny, genes_by_sample, net = load_expr(train_p)
         pathway_names = list(net["source"].unique())
         assert len(pathway_names) == 14, f"expected 14 PROGENy pathways, got {len(pathway_names)}"
         common_genes = sorted(set.intersection(*genes_by_sample.values())) if genes_by_sample else []
 
+        # select HVGs
         hvg = select_hvg_for_fold(train_expr, common_genes, mt["hvg1000"], mt["hvg50"])
         assert set(hvg["hvg50"]).issubset(set(hvg["hvg1000"])), "HVG50 must be a subset of HVG1000"
         save_json(hvg["hvg1000"], hvg_lists_dir / f"{cancer}_hvg1000.json")
@@ -458,6 +448,7 @@ def main():
                 out.append(c["embedding"][pos])
             return np.stack(out)
 
+        # load cached GenBio embeddings
         x_train, x_val, x_test = load_feats(ids_train), load_feats(ids_val), load_feats(ids_test)
         for name, x in (("train", x_train), ("val", x_val), ("test", x_test)):
             assert x.shape[1] == GENBIO_EMBED_DIM
@@ -467,6 +458,7 @@ def main():
               f"val={len(val_p)}pat/{len(ids_val)}spots test={len(test_patients)}pat/{len(ids_test)}spots "
               f"(split source: {split_source})")
 
+        # train head
         seed_everything(args.seed)
         t_train0 = time.time()
         if args.head == "ridge":
@@ -524,11 +516,13 @@ def main():
             gene_pred, path_pred = out["gene"].cpu().numpy(), out["pathway"].cpu().numpy()
         head_training_seconds = time.time() - t_train0
 
+        # evaluate on test
         test_patient_ids = spot_by_uid.loc[ids_test, "patient_id"].values
         n_hvg50 = len(hvg["hvg50"])
 
         pp_hvg1000 = per_patient_per_column_pearson(y_gene_test, gene_pred, test_patient_ids, hvg["hvg1000"],
                                                       cfg["evaluation"]["min_regions_per_patient"])
+        # HVG50 is a strict column slice of the HVG1000 predictions/targets -- no separate model
         pp_hvg50 = per_patient_per_column_pearson(y_gene_test[:, :n_hvg50], gene_pred[:, :n_hvg50], test_patient_ids,
                                                     hvg["hvg50"], cfg["evaluation"]["min_regions_per_patient"])
         pp_pathway = per_patient_per_column_pearson(y_path_test, path_pred, test_patient_ids, pathway_names,
@@ -543,6 +537,7 @@ def main():
         gene_metric_rows.extend(pp_hvg1000.to_dict("records"))
         pathway_metric_rows.extend(pp_pathway.to_dict("records"))
 
+        # build summary row
         summary_row = {
             "cancer": cancer, "n_train_patients": len(train_p), "n_test_patients": len(test_patients),
             "n_train_spots": len(ids_train), "n_test_spots": len(ids_test),

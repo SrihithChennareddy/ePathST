@@ -1,13 +1,6 @@
-"""PROGENy14 pathway scoring via decoupler's MLM method. Adapted from
-STS_PoC/PoC_5/crcspatial/pathways.py.
-
-decoupler's API changed between v1 and v2 (confirmed against installed
-v2.2.0): `dc.get_progeny(...)` -> `dc.op.progeny(...)` (same kwargs/return
-schema), and `dc.run_mlm(mat=..., net=..., source=..., target=...,
-weight=..., min_n=...)` -> `dc.mt.mlm(data=..., net=..., tmin=...)` --
-source/target/weight are now inferred from `net`'s standard column names
-instead of passed as kwargs, and `min_n` was renamed `tmin`. Return shape
-(spots x pathways) is unchanged."""
+"""PROGENy14 pathway scoring via decoupler's MLM method. Uses the installed
+decoupler v2 API (`dc.op.progeny`, `dc.mt.mlm`), not the v1 API
+(`dc.get_progeny`, `dc.run_mlm`) this was adapted from."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -53,6 +46,8 @@ def compute_progeny_scores(expr_df: pd.DataFrame, net: pd.DataFrame, min_n: int 
     target)."""
     import decoupler as dc
 
+    # v2 API: source/target/weight are inferred from net's standard columns (no longer kwargs),
+    # and v1's min_n kwarg is now tmin.
     acts, pvals = dc.mt.mlm(data=expr_df, net=net, tmin=min_n, verbose=False)
     acts.index = acts.index.astype(expr_df.index.dtype)
     n_dropped = expr_df.shape[0] - acts.shape[0]

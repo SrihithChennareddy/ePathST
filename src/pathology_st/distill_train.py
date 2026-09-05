@@ -1,10 +1,7 @@
-"""Distillation training loop and the S0/S1/S2 baseline definitions.
-
-  S0 - ImageNet ConvNeXt V2-Atto, NO pathology distillation (encoder used
-       as-is; nothing to train here, see src/scripts/05).
-  S1 - GenBio-distilled ConvNeXt V2-Atto (ImageNet init -> distilled). Main comparison target.
-  S2 - random-init ConvNeXt V2-Atto distilled against the GenBio teacher.
-"""
+"""Distillation training loop and the S0/S1/S2 baseline definitions: S0 is
+ImageNet ConvNeXt V2-Atto with no distillation, S1 is ImageNet-init distilled
+against the GenBio teacher (the main comparison target), and S2 is
+random-init distilled against the same teacher."""
 from __future__ import annotations
 
 import math
@@ -134,6 +131,7 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
     from pathology_st.utils import seed_everything
     seed_everything(seed)
 
+    # build model, optimizer, dataloaders
     pretrained = "imagenet" if baseline == "S1" else None
     model = DistillationStudent(cfg, pretrained=pretrained).to(device)
     d = cfg["distillation"]
@@ -153,6 +151,7 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
     resume_path = out_dir / f"{baseline}_seed{seed}_resume.pt"
     history_path = out_dir / f"{baseline}_seed{seed}_history.json"
 
+    # resume from a prior wall-clock-budgeted run, if present
     start_epoch, best_val_cos, best_epoch, patience_ctr, global_step = 0, -1.0, -1, 0, 0
     history = []
     if resume_path.exists():
@@ -174,14 +173,19 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
         epoch_losses = []
         for x, teacher_emb, _ in train_loader:
             x, teacher_emb = x.to(device), teacher_emb.to(device)
+
+            # lr warmup/cosine-decay schedule
             lr_scale = cosine_warmup_lr(global_step, total_steps, warmup_steps)
             for g, base_lr in zip(opt.param_groups, [d["backbone_lr"], d["projection_lr"]]):
                 g["lr"] = base_lr * lr_scale
 
+            # forward + distillation loss
             opt.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast(enabled=d["amp"]):
                 out = model(x)
                 losses = distillation_loss(out["projected"], teacher_emb, d["lambda_feature"], d["feature_loss"])
+
+            # backward + optimizer step
             scaler.scale(losses["loss"]).backward()
             scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), d["grad_clip_norm"])
@@ -194,11 +198,13 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
                 stopped_early_for_time = True
                 break
 
+        # validation + logging
         val_cos = evaluate_val_cosine(model, val_loader, device)
         history.append({"epoch": epoch, "train_loss": float(np.mean(epoch_losses)), "val_cosine_sim": val_cos})
         print(f"[{baseline} seed{seed}] epoch {epoch}: train_loss={np.mean(epoch_losses):.4f} val_cos={val_cos:.4f}"
               + (" [time-budget hit mid-epoch]" if stopped_early_for_time else ""))
 
+        # save best-so-far checkpoint
         if val_cos > best_val_cos:
             best_val_cos, best_epoch, patience_ctr = val_cos, epoch, 0
             torch.save({"model_state_dict": model.state_dict(), "epoch": epoch, "val_cosine_sim": val_cos,
@@ -206,6 +212,7 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
         else:
             patience_ctr += 1
 
+        # save resumable full training state
         torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": opt.state_dict(),
                     "scaler_state_dict": scaler.state_dict(), "epoch": epoch, "best_val_cos": best_val_cos,
                     "best_epoch": best_epoch, "patience_ctr": patience_ctr, "global_step": global_step,

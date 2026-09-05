@@ -31,26 +31,26 @@ def main():
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
 
-    spot_manifest = pd.read_csv(paths["manifests"] / "hest_spot_manifest.csv")
+    spot_manifest = pd.read_csv(paths["manifests"] / "hest_spot_manifest.csv")  # load manifest
     patch_shard_dir = paths["work_dir"] / "hest_patches"
     out_dir = paths["student_embeddings"] / "genbio_teacher"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     with RunEnvironment("15_genbio_fair_comparison_extract", paths["logs"] / "15_genbio_fair_comparison_env.json"):
-        teacher = GenBioPathFMTeacher(cfg, device=args.device)
+        teacher = GenBioPathFMTeacher(cfg, device=args.device)  # load teacher
         bs = cfg["teacher"]["batch_size"]
         for sample_id, group in tqdm(spot_manifest.groupby("sample_id"), desc="GenBio features on HEST"):
-            with h5py.File(patch_shard_dir / f"{sample_id}.h5", "r") as f:
+            with h5py.File(patch_shard_dir / f"{sample_id}.h5", "r") as f:  # load patch shard
                 shard_pids = f["patch_id"][:].astype(str)
                 shard_patches = f["patches"][:]
             group = group.set_index("spot_id").loc[shard_pids].reset_index()
 
             feats = []
             for start in range(0, len(shard_pids), bs):
-                feats.append(teacher.embed_batch(shard_patches[start:start + bs]))
+                feats.append(teacher.embed_batch(shard_patches[start:start + bs]))  # run inference
             feats = np.concatenate(feats, axis=0)
             coords = group[["x_um", "y_um"]].values
-            cache_features(out_dir / f"{sample_id}.h5", shard_pids.tolist(), feats, coords)
+            cache_features(out_dir / f"{sample_id}.h5", shard_pids.tolist(), feats, coords)  # save features
 
     print(f"[15_genbio_fair_comparison] cached GenBio-teacher (4608-D) HEST features under {out_dir}")
     print("[15_genbio_fair_comparison] to compare against the student, rerun the patch-only/graph "

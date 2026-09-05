@@ -1,12 +1,7 @@
-"""Patient-level cross-validation, 5 folds x 3 seeds, grouped by patient
-(never by section/spot), never randomly splitting spots within a patient.
-Falls back to fewer folds, with a documented reason, when a cohort has
-too few independent patients.
-
-`assert_run_completeness` is a hard gate every aggregation script must
-call before computing any cross-fold statistic: it guards against
-silently pooling a partial run as if it were complete (this project once
-hit exactly that bug -- see docs/POC5_RESULTS.md)."""
+"""Patient-level cross-validation (5 folds x 3 seeds, grouped by patient,
+never by section/spot), with cohort-size fallback to fewer folds, plus
+`assert_run_completeness`, a hard gate every aggregation script must call
+before computing any cross-fold statistic."""
 from __future__ import annotations
 
 import numpy as np
@@ -133,7 +128,8 @@ def assert_run_completeness(expected: set[tuple], completed: set[tuple], context
     """Hard completeness gate: prints every included (cancer, fold, seed,
     model) row, then asserts completed == expected. Raises AssertionError
     (not a soft warning) on any mismatch -- aggregation must fail loudly
-    rather than silently proceed on a partial run (see module docstring)."""
+    rather than silently proceed on a partial run (this project once did
+    exactly that -- see docs/POC5_RESULTS.md)."""
     print(f"[assert_run_completeness{f' ({context})' if context else ''}] "
           f"{len(completed)}/{len(expected)} expected runs present")
     for key in sorted(completed):

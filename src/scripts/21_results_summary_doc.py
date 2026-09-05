@@ -1,13 +1,10 @@
 #!/usr/bin/env python
-"""Step 29: a detailed but still-skimmable results summary -- per-cancer
-and macro A0-A9 tables (with bootstrap 95% CIs and cell counts), the 3
-primary gates and 5 secondary comparisons with effect sizes/p-values, a
-pathway/PROGENy14-only view, GenBio-PathFM reference numbers (kept on two
-explicitly separate tracks), and measured efficiency numbers. Pure
-formatting over results/final/tables/*.csv (script 20's output); computes
-nothing new. Writes two copies: the live results/final/ tree (canonical,
-regenerated every time script 20 reruns) and a git-tracked copy under
-docs/ (for readers browsing the repo without cluster access)."""
+"""Step 29: formats a detailed, skimmable results summary (per-cancer and
+macro A0-A9 tables, primary gates, secondary comparisons, pathway view,
+GenBio-PathFM reference numbers, efficiency) purely from
+results/final/tables/*.csv (script 20's output) -- computes nothing new.
+Writes both the live results/final/ copy and a git-tracked copy under
+docs/."""
 from __future__ import annotations
 
 import sys
@@ -43,6 +40,7 @@ def main():
     cancers = cfg["cancers"]["hest"]
     n_boot = cfg["statistics"]["n_bootstrap"]
 
+    # load script 20's tables
     macro = pd.read_csv(tables / "model_comparison_macro.csv").set_index("model")
     per_cancer = pd.read_csv(tables / "model_comparison_per_cancer.csv")
     gates = pd.read_csv(tables / "gate_summary.csv")
@@ -240,11 +238,14 @@ def main():
               "`experimental_runs/2026-08-31_job84871_final_5fold_3cancer_seed0_with_results_final/"
               "config_used.json`.\n")
 
+    # write both copies
     text = "\n".join(L)
     out_path = final_dir / "HEST_FINAL_5FOLD_RESULTS.md"
     out_path.write_text(text)
     print(f"[21_results_summary_doc] wrote {out_path}")
 
+    # git-tracked copy for readers browsing the repo without cluster access;
+    # results/final/ above is canonical and regenerated every time script 20 reruns
     docs_path = Path(__file__).resolve().parents[1] / "docs" / "HEST_FINAL_5FOLD_RESULTS.md"
     docs_path.write_text(text)
     print(f"[21_results_summary_doc] wrote {docs_path}")
