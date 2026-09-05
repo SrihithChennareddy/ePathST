@@ -68,6 +68,9 @@ Difficulty ranks the same as the custom-protocol run: IDC (easiest) > COAD > CCR
   A4-A9 (any graph, real or fake) cluster within ~0.31-0.32 pooled, and A3 (a parameter-matched
   MLP with **no** neighbor information at all) matches them too. The graph correction is not
   adding topology-specific signal beyond "any local averaging helps a little."
+  This is an indirect test (real vs. shuffled graph); `src/scripts/23_morans_i_diagnostic.py`
+  tests the same question directly (does a gene's real spatial autocorrelation predict its
+  A8-vs-A2 gain), replicating PoC_5's null result on the current official data -- pending.
 
 ## GenBio-PathFM teacher reference (same official protocol, PCA(256)+Ridge head)
 

@@ -29,3 +29,11 @@ The `src/scripts/` are numbered end-to-end and split into two phases: distilling
 16. `16_sanity_checks.py` — sanity checks that must pass before launching full runs
 17. `17_make_results_tables_and_figures.py` — final results tables and figures across HVG settings
 18. `18_final_interpretation.py` — final scientific interpretation of the results
+
+**Official HEST-1k Benchmark reproduction** (separate from the custom protocol above — see `docs/HEST_OFFICIAL_ABLATION_RESULTS.md`)
+
+19. `19_official_hest_benchmark.py` — official splits/genes/PCA256+Ridge protocol, raw teacher/student encoders only
+20. `20_build_final_results.py` — assembles the final results tables from all upstream result files
+21. `21_results_summary_doc.py` — regenerates the git-tracked results summary doc
+22. `22_official_hest_ablation_grid.py` — the full A0-A9 grid re-evaluated under the official protocol
+23. `23_morans_i_diagnostic.py` — tests whether A8's per-gene gain over A2 tracks real spatial autocorrelation (ground-truth Moran's I)

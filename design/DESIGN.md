@@ -236,7 +236,34 @@ mismatch between the expected and completed (cancer, fold, seed, ablation)
 run set — added after PoC_5's own aggregate silently pooled an incomplete
 fold set (see `docs/POC5_RESULTS.md`).
 
-## 6. Known constraints / follow-ups
+## 6. Official HEST-1k Benchmark reproduction (scripts 19-23)
+
+Separate from the custom protocol above (own patient-level GroupKFold,
+HVG1000/HVG50, PROGENy14), scripts 19-23 answer "how does this project's
+model compare on the standard published HEST-1k leaderboard" (official
+splits, official curated 50-gene panel per cancer, official pooled-spot
+Pearson metric) — see `docs/HEST_OFFICIAL_ABLATION_RESULTS.md` and
+`docs/HEST_OFFICIAL_HVG50_GENES.md` for the full protocol/gene-list
+writeup and results.
+
+- `19_official_hest_benchmark.py` — official protocol, raw teacher/student
+  encoders only (train-fold PCA256 + Ridge, not the trained A0-A9 heads).
+- `22_official_hest_ablation_grid.py` — reuses `10_run_patient_cv.py`'s
+  `run_ablation`/`train_patch_head` (via `importlib`) to run the *same*
+  trained A0-A9 grid against official data/splits/genes instead of
+  reimplementing it — the direct A0-A9-vs-leaderboard comparison.
+- `23_morans_i_diagnostic.py` — Gate 3 (`docs/HEST_FINAL_5FOLD_RESULTS.md`,
+  `docs/HEST_OFFICIAL_ABLATION_RESULTS.md`) already shows A8 statistically
+  indistinguishable from A5 (shuffled-graph control) on both protocols —
+  an indirect null result. This script tests the same question directly:
+  per gene, does (A8 R − A2 R) correlate with that gene's ground-truth
+  Moran's I (real spatial autocorrelation)? Replicates the diagnostic
+  PoC_5 already ran once (`Corr(delta, MoranI) = 0.1148, p = 0.630` — no
+  relationship) on the current official-protocol data.
+- `20_build_final_results.py` / `21_results_summary_doc.py` — assemble
+  the final cross-script results tables and the git-tracked summary doc.
+
+## 7. Known constraints / follow-ups
 
 - HEST metadata + WSI/ST data is now confirmed present for all three
   cancers as of 2026-08-29 (`configs/base.yaml`'s `paths.hest_by_cancer`;
