@@ -1,6 +1,6 @@
 # HEST Final 5-Fold Experiment -- Results
 
-Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x 3-cancer x seed-0 experiment (SLURM job 84871, completed 2026-08-31, 03:15:54 elapsed). Metric: patient-level Fisher-z mean Pearson R (`sts.metrics.patient_macro_fisher_z`). All CIs are bootstrap 95% intervals, n_bootstrap=10000, resampled over (cancer, fold, seed) cells -- see the Limitations section for what that does and does not mean. Every number below is read directly from `results/final/tables/`; nothing is re-derived or estimated in this document.
+Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x 3-cancer x seed-0 experiment (SLURM job 84871, completed 2026-08-31, 03:15:54 elapsed). Metric: patient-level Fisher-z mean Pearson R (`pathology_st.metrics.patient_macro_fisher_z`). All CIs are bootstrap 95% intervals, n_bootstrap=10000, resampled over (cancer, fold, seed) cells -- see the Limitations section for what that does and does not mean. Every number below is read directly from `results/final/tables/`; nothing is re-derived or estimated in this document.
 
 ## Contents
 
@@ -98,7 +98,7 @@ Pooled across IDC + COAD + CCRCC (15 cancer-fold-seed cells per model: 3 cancers
 
 ## 4. Primary statistical gates
 
-The three pre-registered pass/fail tests (configs/base.yaml `primary_gates`). `delta_R` = mean(better) - mean(worse) over shared cells; CI/p-value from `sts.stats_tests.patient_bootstrap_ci` / `paired_sign_flip_test`; **SUPPORTED** requires the 95% CI to lie entirely above zero.
+The three pre-registered pass/fail tests (configs/base.yaml `primary_gates`). `delta_R` = mean(better) - mean(worse) over shared cells; CI/p-value from `pathology_st.stats_tests.patient_bootstrap_ci` / `paired_sign_flip_test`; **SUPPORTED** requires the 95% CI to lie entirely above zero.
 
 ### Gate 1: Distillation (A2 > A1)
 

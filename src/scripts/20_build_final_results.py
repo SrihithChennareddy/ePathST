@@ -32,9 +32,9 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.ablations import ABLATION_GRID
-from sts.stats_tests import patient_bootstrap_ci
-from sts.utils import load_config, resolve_run_paths, save_json
+from pathology_st.ablations import ABLATION_GRID
+from pathology_st.stats_tests import patient_bootstrap_ci
+from pathology_st.utils import load_config, resolve_run_paths, save_json
 
 MODEL_DESC = {a.name: a.description for a in ABLATION_GRID}
 MODEL_PRIORITY = {a.name: a.priority for a in ABLATION_GRID}

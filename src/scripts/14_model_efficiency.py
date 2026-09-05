@@ -11,11 +11,11 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.efficiency import (compression_ratio, count_model_params, measure_flops_macs,
+from pathology_st.efficiency import (compression_ratio, count_model_params, measure_flops_macs,
                              measure_inference_throughput, stored_embedding_size_bytes)
-from sts.student_model import ConvNeXtV2AttoStudent, load_locked_encoder
-from sts.teacher_genbio import GenBioPathFMTeacher
-from sts.utils import RunEnvironment, load_config, resolve_run_paths, save_json
+from pathology_st.student_model import ConvNeXtV2AttoStudent, load_locked_encoder
+from pathology_st.teacher_genbio import GenBioPathFMTeacher
+from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json
 
 
 def main():

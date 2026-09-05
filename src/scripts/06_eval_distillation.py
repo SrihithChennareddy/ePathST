@@ -13,10 +13,10 @@ import pandas as pd
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.distill_eval import evaluate_distillation, linear_probe_sanity, umap_embedding
-from sts.distill_train import CPTACDistillDataset
-from sts.student_model import DistillationStudent
-from sts.utils import load_config, resolve_run_paths, save_json
+from pathology_st.distill_eval import evaluate_distillation, linear_probe_sanity, umap_embedding
+from pathology_st.distill_train import CPTACDistillDataset
+from pathology_st.student_model import DistillationStudent
+from pathology_st.utils import load_config, resolve_run_paths, save_json
 
 
 @torch.no_grad()

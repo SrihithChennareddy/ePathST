@@ -8,11 +8,11 @@ written after seeing PoC_5's real results -- see `docs/POC5_RESULTS.md`).
 **Explicit constraint honored throughout this migration**: nothing related
 to CPTAC WSI selection/QC, patch extraction, GenBio-PathFM teacher
 inference, or ConvNeXt V2-Atto distillation training was touched --
-`src/sts/teacher_genbio.py`, `src/sts/student_model.py`, `src/sts/distill_train.py`,
-`src/sts/distill_loss.py`, `src/scripts/01`-`07`, and `configs/base.yaml`'s
+`src/pathology_st/teacher_genbio.py`, `src/pathology_st/student_model.py`, `src/pathology_st/distill_train.py`,
+`src/pathology_st/distill_loss.py`, `src/scripts/01`-`07`, and `configs/base.yaml`'s
 `teacher:`/`student:`/`distillation:` sections are byte-for-byte unchanged
 except where an earlier, unrelated fix (the HDF5 truncation bug) already
-touched `src/sts/teacher_genbio.py` before this migration started -- see
+touched `src/pathology_st/teacher_genbio.py` before this migration started -- see
 `docs/RUN_STATUS.md`. This was verified by diffing those sections'
 resolved config values before/after (`distillation.max_epochs=100`,
 `teacher.hf_repo=genbio-ai/genbio-pathfm`, `student.backbone=
@@ -25,7 +25,7 @@ interruption or config drift.
 ### 1. Edge-feature dimensionality bug fix (V2 Phase 9)
 V1's single edge-feature function (16 RBF + 3-D scale one-hot = **19-D**)
 omitted the explicit normalized-distance scalar V2's spec calls for.
-Fixed in `src/sts/graph_builder.py`:
+Fixed in `src/pathology_st/graph_builder.py`:
 - `union_edge_features` (new name; `rbf_edge_features` kept as a
   back-compat alias) -- now correctly **20-D** (1 distance + 16 RBF + 3
   one-hot), used by A4/A5/A6/A7/A9 (any backend where one message-passing
@@ -40,7 +40,7 @@ the buggy 19-D shape, now asserts 20-D/17-D) and a live forward-pass smoke
 test (see below).
 
 ### 2. New graph-model backends (V2 Phases 12, 15)
-`src/sts/graph_model.py` (previously one backend) now has three, all sharing
+`src/pathology_st/graph_model.py` (previously one backend) now has three, all sharing
 the same residual-correction wrapper (`ResidualGraphPredictor`, backend-
 agnostic via `*args` passthrough):
 - `GraphCorrectionModel` -- union multiscale PNA (A4/A5/A6/A7), unchanged core logic.
@@ -48,12 +48,12 @@ agnostic via `*args` passthrough):
   -- three independent per-scale PNA branches + a learned softmax gate
   over `[h^0; h^L; h^M; h^G]`. Reuses the SAME single-`Data`-object PyG
   pipeline as every other backend via a per-edge `edge_scale` tag
-  (`src/sts/ablations.scale_aware_edge_data`) rather than a parallel 3-edge-set
-  data path -- `src/sts/graph_training.py`'s make_pyg_data/train_graph_model/
+  (`src/pathology_st/ablations.scale_aware_edge_data`) rather than a parallel 3-edge-set
+  data path -- `src/pathology_st/graph_training.py`'s make_pyg_data/train_graph_model/
   predict_graph_model needed only a `backend` parameter and an optional
   `edge_scale` field, no structural rewrite.
 - `GATv2CorrectionModel` (**new, A9, architecture control**) --
-  `src/sts/gatv2_block.py`, identical structure to the PNA block with GATv2 as
+  `src/pathology_st/gatv2_block.py`, identical structure to the PNA block with GATv2 as
   the message-passing operator, isolating PNA-vs-GATv2 as V2 Phase 15
   requires ("everything except the message-passing layer should remain
   identical").
@@ -63,7 +63,7 @@ agnostic via `*args` passthrough):
   init, for whichever backend is active. Called automatically at the start
   of every `train_graph_model` call, not just in sanity checks.
 
-**Real bug this surfaced and fixed**: `src/sts/patch_head.py`'s V2-mandated
+**Real bug this surfaced and fixed**: `src/pathology_st/patch_head.py`'s V2-mandated
 bottleneck (LayerNorm+GELU+**Dropout**) made the "frozen" patch head
 non-deterministic across forward calls in train mode, since nothing had
 put it in `eval()`. `ResidualGraphPredictor.__init__` now calls
@@ -73,7 +73,7 @@ fixed, then reconfirmed passing (see `docs/RUN_STATUS.md`-style
 incident record, kept here since it's part of this migration's own work).
 
 ### 3. Ablation grid restructured (V2 Phase 14)
-`src/sts/ablations.py`'s `ABLATION_GRID` is now ordered **primary block first**
+`src/pathology_st/ablations.py`'s `ABLATION_GRID` is now ordered **primary block first**
 (A1, A2, A5, A6, A7, A8) **then secondary** (A0, A3, A4, A9) per V2 Phase
 14/18's explicit run-priority. A0 (mean-expression) and A3 (parameter-
 matched MLP) are now REAL implementations in `src/scripts/10_run_patient_cv.py`
@@ -84,7 +84,7 @@ separate PCA-256-based analysis (see #6 below), run only after this grid
 is locked.
 
 ### 4. Patch-head loss changed to gene-only by default (V2 Phase 7)
-`src/sts/patch_head.py` / `configs/base.yaml`'s `patch_head.pathway_loss_weight`
+`src/pathology_st/patch_head.py` / `configs/base.yaml`'s `patch_head.pathway_loss_weight`
 default changed **0.2 -> 0.0** (PoC_5 showed no consistent benefit from the
 mandatory pathway auxiliary term). `pathway_loss_sweep: [0.0, 0.05, 0.10,
 0.20]` added to config for the post-lock ablation V2 Phase 19 calls for
@@ -97,9 +97,9 @@ silently pooled only 3 of 4 completed folds (fold 3 finished but was never
 included; fold 4 failed both/all 3 seeds on a broken script path -- see
 `docs/POC5_RESULTS.md` for the full forensic writeup). V2 Phase 3 requires
 a hard assertion against exactly this. Added:
-- `src/sts/cv_folds.expected_run_keys` -- enumerates every (cancer, fold,
+- `src/pathology_st/cv_folds.expected_run_keys` -- enumerates every (cancer, fold,
   seed, ablation) the CV design calls for.
-- `src/sts/cv_folds.assert_run_completeness` -- prints every included run,
+- `src/pathology_st/cv_folds.assert_run_completeness` -- prints every included run,
   then **raises** (not warns) on any mismatch between expected and
   completed sets.
 - Wired into `src/scripts/10_run_patient_cv.py` (end-of-run gate) and
@@ -110,7 +110,7 @@ a hard assertion against exactly this. Added:
   before relying on it for anything real.
 
 ### 6. Per-cancer as primary analysis unit (V2 Phase 1)
-`src/sts/cv_folds.build_cv_grid` now returns `primary_analysis_unit:
+`src/pathology_st/cv_folds.build_cv_grid` now returns `primary_analysis_unit:
 "per_cancer"`; `configs/base.yaml`'s `cross_validation.primary_analysis_unit`
 mirrors this. `src/scripts/12_primary_hypothesis_test.py` reports every gate
 BOTH pooled and per-cancer, with per-cancer as the stated primary result.
@@ -130,8 +130,8 @@ V2 explicitly redefines the primary spatial-topology comparison to use A8
 now that it's the proposed final architecture.
 
 ### 8. GenBio fair comparison redesigned around training-fold PCA (V2 Phase 21)
-New `src/sts/genbio_pca.py`: `TrainOnlyPCA` (256-D, fit on train patients
-only, leakage-asserted like `sts.expression.TrainOnlyStandardizer`) +
+New `src/pathology_st/genbio_pca.py`: `TrainOnlyPCA` (256-D, fit on train patients
+only, leakage-asserted like `pathology_st.expression.TrainOnlyStandardizer`) +
 Ridge/report helpers, replacing V1's ambiguous "feed the raw 4608-D GenBio
 embedding into the same head" approach. `configs/base.yaml`'s new
 `genbio_fair_comparison` block (`pca_n_components: 256, ridge_alpha: 1.0`).
@@ -141,8 +141,8 @@ three-head x two-encoder PCA comparison V2 Phase 21 specifies) is a
 follow-up, not yet done (see below).
 
 ### 9. Post-hoc pathway scoring (V2 Phase 19)
-New `src/sts/pathway_posthoc.py`: computes PROGENy pathway activity from a
-model's PREDICTED genes (reusing `sts.pathways.compute_progeny_scores`)
+New `src/pathology_st/pathway_posthoc.py`: computes PROGENy pathway activity from a
+model's PREDICTED genes (reusing `pathology_st.pathways.compute_progeny_scores`)
 rather than only from a dedicated pathway head -- V2's stated reasoning:
 "tests biological consistency rather than giving the model the answer
 through an auxiliary objective." Library-level only; not yet wired into
@@ -150,7 +150,7 @@ an evaluation driver script.
 
 ## Verification performed
 
-- `python3 -m py_compile src/sts/*.py src/scripts/*.py` -- clean.
+- `python3 -m py_compile src/pathology_st/*.py src/scripts/*.py` -- clean.
 - `tests/test_graph_and_stats.py` -- all 9 pass (3 new/updated for the
   edge-feature dimensionality fix).
 - `src/scripts/16_sanity_checks.py` -- all 9 (S1-S9) pass, including the two
@@ -168,22 +168,22 @@ an evaluation driver script.
 ## Known follow-ups (not done in this pass -- explicitly out of scope for now)
 
 - `src/scripts/15_genbio_fair_comparison.py` still uses V1's raw-4608-D
-  approach; needs a rewrite using `src/sts/genbio_pca.py`'s `TrainOnlyPCA` to
+  approach; needs a rewrite using `src/pathology_st/genbio_pca.py`'s `TrainOnlyPCA` to
   match V2 Phase 21's three-head (Ridge/MLP/PNA) x two-encoder
   (GenBio-PCA256 vs. student-256) comparison.
-- `src/sts/pathway_posthoc.py` and the `pathway_loss_sweep` config value exist
+- `src/pathology_st/pathway_posthoc.py` and the `pathway_loss_sweep` config value exist
   but aren't yet driven by a script -- V2 Phase 19's post-lock ablation
   (run only after the architecture matrix above is frozen) is future work.
 - V2 Phase 20's spatial-destruction dose-response "ideally preserve
   local/meso/macro edge counts per scale" refinement (vs. the current
-  aggregate-degree-only preservation in `src/sts/destruction.
+  aggregate-degree-only preservation in `src/pathology_st/destruction.
   partial_edge_replacement`) not yet implemented.
 - V2 Phase 16's small COAD-fold0-seed0 engineering smoke run (a real-data,
   not synthetic-data, pre-flight check) has no dedicated script yet --
   `src/scripts/16_sanity_checks.py` covers the synthetic-data S1-S9 checks V2
   Phase 17 requires, but not the separate real-data engineering run V2
   Phase 16 also asks for.
-- `src/sts/cv_folds.build_cv_grid`'s "make the three cancers separate primary
+- `src/pathology_st/cv_folds.build_cv_grid`'s "make the three cancers separate primary
   experiments" (V2's `experiment_idc/`, `experiment_coad/`,
   `experiment_ccrcc/` directory suggestion) is reflected in
   `primary_analysis_unit` and per-cancer reporting, but the pipeline

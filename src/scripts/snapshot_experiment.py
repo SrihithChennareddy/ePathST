@@ -23,7 +23,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.utils import load_config, resolve_run_paths
+from pathology_st.utils import load_config, resolve_run_paths
 
 
 def _headline_metric(results_dir: Path) -> str:

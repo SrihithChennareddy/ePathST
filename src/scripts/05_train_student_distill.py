@@ -13,8 +13,8 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.distill_train import CPTACDistillDataset, train_student
-from sts.utils import RunEnvironment, load_config, resolve_run_paths, save_json
+from pathology_st.distill_train import CPTACDistillDataset, train_student
+from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json
 
 
 def main():

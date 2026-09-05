@@ -10,8 +10,8 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.patient_split import assert_no_patch_leakage, cptac_patient_split
-from sts.utils import load_config, resolve_run_paths
+from pathology_st.patient_split import assert_no_patch_leakage, cptac_patient_split
+from pathology_st.utils import load_config, resolve_run_paths
 
 
 def main():

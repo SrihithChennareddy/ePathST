@@ -13,7 +13,7 @@ memory of the paper:
     mean_50genes.json, which the official code never reads for evaluation).
   - target preprocessing: subset raw counts to those 50 genes, then
     `sc.pp.log1p` only -- no `sc.pp.normalize_total` (this differs from
-    this project's own `sts.expression.normalize_log1p_slide`, which does
+    this project's own `pathology_st.expression.normalize_log1p_slide`, which does
     apply normalize_total; that's intentional, this script exists
     specifically to not use our own convention here).
   - features: Pipeline(StandardScaler -> PCA(n_components=256,
@@ -53,10 +53,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.feature_cache import extract_student_features
-from sts.student_model import load_locked_encoder
-from sts.teacher_genbio import GenBioPathFMTeacher
-from sts.utils import load_config, resolve_run_paths, save_json
+from pathology_st.feature_cache import extract_student_features
+from pathology_st.student_model import load_locked_encoder
+from pathology_st.teacher_genbio import GenBioPathFMTeacher
+from pathology_st.utils import load_config, resolve_run_paths, save_json
 
 
 def _decode_barcodes(raw: np.ndarray) -> list[str]:

@@ -22,7 +22,7 @@ from sklearn.linear_model import Ridge
 class TrainOnlyPCA:
     """Fits sklearn PCA on TRAIN-patient rows only; transforms train/val/
     test identically. Tracks fit spot_ids so leakage can be asserted, same
-    convention as sts.expression.TrainOnlyStandardizer."""
+    convention as pathology_st.expression.TrainOnlyStandardizer."""
 
     def __init__(self, n_components: int = 256, random_state: int = 0):
         self.pca = PCA(n_components=n_components, random_state=random_state)

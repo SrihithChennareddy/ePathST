@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from sts.pathways import compute_progeny_scores
+from pathology_st.pathways import compute_progeny_scores
 
 
 def posthoc_pathway_scores(predicted_genes: np.ndarray, gene_names: list[str], progeny_net: pd.DataFrame,
@@ -23,7 +23,7 @@ def posthoc_pathway_scores(predicted_genes: np.ndarray, gene_names: list[str], p
     output. `gene_names` must be the exact HVG1000 order used to produce
     it -- never re-derive or reorder, it must match the fold's locked gene
     order. Returns (n_spots, n_pathways) post-hoc PROGENy scores, same
-    shape/convention as `sts.pathways.compute_progeny_scores`'s
+    shape/convention as `pathology_st.pathways.compute_progeny_scores`'s
     ground-truth output.
 
     Gotcha: PROGENy's MLM scoring expects log-normalized expression-scale

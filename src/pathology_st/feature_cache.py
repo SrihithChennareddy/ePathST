@@ -16,7 +16,7 @@ def extract_student_features(encoder, patches_uint8: np.ndarray, device: str, ba
     """Runs the frozen encoder over patches in batches; image only, no
     expression data touches this path. Returns R^320 features (R^256 if
     `downstream_proj` is given)."""
-    from sts.distill_train import IMAGENET_MEAN, IMAGENET_STD
+    from pathology_st.distill_train import IMAGENET_MEAN, IMAGENET_STD
 
     encoder.eval()
     outs = []
@@ -39,7 +39,7 @@ def cache_features(out_path: str | Path, spot_ids: list[str], features: np.ndarr
     """Stores `encoder_name`/`checkpoint_source`/`sample_id` as h5 attrs so
     `load_cached_features` can assert a cache belongs to the encoder the
     caller expects -- without this, A1 (ImageNet) and A2 (distilled) can
-    silently load each other's features (see src/sts/ablations.py)."""
+    silently load each other's features (see src/pathology_st/ablations.py)."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(out_path, "w") as f:
@@ -67,7 +67,7 @@ def load_cached_features(path: str | Path, expected_encoder_name: str | None = N
         assert out["encoder_name"] == expected_encoder_name, (
             f"cache routing error: {path} was cached by encoder "
             f"'{out['encoder_name']}', but the caller required '{expected_encoder_name}' -- "
-            f"this is the A1/A2 feature-mixup bug class, see src/sts/ablations.py")
+            f"this is the A1/A2 feature-mixup bug class, see src/pathology_st/ablations.py")
     return out
 
 

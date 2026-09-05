@@ -17,15 +17,15 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.ablations import build_graph_for_ablation, edge_features_for_ablation, scale_aware_edge_data
-from sts.cv_folds import assert_run_completeness
-from sts.destruction import degree_preserving_rewire, random_graph
-from sts.graph_model import (GraphCorrectionModel, ResidualGraphPredictor, ScaleAwareGraphCorrectionModel,
+from pathology_st.ablations import build_graph_for_ablation, edge_features_for_ablation, scale_aware_edge_data
+from pathology_st.cv_folds import assert_run_completeness
+from pathology_st.destruction import degree_preserving_rewire, random_graph
+from pathology_st.graph_model import (GraphCorrectionModel, ResidualGraphPredictor, ScaleAwareGraphCorrectionModel,
                               assert_zero_residual_at_init)
-from sts.graph_training import make_pyg_data, train_graph_model
-from sts.patch_head import build_patch_head, patch_head_loss
-from sts.pna_block import compute_degree_histogram
-from sts.utils import load_config, resolve_run_paths, save_json
+from pathology_st.graph_training import make_pyg_data, train_graph_model
+from pathology_st.patch_head import build_patch_head, patch_head_loss
+from pathology_st.pna_block import compute_degree_histogram
+from pathology_st.utils import load_config, resolve_run_paths, save_json
 
 
 def synthetic_toy_data(cfg, n_nodes=60, in_dim=320, gene_dim=20, pathway_dim=14, seed=0):

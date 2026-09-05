@@ -11,11 +11,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.report import (Conclusion, build_final_report, classify_compression_retention,
+from pathology_st.report import (Conclusion, build_final_report, classify_compression_retention,
                          classify_distillation_improvement, classify_morans_correlation,
                          classify_multiscale_vs_local, classify_real_vs_shuffled,
                          classify_representation_fidelity)
-from sts.utils import load_config, resolve_run_paths, save_json
+from pathology_st.utils import load_config, resolve_run_paths, save_json
 
 
 def load_json_if_exists(path: Path):

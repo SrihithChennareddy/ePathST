@@ -11,7 +11,7 @@
 #SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_official_ablation_grid_%j.out
 #SBATCH --error=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_official_ablation_grid_%j.err
 
-# Full A0-A9 ablation grid (sts.ablations.ABLATION_GRID) under the OFFICIAL
+# Full A0-A9 ablation grid (pathology_st.ablations.ABLATION_GRID) under the OFFICIAL
 # HEST-1k Benchmark protocol (official splits/genes/log1p-only targets),
 # all 3 cancers (IDC/COAD/CCRCC), every official k-fold split (IDC 4,
 # COAD 2, CCRCC 6 -- 12 fold x 9 ablations = 108 trained-model runs total).

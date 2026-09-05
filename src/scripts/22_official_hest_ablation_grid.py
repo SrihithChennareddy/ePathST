@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Runs the full A0-A9 ablation grid (`sts.ablations.ABLATION_GRID`) under
+"""Runs the full A0-A9 ablation grid (`pathology_st.ablations.ABLATION_GRID`) under
 the OFFICIAL HEST-1k Benchmark protocol (official splits/genes/log1p-only
 targets from https://huggingface.co/datasets/MahmoodLab/hest-bench) --
 answers "how do the patch-only / GNN-corrected ablations compare on the
@@ -49,7 +49,7 @@ buried in the diff:
     validated against fails loudly instead of silently building graphs at
     the wrong physical scale.
   - validation split: 85/15 sample-level split of each official fold's
-    train samples (`sts.cv_folds.carve_validation_from_train`, treating
+    train samples (`pathology_st.cv_folds.carve_validation_from_train`, treating
     sample_id like a patient_id) -- only for early stopping; the official
     split itself is what prevents train/test leakage. Some official folds
     have as few as 1 train sample (COAD); when there aren't at least 2
@@ -80,12 +80,12 @@ import torch
 from scipy.stats import pearsonr
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.ablations import ABLATION_GRID
-from sts.cv_folds import carve_validation_from_train
-from sts.expression import TrainOnlyStandardizer
-from sts.feature_cache import extract_student_features
-from sts.student_model import ConvNeXtV2AttoStudent, load_locked_encoder
-from sts.utils import load_config, resolve_run_paths, save_json, seed_everything
+from pathology_st.ablations import ABLATION_GRID
+from pathology_st.cv_folds import carve_validation_from_train
+from pathology_st.expression import TrainOnlyStandardizer
+from pathology_st.feature_cache import extract_student_features
+from pathology_st.student_model import ConvNeXtV2AttoStudent, load_locked_encoder
+from pathology_st.utils import load_config, resolve_run_paths, save_json, seed_everything
 
 # `10_run_patient_cv.py` starts with a digit -- not a valid module name for a
 # normal `import` -- loaded via importlib instead, same precedent as

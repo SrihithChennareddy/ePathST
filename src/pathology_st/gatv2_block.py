@@ -1,5 +1,5 @@
 """Edge-aware GATv2 block for the A9 architecture-control ablation. Mirrors
-sts.pna_block.PNABlock's structure exactly (edge-aware conv -> LayerNorm ->
+pathology_st.pna_block.PNABlock's structure exactly (edge-aware conv -> LayerNorm ->
 GELU -> Dropout -> residual) so A7/A8 (PNA) and A9 (GATv2) differ only in
 the message-passing operator -- everything else (features, graph, head,
 folds) stays identical."""
@@ -29,7 +29,7 @@ class GATv2Block(nn.Module):
 
 
 class MultiLayerGATv2(nn.Module):
-    """Same depth as sts.pna_block.MultiLayerPNA for a fair, approximately
+    """Same depth as pathology_st.pna_block.MultiLayerPNA for a fair, approximately
     parameter-matched architecture comparison."""
 
     def __init__(self, hidden_dim: int, n_layers: int, edge_dim: int, heads: int = 4, dropout: float = 0.1):

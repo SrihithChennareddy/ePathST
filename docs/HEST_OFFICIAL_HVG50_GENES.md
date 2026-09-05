@@ -20,7 +20,7 @@ genes**. This doc lists both, per cancer, and explains why they diverge (see als
 6. This one list is then used, unchanged, for every official fold and every model evaluated
    against that cancer.
 
-**This project's own HVG50** (`sts.expression.select_hvg_for_fold`, used by
+**This project's own HVG50** (`pathology_st.expression.select_hvg_for_fold`, used by
 `src/scripts/10_run_patient_cv.py`'s custom protocol):
 1. Per fold, using **train patients only** (a fresh selection every fold -- leakage-free by
    construction, but not the same list across folds or comparable to a fixed benchmark panel).

@@ -13,7 +13,7 @@
 
 # IDC-only sanity rerun (final-experiment diagnostic, 2026-08-30) after fixing:
 #   1. A1_imagenet_patch restored with its own real feature cache + patch_head
-#      (src/sts/feature_cache.py metadata + src/sts/ablations.py + src/scripts/10).
+#      (src/pathology_st/feature_cache.py metadata + src/pathology_st/ablations.py + src/scripts/10).
 #   2. Target/prediction misalignment bug for every graph ablation (A4-A9)
 #      in src/scripts/10_run_patient_cv.py's run_ablation().
 # Reuses ALL existing caches (patches, distilled+imagenet features, teacher
@@ -40,7 +40,7 @@ mkdir -p results/debug_idc_pipeline
 python3 - <<'PYEOF'
 import json, sys
 sys.path.insert(0, ".")
-from sts.utils import load_config, resolve_run_paths
+from pathology_st.utils import load_config, resolve_run_paths
 cfg = load_config("configs/debug_idc_only.json")
 paths = resolve_run_paths(cfg)
 import shutil

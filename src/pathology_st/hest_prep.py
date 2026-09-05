@@ -41,7 +41,7 @@ def audit_hest_samples(raw_meta: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame,
 def enforce_patient_section_grouping(df: pd.DataFrame) -> pd.DataFrame:
     """Multiple sections from one patient must stay in the same train/test
     fold. No-op here beyond asserting the grouping key exists -- the
-    actual grouping happens in sts.cv_folds, which splits on `patient_id`,
+    actual grouping happens in pathology_st.cv_folds, which splits on `patient_id`,
     never `sample_id`."""
     assert "patient_id" in df.columns and df["patient_id"].notna().all()
     return df
@@ -54,7 +54,7 @@ def alignment_qc_sample(he_reader, spot_coords_px: np.ndarray, spot_ids: list[st
     correct H&E/ST registration. Returns per-spot tissue fraction so
     systematic misregistration (near-zero tissue fraction across most
     spots) can be flagged."""
-    from sts.cptac_select import tissue_mask_from_thumbnail
+    from pathology_st.cptac_select import tissue_mask_from_thumbnail
 
     n = cfg["hest"]["n_alignment_qc_samples"]
     rng = np.random.RandomState(seed)

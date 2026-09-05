@@ -4,7 +4,7 @@ for the student, cached in the same format so they can be dropped into
 src/scripts/10_run_patient_cv.py's ablation loop for a like-for-like
 teacher-vs-student comparison (same patients/genes/folds/normalization/
 graph/metric). Superseded by the train-fold-only PCA256 comparison in
-src/sts/genbio_pca.py for the locked final experiment; kept for reference."""
+src/pathology_st/genbio_pca.py for the locked final experiment; kept for reference."""
 from __future__ import annotations
 
 import argparse
@@ -18,9 +18,9 @@ import torch
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.feature_cache import cache_features
-from sts.teacher_genbio import GenBioPathFMTeacher
-from sts.utils import RunEnvironment, load_config, resolve_run_paths
+from pathology_st.feature_cache import cache_features
+from pathology_st.teacher_genbio import GenBioPathFMTeacher
+from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths
 
 
 def main():

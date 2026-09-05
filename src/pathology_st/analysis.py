@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr
 
-from sts.metrics import morans_i, per_patient_per_column_pearson
+from pathology_st.metrics import morans_i, per_patient_per_column_pearson
 
 
 def multiscale_contribution(r_local_by_gene: pd.Series, r_multiscale_by_gene: pd.Series) -> pd.DataFrame:

@@ -11,7 +11,7 @@ never fine-tuned and no graph/GNN is built here: this is a patch-only
 foundation-model baseline for comparison against the CNN/GNN pipeline, not
 a replacement for it.
 
-Reuses (imports, never modifies) sts.teacher_genbio/expression/pathways/
+Reuses (imports, never modifies) pathology_st.teacher_genbio/expression/pathways/
 cv_folds/patch_head/metrics/utils, plus src/scripts/10_run_patient_cv.py's own
 `load_fold_expression` (loaded via importlib since a leading-digit filename
 can't be `import`ed normally -- never copy-pasted). Reads src/scripts/08's
@@ -37,12 +37,12 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.cv_folds import build_cv_grid, carve_validation_from_train, exclude_targeted_panel_samples
-from sts.expression import TrainOnlyStandardizer, select_hvg_for_fold
-from sts.metrics import patient_macro_fisher_z, per_patient_per_column_pearson, target_summary
-from sts.patch_head import patch_head_loss
-from sts.teacher_genbio import GenBioPathFMTeacher
-from sts.utils import RunEnvironment, load_config, resolve_run_paths, save_json, seed_everything
+from pathology_st.cv_folds import build_cv_grid, carve_validation_from_train, exclude_targeted_panel_samples
+from pathology_st.expression import TrainOnlyStandardizer, select_hvg_for_fold
+from pathology_st.metrics import patient_macro_fisher_z, per_patient_per_column_pearson, target_summary
+from pathology_st.patch_head import patch_head_loss
+from pathology_st.teacher_genbio import GenBioPathFMTeacher
+from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json, seed_everything
 
 GENBIO_EMBED_DIM = 4608
 HIDDEN1, HIDDEN2 = 320, 128
@@ -212,7 +212,7 @@ def load_or_recompute_split(cfg: dict, paths: dict, hest_samples: pd.DataFrame, 
     uses -- never regenerates a new random split. Prefers loading the
     persisted manifests/hest_cv_folds.json that script 10 writes; if that
     job hasn't reached its Step 10 yet, falls back to calling the identical
-    `sts.cv_folds.build_cv_grid` on the current hest_samples.csv. This
+    `pathology_st.cv_folds.build_cv_grid` on the current hest_samples.csv. This
     fallback is not an approximation: GroupKFold has no RNG (it depends
     only on the sorted patient-id list), and hest_samples.csv is written in
     full at every checkpoint, so once script 10 does run it derives the
@@ -228,7 +228,7 @@ def load_or_recompute_split(cfg: dict, paths: dict, hest_samples: pd.DataFrame, 
         cv_grid = build_cv_grid(patients_by_cancer, cfg)
         source = "recomputed_deterministic_build_cv_grid_fallback"
         print(f"[run_genbio_hest_baseline] WARNING: {cv_path} not found yet (CNN/GNN job hasn't reached Step 10) -- "
-              f"recomputed the identical deterministic split via sts.cv_folds.build_cv_grid instead of loading it.")
+              f"recomputed the identical deterministic split via pathology_st.cv_folds.build_cv_grid instead of loading it.")
     fold_info = cv_grid["per_cancer"][cancer]["folds"][fold]
     assert fold_info["fold"] == fold
     cv_seeds = cv_grid.get("seeds", cfg["cross_validation"]["seeds"])
@@ -436,7 +436,7 @@ def main():
             gene_t = gene_std.transform(expr[hvg["hvg1000"]].reindex(columns=hvg["hvg1000"]).values)
             path_t = path_std.transform(progeny.reindex(columns=pathway_names).values)
             # NaN is expected here, not a bug: decoupler returns NaN for spots it drops as degenerate
-            # (sts.pathways.compute_progeny_scores), and patch_head_loss already masks NaN via
+            # (pathology_st.pathways.compute_progeny_scores), and patch_head_loss already masks NaN via
             # gene_mask/path_mask. Only Inf would indicate a real standardization bug.
             assert not np.isinf(gene_t).any() and not np.isinf(path_t).any(), \
                 f"{cancer}: Inf in standardized targets for {'train' if is_train else 'eval'} patients"
@@ -548,7 +548,7 @@ def main():
             "cancer": cancer, "n_train_patients": len(train_p), "n_test_patients": len(test_patients),
             "n_train_spots": len(ids_train), "n_test_spots": len(ids_test),
             "HVG50_r": r_hvg50, "HVG1000_r": r_hvg1000, "PROGENy14_r": r_pathway,
-            # mirrors sts.metrics.evaluate_predictions's mean_mse/mean_mae (target_summary doesn't
+            # mirrors pathology_st.metrics.evaluate_predictions's mean_mse/mean_mae (target_summary doesn't
             # surface these) so this table has the same columns as cv_ablation_metrics.csv.
             "HVG50_mse": float(pp_hvg50["mse"].mean()) if len(pp_hvg50) else float("nan"),
             "HVG50_mae": float(pp_hvg50["mae"].mean()) if len(pp_hvg50) else float("nan"),

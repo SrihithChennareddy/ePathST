@@ -25,8 +25,8 @@ import pandas as pd
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.teacher_genbio import GenBioPathFMTeacher, cache_teacher_embeddings, verify_teacher_cache
-from sts.utils import RunEnvironment, load_config, resolve_run_paths, save_json
+from pathology_st.teacher_genbio import GenBioPathFMTeacher, cache_teacher_embeddings, verify_teacher_cache
+from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json
 
 
 def _already_cached_patch_ids(path: Path) -> set[str]:

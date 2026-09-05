@@ -19,7 +19,7 @@ Three interchangeable graph-correction backends, all producing the same
 is backend-agnostic:
   - `GraphCorrectionModel` -- union multiscale PNA (A4/A5/A6/A7): one PNA
     sees all edges (of possibly mixed scale) at once, 20-D union edge
-    features (sts.graph_builder.union_edge_features).
+    features (pathology_st.graph_builder.union_edge_features).
   - `ScaleAwareGraphCorrectionModel` -- the proposed final model (A8):
     three independent PNA branches (local/meso/macro), each over ONLY its
     own scale's edges (17-D per_scale_edge_features), fused by a learned
@@ -34,8 +34,8 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from sts.gatv2_block import MultiLayerGATv2
-from sts.pna_block import MultiLayerPNA
+from pathology_st.gatv2_block import MultiLayerGATv2
+from pathology_st.pna_block import MultiLayerPNA
 
 
 class GraphCorrectionModel(nn.Module):
@@ -106,7 +106,7 @@ class ScaleAwareGraphCorrectionModel(nn.Module):
 
     Interface note: rather than a parallel 3-edge-set data pipeline, this
     reuses the same single-`Data`-object PyG plumbing every other backend
-    uses (src/sts/graph_training.py). `edge_index`/`edge_attr` carry the
+    uses (src/pathology_st/graph_training.py). `edge_index`/`edge_attr` carry the
     UNION of all three scales' edges (17-D per_scale_edge_features, no
     one-hot needed), and a parallel `edge_scale` LongTensor (0=local,
     1=meso, 2=macro) tags which branch each edge belongs to. forward()
@@ -228,7 +228,7 @@ def graph_loss(pred: dict, gene_target: torch.Tensor, pathway_target: torch.Tens
                pathway_weight: float = 0.0) -> dict:
     """Primary loss is gene-only by default (pathway_weight=0.0); pathway
     loss weight is swept separately as an ablation once the architecture
-    is locked (see src/sts/patch_head.py's matching default)."""
-    from sts.patch_head import patch_head_loss
+    is locked (see src/pathology_st/patch_head.py's matching default)."""
+    from pathology_st.patch_head import patch_head_loss
     fake_pred = {"gene": pred["gene"], "pathway": pred["pathway"]}
     return patch_head_loss(fake_pred, gene_target, pathway_target, pathway_weight)

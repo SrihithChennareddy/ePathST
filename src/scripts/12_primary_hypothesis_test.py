@@ -20,9 +20,9 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.cv_folds import assert_run_completeness, build_cv_grid, expected_run_keys
-from sts.stats_tests import paired_sign_flip_test, patient_bootstrap_ci
-from sts.utils import load_config, resolve_run_paths, save_json
+from pathology_st.cv_folds import assert_run_completeness, build_cv_grid, expected_run_keys
+from pathology_st.stats_tests import paired_sign_flip_test, patient_bootstrap_ci
+from pathology_st.utils import load_config, resolve_run_paths, save_json
 
 
 def main():

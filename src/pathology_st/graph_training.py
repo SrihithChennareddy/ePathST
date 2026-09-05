@@ -1,6 +1,6 @@
 """Training loop for the residual graph model. Supports three
 interchangeable backends (pna_union / scale_aware / gatv2 -- see
-src/sts/graph_model.py) through one shared train/eval/predict path. One graph
+src/pathology_st/graph_model.py) through one shared train/eval/predict path. One graph
 per patient/slide; batches of 1-4 graphs per optimizer step."""
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ import numpy as np
 import torch
 from torch_geometric.data import Data, Batch
 
-from sts.graph_model import (GATv2CorrectionModel, GraphCorrectionModel, ResidualGraphPredictor,
+from pathology_st.graph_model import (GATv2CorrectionModel, GraphCorrectionModel, ResidualGraphPredictor,
                               ScaleAwareGraphCorrectionModel, assert_zero_residual_at_init, graph_loss)
-from sts.pna_block import compute_degree_histogram
-from sts.utils import save_json, seed_everything
+from pathology_st.pna_block import compute_degree_histogram
+from pathology_st.utils import save_json, seed_everything
 
 
 def make_pyg_data(features: np.ndarray, edge_index: np.ndarray, edge_attr: np.ndarray,

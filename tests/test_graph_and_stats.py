@@ -5,8 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts import destruction, graph_builder, metrics, stats_tests
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from pathology_st import destruction, graph_builder, metrics, stats_tests
 
 
 def test_multiscale_edges_within_radius():

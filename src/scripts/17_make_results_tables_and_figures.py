@@ -15,9 +15,9 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts import figures
-from sts.stats_tests import patient_bootstrap_ci
-from sts.utils import load_config, resolve_run_paths, save_json
+from pathology_st import figures
+from pathology_st.stats_tests import patient_bootstrap_ci
+from pathology_st.utils import load_config, resolve_run_paths, save_json
 
 MODEL_ORDER = ["A0_mean_expression", "A1_imagenet_patch", "A2_distilled_patch", "A5_shuffled_graph",
                "A6_local_pna", "A7_multiscale_pna", "A8_scale_aware_pna", "A3_matched_mlp",
@@ -91,7 +91,7 @@ def main():
             valid[valid["model"] == "A2_distilled_patch"]) else [0]
         labels = ["distilled student"]
         # GenBio-PathFM teacher point intentionally not added here -- its performance lives in a
-        # separate PCA256-based comparison (src/sts/genbio_pca.py), not in cv_ablation_metrics.csv.
+        # separate PCA256-based comparison (src/pathology_st/genbio_pca.py), not in cv_ablation_metrics.csv.
         figures.fig7_efficiency_vs_performance(params, perf, labels, paths["figures"] / "fig7_efficiency.png")
 
     print(f"[17_results_and_figures] wrote tables and figures under {paths['results']} / {paths['figures']}")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Standalone diagnostic for the HEST pipeline. Imports the same project
-utilities the real experiment uses (sts.metrics) so this tests the actual
+utilities the real experiment uses (pathology_st.metrics) so this tests the actual
 implementation, not a reimplementation of it.
 
 T1 demonstrates and verifies the fix for a target/prediction misalignment
@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.metrics import evaluate_predictions
+from pathology_st.metrics import evaluate_predictions
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "results" / "debug_idc_pipeline"
 

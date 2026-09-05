@@ -9,7 +9,7 @@ For every cancer's patient-level CV folds x every seed:
   2. train the patch-only molecular bottleneck head -- this defines
      y_patch,i (gene-only loss by default);
   3. build the physical multiscale graph;
-  4. for every ablation in sts.ablations.ABLATION_GRID (primary block
+  4. for every ablation in pathology_st.ablations.ABLATION_GRID (primary block
      first -- A1/A2/A5/A6/A7/A8 -- then secondary -- A0/A3/A4/A9), train/
      evaluate with the same folds, features, targets, and procedure,
      saving predictions for every test spot. A8 (scale-aware PNA) and A9
@@ -35,19 +35,19 @@ import torch
 from torch_geometric.data import Data
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.ablations import (ABLATION_GRID, build_graph_for_ablation, edge_features_for_ablation,
+from pathology_st.ablations import (ABLATION_GRID, build_graph_for_ablation, edge_features_for_ablation,
                             matched_mlp_hidden_dim, scale_aware_edge_data)
-from sts.cv_folds import (assert_run_completeness, build_cv_grid, carve_validation_from_train,
+from pathology_st.cv_folds import (assert_run_completeness, build_cv_grid, carve_validation_from_train,
                            exclude_targeted_panel_samples, expected_run_keys)
-from sts.expression import TrainOnlyStandardizer, ensure_gene_symbol_index, normalize_log1p_slide, select_hvg_for_fold
-from sts.feature_cache import load_cached_features
-from sts.graph_model import ResidualGraphPredictor
-from sts.graph_training import _build_correction_model, make_pyg_data, predict_graph_model, train_graph_model
-from sts.metrics import evaluate_predictions
-from sts.pathways import check_pathway_gene_coverage, compute_progeny_scores, fetch_and_cache_progeny_net
-from sts.patch_head import MolecularBottleneckHead, build_patch_head, patch_head_loss
-from sts.pna_block import compute_degree_histogram
-from sts.utils import RunEnvironment, load_config, resolve_run_paths, save_json, seed_everything
+from pathology_st.expression import TrainOnlyStandardizer, ensure_gene_symbol_index, normalize_log1p_slide, select_hvg_for_fold
+from pathology_st.feature_cache import load_cached_features
+from pathology_st.graph_model import ResidualGraphPredictor
+from pathology_st.graph_training import _build_correction_model, make_pyg_data, predict_graph_model, train_graph_model
+from pathology_st.metrics import evaluate_predictions
+from pathology_st.pathways import check_pathway_gene_coverage, compute_progeny_scores, fetch_and_cache_progeny_net
+from pathology_st.patch_head import MolecularBottleneckHead, build_patch_head, patch_head_loss
+from pathology_st.pna_block import compute_degree_histogram
+from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json, seed_everything
 
 
 def load_fold_expression(hest_samples, spot_manifest, hest_root, patients, cfg):
@@ -156,7 +156,7 @@ def main():
     # Both encoders' caches must be loaded here (not just "distilled"), each asserted via
     # load_cached_features(expected_encoder_name=...) to only ever serve its own encoder's
     # features -- otherwise A1 ("imagenet") silently gets distilled features too. See
-    # src/sts/ablations.py and load_feats() below.
+    # src/pathology_st/ablations.py and load_feats() below.
     FEATURE_SOURCES = ("distilled", "imagenet")
     feat_dirs = {src: paths["student_embeddings"] / src for src in FEATURE_SOURCES}
 
@@ -276,7 +276,7 @@ def main():
 def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_gene_train, y_path_train,
                   y_gene_val, y_path_val, y_gene_test, y_path_test, patch_head, spot_manifest, cfg, seed, device,
                   n_hvg50, pathway_names):
-    """Trains/evaluates one ablation from sts.ablations.ABLATION_GRID.
+    """Trains/evaluates one ablation from pathology_st.ablations.ABLATION_GRID.
     Returns (test predictions, headline metrics, eval_ids_test), where
     eval_ids_test is the spot_uid order `preds`/`metrics` were actually
     scored against -- identity order for A0-A3, per-patient-grouped for
@@ -382,7 +382,7 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
 
     # The results table needs HVG50/HVG1000/pathway evaluated separately, not one pooled
     # number relabeled after the fact -- HVG50 is exactly the first n_hvg50 columns of the
-    # HVG1000 target (nested by construction, see sts.expression.select_hvg_for_fold), so no
+    # HVG1000 target (nested by construction, see pathology_st.expression.select_hvg_for_fold), so no
     # separate model/prediction is needed, just a column slice.
     pids, cancer_placeholder = patient_for(ids_test), np.array(["cancer"] * len(ids_test))
     m_hvg1000 = evaluate_predictions(y_gene_test, gene_pred, pids, cancer_placeholder,
@@ -394,7 +394,7 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
     metrics = {f"hvg1000_{k}": v for k, v in m_hvg1000.items()}
     metrics.update({f"hvg50_{k}": v for k, v in m_hvg50.items()})
     metrics.update({f"pathway_{k}": v for k, v in m_pathway.items()})
-    # sts.cv_folds' completeness gate and the Gate 1-3 tests key off this exact unprefixed name.
+    # pathology_st.cv_folds' completeness gate and the Gate 1-3 tests key off this exact unprefixed name.
     metrics["fisher_z_mean_patient_R"] = m_hvg1000.get("fisher_z_mean_patient_R")
     return {"gene": gene_pred, "pathway": path_pred}, metrics, ids_test
 

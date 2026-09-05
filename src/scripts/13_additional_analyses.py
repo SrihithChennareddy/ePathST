@@ -11,8 +11,8 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.analysis import per_cancer_consistency
-from sts.utils import load_config, resolve_run_paths, save_json
+from pathology_st.analysis import per_cancer_consistency
+from pathology_st.utils import load_config, resolve_run_paths, save_json
 
 
 def main():
@@ -42,8 +42,8 @@ def main():
     summary = {
         "multiscale_minus_local": float(multi_mean - local_mean) if pd.notna(local_mean) and pd.notna(multi_mean) else None,
         "note": ("Moran's I vs delta_r correlation and per-pathway delta ranking need the full "
-                 "per-gene/per-pathway per-patient r tables from sts.metrics.per_patient_per_column_pearson "
-                 "during script 10's run -- not yet wired to sts.analysis.ground_truth_morans_i_per_gene / "
+                 "per-gene/per-pathway per-patient r tables from pathology_st.metrics.per_patient_per_column_pearson "
+                 "during script 10's run -- not yet wired to pathology_st.analysis.ground_truth_morans_i_per_gene / "
                  "spatial_benefit_vs_autocorrelation / per_pathway_delta."),
     }
     save_json(summary, paths["results"] / "additional_analyses_summary.json")

@@ -15,9 +15,9 @@ import torch
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.feature_cache import assert_full_alignment, cache_features, extract_student_features
-from sts.student_model import ConvNeXtV2AttoStudent, load_locked_encoder
-from sts.utils import RunEnvironment, load_config, resolve_run_paths
+from pathology_st.feature_cache import assert_full_alignment, cache_features, extract_student_features
+from pathology_st.student_model import ConvNeXtV2AttoStudent, load_locked_encoder
+from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths
 
 
 def load_expression_index(sample_id: str, hest_root: Path, hest_samples: pd.DataFrame):

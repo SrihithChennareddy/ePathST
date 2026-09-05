@@ -12,7 +12,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from sts.cptac_select import tissue_mask_from_thumbnail
+from pathology_st.cptac_select import tissue_mask_from_thumbnail
 
 
 def _clamp_region(x0: int, y0: int, size: int, level_width: int, level_height: int) -> tuple[int, int]:
@@ -42,7 +42,7 @@ def open_slide(path: str):
 
 class WsiDicomReader:
     """Duck-typed wrapper around wsidicom.WsiDicom, matching the interface
-    expected by sts.cptac_select.compute_wsi_qc and the patch extractors
+    expected by pathology_st.cptac_select.compute_wsi_qc and the patch extractors
     below. `path` is a DIRECTORY containing every .dcm instance of one
     series (wsidicom auto-discovers and assembles the pyramid).
     wsidicom.read_region's `location` is level-0 pixel coordinates (same
@@ -122,7 +122,7 @@ class WsiDicomReader:
 
 class OpenSlideReader:
     """Thin duck-typed wrapper around openslide.OpenSlide matching the
-    interface expected by sts.cptac_select.compute_wsi_qc and the patch
+    interface expected by pathology_st.cptac_select.compute_wsi_qc and the patch
     extractors below. cuCIM is a drop-in alternative when GPU-accelerated
     slide reading is available; swap the backend here if so."""
 

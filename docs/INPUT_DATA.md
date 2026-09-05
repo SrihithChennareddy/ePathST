@@ -24,7 +24,7 @@ resolution proxy (`series_size_MB`, pyramid instance count) — with an
 additional pixel-level QC pass (tissue fraction, focus/Laplacian variance,
 pen-mark/artifact detection, stain-saturation outliers) used to re-verify
 or override that pick where multiple candidates existed. See
-`src/sts/cptac_select.py` for the QC/selection logic as implemented in this
+`src/pathology_st/cptac_select.py` for the QC/selection logic as implemented in this
 repo, and `src/scripts/01_select_cptac_wsi.py` for how it runs against the
 already-downloaded data below.
 
@@ -41,7 +41,7 @@ CPTAC_ROOT/{BRCA,COAD,ccRCC}/{patient_id}/*.dcm
   one DICOM whole-slide-image SERIES per patient: multiple .dcm SOP
   instances forming a resolution pyramid (VOLUME levels + LABEL/OVERVIEW/
   THUMBNAIL auxiliary images), SOPClassUID 1.2.840.10008.5.1.4.1.1.77.1.6
-  ("VL Whole Slide Microscopy Image"). Read via sts.wsi_patches
+  ("VL Whole Slide Microscopy Image"). Read via pathology_st.wsi_patches
   .WsiDicomReader (the `wsidicom` package) — plain openslide-python cannot
   read this without a libdicom-enabled build.
 ```
@@ -79,7 +79,7 @@ since it's the only candidate.
 
 Section 4's hard filters (human / H&E / tumor specimen / readable / mpp
 known / adequate tissue) were applied to all 598 candidates via
-`src/sts/cptac_select.py`. Full results, for the paper's Data/Methods section:
+`src/pathology_st/cptac_select.py`. Full results, for the paper's Data/Methods section:
 
 | Stage | BRCA | COAD | CCRCC | Total |
 |---|---|---|---|---|
@@ -120,7 +120,7 @@ found) before the final cohort composition is reported in the paper.
 
 Split is **patient-level, 80/10/10, stratified per cancer type**
 (`configs/base.yaml`: `train_frac/val_frac/test_frac`), computed by
-`src/sts/patient_split.py` *before* any patch is extracted — no patient's
+`src/pathology_st/patient_split.py` *before* any patch is extracted — no patient's
 patches ever cross a split boundary (enforced by
 `assert_no_patch_leakage`). Real counts:
 
@@ -187,7 +187,7 @@ real files actually are):
 | `disease_state` | filtered to `"cancer"` (case-insensitive) only |
 | `oncotree_code` | mapped onto this project's three cancer buckets via `ONCOTREE_TO_CANCER`: `IDC`→IDC (excludes 4/125 `ILC` breast rows — a biologically distinct histology); `COAD`/`COADREAD`/`READ`→COAD (all colorectal); `SCCRCC`→CCRCC (excludes 1/25 `PRCC` kidney row — papillary RCC, a distinct RCC subtype) |
 | `st_technology` | ST platform (Visium, Visium HD, Xenium, etc.) |
-| `species` | present for colon/kidney (`Homo sapiens`); absent from the breast CSV — every present breast sample is confirmed human, so `sts.hest_prep` defaults to `species: human` when the column is missing |
+| `species` | present for colon/kidney (`Homo sapiens`); absent from the breast CSV — every present breast sample is confirmed human, so `pathology_st.hest_prep` defaults to `species: human` when the column is missing |
 
 **`{id}.h5ad` structure** (standard scanpy/Visium AnnData):
 
@@ -196,7 +196,7 @@ real files actually are):
 - `obsm['spatial']` — `(x_px, y_px)` = `(pxl_col_in_fullres, pxl_row_in_fullres)`, already filtered to `in_tissue == 1`
 - `uns['spatial']['ST']['scalefactors']['spot_diameter_fullres']` — the Visium 55µm spot's diameter in pixels; used as an independent cross-check of microns-per-pixel against `openslide.mpp-x` (confirmed to agree to 4 decimal places, e.g. 0.7257 vs. 0.7258 µm/px on sample `TENX28`)
 
-**Alignment QC**: before any patch extraction, `sts.hest_prep
+**Alignment QC**: before any patch extraction, `pathology_st.hest_prep
 .alignment_qc_sample` samples ST spot coordinates and confirms they
 actually land on real tissue in the paired WSI (`pct_spots_with_tissue`);
 a sample is excluded as `likely_misaligned` if this check fails, since a

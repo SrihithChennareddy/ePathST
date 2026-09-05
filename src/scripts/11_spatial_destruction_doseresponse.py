@@ -14,14 +14,14 @@ import pandas as pd
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sts.destruction import partial_edge_replacement
-from sts.graph_builder import build_multiscale_edges, rbf_edge_features
-from sts.graph_model import GraphCorrectionModel, ResidualGraphPredictor
-from sts.graph_training import make_pyg_data, predict_graph_model, train_graph_model
-from sts.metrics import evaluate_predictions
-from sts.pna_block import compute_degree_histogram
-from sts.stats_tests import patient_bootstrap_ci
-from sts.utils import RunEnvironment, load_config, resolve_run_paths, save_json
+from pathology_st.destruction import partial_edge_replacement
+from pathology_st.graph_builder import build_multiscale_edges, rbf_edge_features
+from pathology_st.graph_model import GraphCorrectionModel, ResidualGraphPredictor
+from pathology_st.graph_training import make_pyg_data, predict_graph_model, train_graph_model
+from pathology_st.metrics import evaluate_predictions
+from pathology_st.pna_block import compute_degree_histogram
+from pathology_st.stats_tests import patient_bootstrap_ci
+from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json
 
 
 def build_graphs_at_q(x, coords, patient_of, gene_t, path_t, q, cfg, seed):
@@ -57,7 +57,7 @@ def main():
     patch_head_state = data["patch_head_state"].item()
     seed = int(data["seed"])
 
-    from sts.patch_head import build_patch_head
+    from pathology_st.patch_head import build_patch_head
     patch_head = build_patch_head(cfg, x_train.shape[1], y_gene_train.shape[1], y_path_train.shape[1]).to(args.device)
     patch_head.load_state_dict(patch_head_state)
 

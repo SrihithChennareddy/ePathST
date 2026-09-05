@@ -15,9 +15,9 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from sts.distill_loss import distillation_loss
-from sts.student_model import DistillationStudent
-from sts.utils import save_json
+from pathology_st.distill_loss import distillation_loss
+from pathology_st.student_model import DistillationStudent
+from pathology_st.utils import save_json
 
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
@@ -55,7 +55,7 @@ def to_tensor_normalized(img_float01: np.ndarray) -> np.ndarray:
 
 
 class CPTACDistillDataset(Dataset):
-    """Reads patches on-demand from per-WSI HDF5 shards (sts.wsi_patches
+    """Reads patches on-demand from per-WSI HDF5 shards (pathology_st.wsi_patches
     format) and pairs each with its cached teacher embedding by patch_id.
     Asserts every manifest patch has a cached embedding before training starts."""
 
@@ -131,7 +131,7 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
     first) once elapsed time exceeds it, returning with
     `stopped_early_for_time=True` rather than raising."""
     import time
-    from sts.utils import seed_everything
+    from pathology_st.utils import seed_everything
     seed_everything(seed)
 
     pretrained = "imagenet" if baseline == "S1" else None

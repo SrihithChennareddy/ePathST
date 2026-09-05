@@ -102,7 +102,7 @@ def compute_wsi_qc(wsi_path: str, cfg: dict, reader) -> dict:
     `get_thumbnail(max_dim)`, `read_region_20x(x, y, size)`, `mpp`,
     `dimensions`. Kept as a parameter (rather than importing openslide
     here) so this module stays importable without openslide for unit
-    tests -- see sts.wsi_patches.OpenSlideReader for the real
+    tests -- see pathology_st.wsi_patches.OpenSlideReader for the real
     implementation."""
     thumb = reader.get_thumbnail(cfg["wsi_selection"]["thumbnail_max_dim"])
     tissue_mask = tissue_mask_from_thumbnail(thumb)

@@ -8,7 +8,7 @@ import time
 import numpy as np
 import torch
 
-from sts.utils import count_parameters
+from pathology_st.utils import count_parameters
 
 
 def count_model_params(model) -> dict:
@@ -65,7 +65,7 @@ def measure_inference_throughput(model, patches_uint8: np.ndarray, device: str, 
 
 
 def _prep_batch(batch_uint8: np.ndarray, device: str):
-    from sts.distill_train import IMAGENET_MEAN, IMAGENET_STD
+    from pathology_st.distill_train import IMAGENET_MEAN, IMAGENET_STD
     x = batch_uint8.astype(np.float32) / 255.0
     x = (x - IMAGENET_MEAN) / IMAGENET_STD
     x = np.transpose(x, (0, 3, 1, 2)).astype(np.float32)
