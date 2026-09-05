@@ -25,10 +25,9 @@ CANCER_DIR_ALIASES = {"BRCA": "BRCA", "COAD": "COAD", "CCRCC": "ccRCC"}
 
 def discover_candidates(cptac_root: Path, cptac_metadata: Path, cancers: list[str]) -> pd.DataFrame:
     """Reads each cancer's `{CANCER}_selected_WSI_per_patient.txt` (already
-    one row per patient) and keeps only rows whose series has actually
-    landed locally under CPTAC_ROOT/{cancer_dir}/{patient_id}/. The scratch
-    download is incremental, so missing patients are reported, not treated
-    as an error."""
+    one row per patient) and keeps only rows whose series has actually landed
+    locally under CPTAC_ROOT/{cancer_dir}/{patient_id}/ -- missing patients
+    (incremental scratch download) are reported, not treated as an error."""
     rows = []
     n_not_yet_downloaded = 0
     for cancer in cancers:
@@ -64,9 +63,9 @@ def discover_candidates(cptac_root: Path, cptac_metadata: Path, cancers: list[st
 
 
 def _qc_one(rec: dict, cfg: dict) -> dict:
-    """Runs in a worker process: QC one WSI, returning the updated record.
-    A read failure is captured as `readable=False` rather than crashing the
-    pool -- unreadable slides are excluded downstream, not fatal."""
+    """Runs in a worker process: QC one WSI, returning the updated record;
+    a read failure is captured as `readable=False` rather than crashing the
+    pool, so unreadable slides are excluded downstream, not fatal."""
     try:
         reader = open_slide(rec["wsi_path"])
         qc = compute_wsi_qc(rec["wsi_path"], cfg, reader)

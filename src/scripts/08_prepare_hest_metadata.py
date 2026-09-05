@@ -40,8 +40,8 @@ ONCOTREE_TO_CANCER = {"IDC": "IDC", "COAD": "COAD", "COADREAD": "COAD", "READ": 
 def load_hest_raw_metadata(cfg: dict) -> pd.DataFrame:
     """Reads each cancer's HEST metadata CSV + WSI/ST directories from
     `cfg["paths"]["hest_by_cancer"]`, normalized to
-    pathology_st.hest_prep.HEST_SAMPLE_COLUMNS. Missing/not-yet-downloaded cancers
-    are skipped and reported, not treated as an error."""
+    pathology_st.hest_prep.HEST_SAMPLE_COLUMNS; missing/not-yet-downloaded
+    cancers are skipped and reported, not treated as an error."""
     sources = cfg["paths"].get("hest_by_cancer", {})
     rows = []
     for cancer in cfg["cancers"]["hest"]:
@@ -74,10 +74,10 @@ def load_hest_raw_metadata(cfg: dict) -> pd.DataFrame:
 
 def _process_one_sample(sample: dict, cfg: dict, patch_shard_dir: str, n_threads: int, seed: int = 0) -> dict:
     """Runs in a worker process: alignment QC + patch extraction + shard
-    write for exactly ONE HEST sample. Self-contained (opens its own
-    WSI/expression handles), writes only its own `{sample_id}.h5` shard,
-    and returns manifest rows only -- the patch array is already on disk
-    and doesn't need to be pickled back to the parent."""
+    write for exactly ONE HEST sample, self-contained (opens its own
+    WSI/expression handles) and writing only its own `{sample_id}.h5`
+    shard -- returns manifest rows only, since the patch array is already
+    on disk and doesn't need to be pickled back to the parent."""
     import anndata as ad
 
     reader = open_slide(sample["he_path"])

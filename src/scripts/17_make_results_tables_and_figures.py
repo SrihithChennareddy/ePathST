@@ -31,7 +31,7 @@ def main():
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
 
-    df = pd.read_csv(paths["results"] / "cv_ablation_metrics.csv")  # load ablation metrics
+    df = pd.read_csv(paths["results"] / "cv_ablation_metrics.csv")
 
     def summarize(vals):
         vals = np.asarray(vals, dtype=float)

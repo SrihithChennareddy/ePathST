@@ -72,18 +72,17 @@ class ScaleAwareGraphCorrectionModel(nn.Module):
         [a_L, a_M, a_G] = softmax(MLP_gate(c_i))
         h_i^spatial = a_L*h_i^L + a_M*h_i^M + a_G*h_i^G
 
-    followed by the same delta heads, zero-initialized exactly as the
-    union model. `deg_local/meso/macro` are separate train-fold-only
-    degree histograms, one per branch, since each branch's own PNA needs
-    its own scalers.
+    followed by the same delta heads, zero-initialized exactly as the union
+    model. `deg_local/meso/macro` are separate train-fold-only degree
+    histograms, one per branch, since each branch's own PNA needs its own
+    scalers.
 
-    Interface note: rather than a parallel 3-edge-set data pipeline, this
-    reuses the same single-`Data`-object PyG plumbing every other backend
-    uses (src/pathology_st/graph_training.py). `edge_index`/`edge_attr` carry the
-    UNION of all three scales' edges (17-D per_scale_edge_features, no
-    one-hot needed), and a parallel `edge_scale` LongTensor (0=local,
-    1=meso, 2=macro) tags which branch each edge belongs to. forward()
-    masks by `edge_scale` internally to route each edge to its branch."""
+    Reuses the same single-`Data`-object PyG plumbing every other backend
+    uses (graph_training.py) instead of a parallel 3-edge-set pipeline:
+    `edge_index`/`edge_attr` carry the UNION of all three scales' edges
+    (17-D per_scale_edge_features, no one-hot needed), and a parallel
+    `edge_scale` LongTensor (0=local, 1=meso, 2=macro) tags each edge's
+    branch; forward() masks by `edge_scale` to route edges to branches."""
 
     def __init__(self, in_dim: int, cfg: dict, deg_local: torch.Tensor, deg_meso: torch.Tensor,
                  deg_macro: torch.Tensor, edge_dim: int, gene_dim: int, pathway_dim: int):
@@ -135,17 +134,14 @@ def _zero_init_delta_heads(model: nn.Module, pna_cfg: dict) -> None:
 
 
 class ResidualGraphPredictor(nn.Module):
-    """Wraps a FROZEN patch-only MolecularBottleneckHead with any
-    trainable graph-correction backend (GraphCorrectionModel /
-    GATv2CorrectionModel / ScaleAwareGraphCorrectionModel); forward()
-    returns final = patch + delta. The patch predictor's parameters never
-    receive gradients here -- isolating "what does spatial context add"
-    is the entire point of the residual design.
-
-    Backend-agnostic via *graph_args passthrough: union/GATv2 backends
-    take (edge_index, edge_attr); the scale-aware backend also takes
-    edge_scale -- either way this class just forwards whatever was passed
-    to `self.graph_correction`."""
+    """Wraps a FROZEN patch-only MolecularBottleneckHead with any trainable
+    graph-correction backend (GraphCorrectionModel / GATv2CorrectionModel /
+    ScaleAwareGraphCorrectionModel); forward() returns final = patch + delta,
+    and the patch predictor never receives gradients -- isolating "what does
+    spatial context add" is the entire point of the residual design.
+    Backend-agnostic via *graph_args passthrough: forwards whatever was
+    passed straight to `self.graph_correction` (union/GATv2 take
+    (edge_index, edge_attr); scale-aware also takes edge_scale)."""
 
     def __init__(self, patch_head, graph_correction: nn.Module):
         super().__init__()

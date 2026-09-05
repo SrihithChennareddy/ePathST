@@ -17,23 +17,19 @@ def normalize_log1p_slide(adata, target_sum: float = 1e4) -> None:
 
 
 def ensure_gene_symbol_index(adata):
-    """HEST slides don't share one gene-ID convention (e.g. in the
-    breast/IDC cohort, `NCBI*` samples index by HGNC symbol while `SPA1xx`
-    samples index by Ensembl ID with the symbol in `var['SYMBOL']`).
-    Everything downstream (PROGENy's net, HVG selection, cross-sample gene
-    intersection) is keyed by symbol, so an unconverted Ensembl-indexed
-    slide has ~zero overlap with any of it -- or makes decoupler hard-crash
-    ('No sources with more than tmin=N targets').
-
-    Detects an Ensembl-style index (`ENSG...`) with a `SYMBOL` column and
-    remaps to it, dropping genes with no symbol and keeping the first of
-    any duplicates. Always finishes with var_names_make_unique(), even for
-    already-symbol-indexed slides: some real COAD slides (TENX128/154/155/156)
-    are symbol-indexed but contain naturally duplicate symbols that make
-    decoupler's MLM hard-crash ('mat contains repeated feature names')
-    otherwise. The resulting suffixed duplicates (GENE-1, ...) just won't
-    match any symbol-keyed net/HVG list -- same harmless outcome as any
-    other absent gene."""
+    """HEST slides mix gene-ID conventions (e.g. breast/IDC `NCBI*` samples
+    index by HGNC symbol, `SPA1xx` by Ensembl ID with symbol in
+    `var['SYMBOL']`), but everything downstream is keyed by symbol, so an
+    unconverted Ensembl-indexed slide has ~zero overlap or crashes decoupler
+    ('No sources with more than tmin=N targets'). Detects an Ensembl-style
+    index (`ENSG...`) with a `SYMBOL` column and remaps to it, dropping
+    genes with no symbol and keeping the first of any duplicates; always
+    finishes with var_names_make_unique() since some real COAD slides
+    (TENX128/154/155/156) are symbol-indexed but contain naturally
+    duplicate symbols that would otherwise crash decoupler's MLM ('mat
+    contains repeated feature names') -- the resulting suffixed duplicates
+    (GENE-1, ...) simply won't match any symbol-keyed net/HVG list, same as
+    any other absent gene."""
     if adata.var.index.size and str(adata.var.index[0]).startswith("ENSG") and "SYMBOL" in adata.var.columns:
         symbol = adata.var["SYMBOL"].astype(str)
         keep = symbol.notna() & (symbol != "nan") & ~symbol.duplicated(keep="first")

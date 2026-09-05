@@ -1,11 +1,9 @@
 #!/usr/bin/env python
-"""Tests whether the A8 graph correction's per-gene gain over A2 (patch-only)
-tracks each gene's real spatial autocorrelation (ground-truth Moran's I) --
-the direct test of "does the GNN exploit genuine spatial structure", as
-opposed to Gate 3's indirect test (A8 vs a shuffled-graph control). Replicates
-the same diagnostic POC_5 ran (`pathology_st.analysis.spatial_benefit_vs_autocorrelation`,
-which found Corr(delta, MoranI) = 0.1148, p = 0.630 -- no relationship) on
-the current official HEST-1k protocol/data, per-cancer and pooled."""
+"""Direct test of whether A8's per-gene gain over A2 tracks each gene's ground-truth
+Moran's I (vs. Gate 3's indirect shuffled-graph control), replicating POC_5's
+`pathology_st.analysis.spatial_benefit_vs_autocorrelation` diagnostic (which found
+Corr(delta, MoranI) = 0.1148, p = 0.630 -- no relationship) on the current official
+HEST-1k protocol/data, per-cancer and pooled."""
 from __future__ import annotations
 
 import argparse
@@ -109,9 +107,9 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
         row_of = {uid: i for i, uid in enumerate(ids_test)}
         patient_ids_test_raw = np.array([uid.split("::")[0] for uid in ids_test])
 
-        # ground-truth Moran's I for this fold's test spots -- computed once per fold (not
-        # per-ablation, it depends only on y_gene_test/coords_test), same convention as
-        # spatial_benefit_vs_autocorrelation's expected per-gene column format.
+        # ground-truth Moran's I per test spot, computed once per fold (not per-ablation,
+        # since it depends only on y_gene_test/coords_test), in spatial_benefit_vs_autocorrelation's
+        # expected per-gene column format.
         morans_df = ground_truth_morans_i_per_gene(y_gene_test, coords_test, patient_ids_test_raw, genes, k=6)
         morans_by_gene = morans_df.set_index("column")["morans_i"]
 
@@ -190,10 +188,8 @@ def main():
     full_df.to_csv(out_dir / "per_fold_per_gene.csv", index=False)
     per_gene_avg.to_csv(out_dir / "per_gene_averaged.csv", index=False)
 
-    # spatial_benefit_vs_autocorrelation expects a "column" key (matching
-    # ground_truth_morans_i_per_gene's own output schema) to merge delta/morans_i on --
-    # rename "gene" -> "column" explicitly rather than relying on pandas' implicit
-    # common-column merge fallback.
+    # rename "gene" -> "column" explicitly (matching ground_truth_morans_i_per_gene's
+    # schema) rather than relying on pandas' implicit common-column merge fallback.
     def _corr(df: pd.DataFrame) -> dict:
         renamed = df.rename(columns={"gene": "column"}).set_index("column")
         return spatial_benefit_vs_autocorrelation(renamed[["delta"]], renamed[["morans_i"]].reset_index())

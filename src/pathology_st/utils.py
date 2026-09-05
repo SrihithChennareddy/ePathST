@@ -47,14 +47,11 @@ def resolve_run_paths(cfg: dict) -> dict[str, Path]:
     """Turns cfg['paths'] into absolute Path objects under work_dir and
     creates every run subdirectory (configs/logs/manifests/qc/
     teacher_embeddings/student_checkpoints/student_embeddings/graphs/
-    predictions/results/figures).
-
-    `teacher_embeddings` and `student_checkpoints` are the two expensive,
-    reusable artifacts (frozen GenBio-PathFM teacher embeddings, and the
-    locked ConvNeXt V2-Atto encoder). If cfg['paths'] sets `persist_dir`,
-    those two subdirs are created there instead of under the (possibly
-    ephemeral/scratch) work_dir, so they survive independently of any one
-    run and are reusable by later runs."""
+    predictions/results/figures). `teacher_embeddings` and
+    `student_checkpoints` are the two expensive, reusable artifacts, so if
+    cfg['paths'] sets `persist_dir` those two are created there instead of
+    under the (possibly ephemeral/scratch) work_dir, to survive independently
+    of any one run and be reusable by later runs."""
     work_dir = Path(cfg["paths"]["work_dir"])
     persist_dir = cfg["paths"].get("persist_dir")
     persist_dir = Path(persist_dir) if persist_dir else None

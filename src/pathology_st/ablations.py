@@ -23,12 +23,10 @@ class AblationSpec:
 
 ABLATION_GRID = [
     # --- primary block: run these first ---
-    # A1 and A2 must load features from separate caches, each asserted via
-    # pathology_st.feature_cache.load_cached_features(expected_encoder_name=...), and train
-    # separate patch heads -- otherwise A1's "imagenet" encoder silently never gets
-    # consulted and A1 ends up byte-identical to A2 (a real bug this project hit once;
-    # see src/pathology_st/feature_cache.py). Everything else (patient split, targets, head
-    # architecture, optimizer, evaluation) is identical between A1 and A2.
+    # A1/A2 must load features from separate caches (each asserted via
+    # feature_cache.load_cached_features(expected_encoder_name=...)) and train separate
+    # patch heads, or A1 silently reuses A2's features and becomes byte-identical to it
+    # (a real bug this project hit once; see feature_cache.py). Otherwise identical.
     AblationSpec("A1_imagenet_patch", "imagenet", "none", "none", "primary",
                  "ImageNet ConvNeXt, no distillation, patch-only"),
     AblationSpec("A2_distilled_patch", "distilled", "none", "none", "primary",

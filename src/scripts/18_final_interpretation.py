@@ -29,7 +29,6 @@ def main():
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
 
-    # load upstream results
     distill_eval = load_json_if_exists(paths["results"] / "distillation_evaluation.json") or {}
     primary = load_json_if_exists(paths["results"] / "primary_hypothesis_test.json")
     secondary = load_json_if_exists(paths["results"] / "secondary_hypothesis_tests.json") or {}
@@ -75,9 +74,9 @@ def main():
         conclusions.append(Conclusion("Did multiscale context outperform purely local context?",
                                        "secondary_hypothesis_tests.json missing -- rerun script 12", "NOT_SUPPORTED", {}))
 
-    report_md = build_final_report(conclusions)  # build report
+    report_md = build_final_report(conclusions)
     out_path = paths["results"] / "final_scientific_interpretation.md"
-    out_path.write_text(report_md)  # save report
+    out_path.write_text(report_md)
     save_json([{"question": c.question, "verdict": c.verdict, "answer": c.answer} for c in conclusions],
               paths["results"] / "final_scientific_interpretation.json")
     print(report_md)

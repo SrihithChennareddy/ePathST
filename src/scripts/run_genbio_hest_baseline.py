@@ -537,7 +537,6 @@ def main():
         gene_metric_rows.extend(pp_hvg1000.to_dict("records"))
         pathway_metric_rows.extend(pp_pathway.to_dict("records"))
 
-        # build summary row
         summary_row = {
             "cancer": cancer, "n_train_patients": len(train_p), "n_test_patients": len(test_patients),
             "n_train_spots": len(ids_train), "n_test_spots": len(ids_test),

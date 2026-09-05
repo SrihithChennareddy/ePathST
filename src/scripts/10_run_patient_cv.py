@@ -77,8 +77,8 @@ def build_graph_data(feat_dict, coords, spot_ids, gene_target, pathway_target, p
 
 def train_patch_head(x_train, x_val, y_gene_train, y_path_train, y_gene_val, y_path_val, cfg, device):
     """Trains one MolecularBottleneckHead to convergence with the locked
-    optimizer/loss/early-stopping recipe. Factored out so A1 (ImageNet
-    features) and A2 (distilled features) each get their own patch_head,
+    optimizer/loss/early-stopping recipe, factored out so A1 (ImageNet
+    features) and A2 (distilled features) each get their own patch_head
     trained identically except for which frozen encoder's features they
     see -- the only difference the Gate 1 (distillation) comparison is
     supposed to isolate."""

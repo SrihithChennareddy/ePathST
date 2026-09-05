@@ -10,16 +10,14 @@ from sklearn.model_selection import GroupKFold
 
 
 def exclude_targeted_panel_samples(hest_samples: pd.DataFrame, min_genes: int = 2000) -> pd.DataFrame:
-    """Drops samples run on a targeted gene panel (e.g. Xenium, ~541
-    genes) rather than whole-transcriptome ST. `load_fold_expression` pools
-    a cancer's training patients into one matrix and intersects genes
-    across samples for the shared HVG1000 list -- a handful of
-    targeted-panel outliers would otherwise collapse that intersection to
-    their much smaller gene set, making cross-cancer HVG1000 comparisons
-    apples-to-oranges. `min_genes` sits well below every real
-    whole-transcriptome panel (14700+) and above every real targeted panel
-    (541) seen in this cohort. Reads gene count via h5py rather than a
-    full anndata load to stay cheap over hundreds of samples."""
+    """Drops samples run on a targeted gene panel (e.g. Xenium, ~541 genes)
+    rather than whole-transcriptome ST, since a handful of such outliers
+    would otherwise collapse the cross-sample HVG1000 gene intersection to
+    their much smaller set, making cross-cancer comparisons apples-to-oranges.
+    `min_genes` sits between every real targeted panel (541) and
+    whole-transcriptome panel (14700+) seen in this cohort. Reads gene count
+    via h5py rather than a full anndata load to stay cheap over hundreds of
+    samples."""
     import h5py
 
     def n_genes(path: str) -> int:

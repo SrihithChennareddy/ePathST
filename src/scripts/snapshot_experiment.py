@@ -107,7 +107,6 @@ def main():
     if config_json.exists():
         shutil.copy(config_json, config_snapshot_path)
 
-    # build manifest
     manifest = {
         "run_id": run_id,
         "captured_at": today,
@@ -127,7 +126,6 @@ def main():
         notes_path.write_text(f"# {run_id}\n\nStage: {args.stage or '(unspecified)'}\n\n"
                                f"(add free-text observations about this snapshot here)\n")
 
-    # compute headline
     headline = _headline_metric(out_dir / "results") if (out_dir / "results").exists() else "N/A"
 
     # append to index

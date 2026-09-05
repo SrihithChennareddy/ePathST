@@ -48,12 +48,12 @@ def main():
     paths = resolve_run_paths(cfg)
 
     results = {}
-    x, coords, gene, pathway = synthetic_toy_data(cfg)  # build synthetic graph
+    x, coords, gene, pathway = synthetic_toy_data(cfg)
     gene_names = [f"gene_{i}" for i in range(gene.shape[1])]
 
-    # S1: two forward passes through the frozen patch head reproduce the same predictions.
-    # eval() is required -- patch_head has a Dropout layer, so train()-mode passes would
-    # legitimately differ (this caught a real missing-.eval() bug in ResidualGraphPredictor).
+    # S1: two forward passes through the frozen patch head reproduce the same predictions;
+    # eval() is required since patch_head has Dropout (this caught a real missing-.eval()
+    # bug in ResidualGraphPredictor).
     patch_head = build_patch_head(cfg, x.shape[1], gene.shape[1], pathway.shape[1]).to(args.device)
     patch_head.eval()
     xt = torch.tensor(x, dtype=torch.float32)
@@ -133,11 +133,9 @@ def main():
     target_var = float(np.var(gene))
     results["S7_tiny_overfit_and_loss_decreases"] = bool(res["best_epoch"] >= 0 and res["best_val_loss"] < target_var)
 
-    # S8: the exact same HVG ordering must be used by every head in a fold.
-    # Here just a consistency check between the gene-name list the patch
-    # head was built against and the graph model's target width; in the
-    # real pipeline this checks the fold's locked `hvg["hvg1000"]` order
-    # end-to-end.
+    # S8: the exact same HVG ordering must be used by every head in a fold -- here just a
+    # name/width consistency check; in the real pipeline this checks the fold's locked
+    # `hvg["hvg1000"]` order end-to-end.
     results["S8_target_gene_order_consistent"] = bool(len(gene_names) == gene.shape[1] == patch_head.gene_head.out_features)
 
     # S9: the fold-completeness assertion raises on a deliberately

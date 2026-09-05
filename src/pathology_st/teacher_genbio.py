@@ -80,15 +80,12 @@ class GenBioPathFMTeacher:
 
 def cache_teacher_embeddings(out_path: str | Path, patch_ids: list[str], embeddings: np.ndarray) -> None:
     """Appends patch_id <-> teacher_embedding to disk (FP16 -- embeddings
-    are unit-norm, so FP16 precision is adequate).
-
-    Uses h5py's variable-length string dtype for `patch_id`, not a
-    fixed-width numpy `dtype="S"` array: a fixed-width dtype freezes its
-    per-element byte-width at the first call's longest string and
-    silently truncates any longer id appended later. This previously
-    corrupted CPTAC patch_ids (length varies with pixel-coordinate digit
-    count) into collisions between unrelated patches, and broke
-    resumability (a fresh id never matches its truncated form on disk)."""
+    are unit-norm, so FP16 precision is adequate). Uses h5py's
+    variable-length string dtype for `patch_id`, not a fixed-width numpy
+    `dtype="S"` array, since a fixed-width dtype freezes its byte-width at
+    the first call's longest string and silently truncates longer ids
+    appended later -- this previously collided unrelated CPTAC patches
+    (id length varies with pixel-coordinate digits) and broke resumability."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     str_dtype = h5py.string_dtype(encoding="utf-8")

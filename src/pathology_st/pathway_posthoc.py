@@ -12,18 +12,14 @@ from pathology_st.pathways import compute_progeny_scores
 
 def posthoc_pathway_scores(predicted_genes: np.ndarray, gene_names: list[str], progeny_net: pd.DataFrame,
                             spot_ids: list[str], min_n: int = 5) -> pd.DataFrame:
-    """`predicted_genes`: (n_spots, n_genes) standardized-scale model
-    output. `gene_names` must be the exact HVG1000 order used to produce
-    it -- never re-derive or reorder, it must match the fold's locked gene
-    order. Returns (n_spots, n_pathways) post-hoc PROGENy scores, same
-    shape/convention as `pathology_st.pathways.compute_progeny_scores`'s
-    ground-truth output.
-
-    Gotcha: PROGENy's MLM scoring expects log-normalized expression-scale
-    values, not standardized (z-scored) targets, so post-hoc scores from
-    standardized predictions live on a different scale than the
-    ground-truth PROGENy scores. Compare ranks/correlations, not raw
-    magnitudes, unless both sides are rescaled first."""
+    """`predicted_genes`: (n_spots, n_genes) standardized-scale model output;
+    `gene_names` must be the exact locked HVG1000 order, never re-derived or
+    reordered. Returns (n_spots, n_pathways), same shape/convention as
+    `pathology_st.pathways.compute_progeny_scores`'s ground-truth output.
+    Gotcha: PROGENy's MLM expects log-normalized expression, not
+    standardized targets, so these scores live on a different scale than
+    ground truth -- compare ranks/correlations, not raw magnitudes, unless
+    both sides are rescaled first."""
     expr_df = pd.DataFrame(predicted_genes, index=spot_ids, columns=gene_names)
     return compute_progeny_scores(expr_df, progeny_net, min_n=min_n)
 
