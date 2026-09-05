@@ -69,8 +69,10 @@ Difficulty ranks the same as the custom-protocol run: IDC (easiest) > COAD > CCR
   MLP with **no** neighbor information at all) matches them too. The graph correction is not
   adding topology-specific signal beyond "any local averaging helps a little."
   This is an indirect test (real vs. shuffled graph); `src/scripts/23_morans_i_diagnostic.py`
-  tests the same question directly (does a gene's real spatial autocorrelation predict its
-  A8-vs-A2 gain), replicating PoC_5's null result on the current official data -- pending.
+  (job 88100) tests the same question directly -- does a gene's real spatial autocorrelation
+  predict its A8-vs-A2 gain? It doesn't: IDC r=0.043 p=0.76, COAD r=-0.051 p=0.72,
+  CCRCC r=-0.134 p=0.35, pooled (n=150 genes) r=0.136 p=0.097 -- none significant, replicating
+  PoC_5's own null result (r=0.115, p=0.63) on the current official data.
 
 ## GenBio-PathFM teacher reference (same official protocol, PCA(256)+Ridge head)
 
