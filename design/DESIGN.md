@@ -1,4 +1,4 @@
-# PathDistill-ST — High-Level Design
+# ePathST — High-Level Design
 
 This document describes the end-to-end system: what each stage does, how
 data flows between stages, and the key architectural decisions. See the

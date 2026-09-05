@@ -2,7 +2,7 @@
 
 Source specs: `/lustre/nvwulf/home/schennareddy/cellvit_project/
 Final_Project_V1.txt` (original, the codebase's foundation) and
-`Final_Project_V2.txt` ("PathDistill-ST — Revised Implementation Plan",
+`Final_Project_V2.txt` ("ePathST — Revised Implementation Plan",
 written after seeing PoC_5's real results -- see `docs/POC5_RESULTS.md`).
 
 **Explicit constraint honored throughout this migration**: nothing related
