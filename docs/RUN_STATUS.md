@@ -6,12 +6,11 @@ operational log (what ran, what broke, what to do next); that folder is
 the scientific record (actual numbers). Both SLURM scripts call
 `src/scripts/snapshot_experiment.py` automatically at the end of their run.
 
-Living document tracking the real (non-simulated) execution of the CPTAC
+Living log of the real (non-simulated) execution of the CPTAC
 distillation pipeline: what's been submitted, what happened, what's
-resumable, and how to recover after a failure/interruption. Update this
-file whenever a job is submitted, finishes, fails, or a config/path
-changes -- it should always be enough on its own to reconstruct "what do I
-do next" without re-deriving anything from chat history.
+resumable, how to recover after a failure/interruption. Update whenever a
+job is submitted, finishes, fails, or a config/path changes -- this file
+alone should be enough to reconstruct "what do I do next."
 
 ## Key paths (2026-08-28)
 
@@ -29,12 +28,12 @@ do next" without re-deriving anything from chat history.
 | SLURM job scripts | `STS_src/slurm/run_cptac_distillation.slurm` (H200x4), `run_cptac_distillation_b40x4.slurm` (b40x4, 1 GPU) |
 | SLURM stdout/stderr | `STS_src/logs/slurm_b40_<jobid>.{out,err}` or `slurm_<jobid>.{out,err}` |
 
-**IMPORTANT -- do not use `/lustre/nvwulf/home/schennareddy` or
+**Do not use `/lustre/nvwulf/home/schennareddy` or
 `/lustre/nvwulf/scratch/schennareddy` for new large outputs.** `lfs quota -u
-schennareddy /lustre/nvwulf` reports a 20GB per-user quota that is already
-~9x over (≈200GB used) across home+scratch. All large pipeline outputs
-were moved to the YurovskyGroup-nvwulf project space, which has a real
-10TB group quota (~150GB used as of 2026-08-28).
+schennareddy /lustre/nvwulf` reports a 20GB per-user quota, already ~9x
+over (≈200GB used) across home+scratch. All large pipeline outputs live
+in the YurovskyGroup-nvwulf project space instead, which has a real 10TB
+group quota (~150GB used as of 2026-08-28).
 
 ## Why every stage is resumable
 
@@ -46,28 +45,26 @@ were moved to the YurovskyGroup-nvwulf project space, which has a real
 - **Step 4** (`04_run_teacher_genbio.py`): skips any `patch_id` already
   present in the canonical `teacher_embeddings/cptac_teacher_embeddings.h5`
   cache (or, when GPU-sharded, its own shard's partial file). Never
-  recomputes an embedding that already exists -- this is the "run GenBio
-  only once" guarantee.
+  recomputes an existing embedding -- the "run GenBio only once" guarantee.
 - **Step 5** (`05_train_student_distill.py` / `src/pathology_st/distill_train.train_student`):
   saves a full training-state snapshot (`{baseline}_seed{seed}_resume.pt`
   -- model+optimizer+scaler+step counters) every epoch, separate from the
   best-val checkpoint (`{baseline}_seed{seed}_best.pt`). A rerun with the
   same baseline/seed reloads the resume checkpoint and continues from the
-  exact epoch/step it left off, rather than restarting.
+  exact epoch/step it left off.
 
 **Consequence:** if a job dies for any reason (OOM, wall-clock limit,
-node failure, preemption), just resubmit the same `.slurm` script. Do not
+node failure, preemption), just resubmit the same `.slurm` script. Don't
 delete anything under `work_dir` or `persist_dir` to "start clean" unless
 you specifically intend to discard real progress.
 
-**Concurrency warning:** Steps 1-2's caches are append-only files with no
+**Concurrency warning:** Steps 1-2's caches are append-only files, no
 file locking. Do NOT run two Step-1/Step-2 jobs at the same time against
 the same `work_dir` -- interleaved writes can corrupt
 `wsi_qc_cache.jsonl`/`cptac_patch_manifest.csv`. Step 4's shards are safe
-to run concurrently (each writes its own file). If you need two GPU jobs
-running simultaneously, make sure only one of them is still inside Steps
-1-2 at a time (check the log for "=== Step 3:" before starting a second
-job's Step 1-2).
+to run concurrently (each writes its own file). For two simultaneous GPU
+jobs, make sure only one is still inside Steps 1-2 at a time (check the
+log for "=== Step 3:" before starting a second job's Step 1-2).
 
 ## Run log
 
@@ -79,9 +76,9 @@ job's Step 1-2).
   Slurm's backfill predicted a start time ~24h out.
 - Cancelled (`scancel 83715`) once a b40x4 (RTX PRO 6000 Blackwell)
   alternative was found with idle GPUs -- avoids two jobs racing on the
-  same Step 1/2 caches, and 24h of queue wait was judged worse than
-  starting immediately on different-but-adequate hardware (validated
-  against this exact GPU model earlier in the project).
+  same Step 1/2 caches, and starting immediately on adequate hardware beat
+  a 24h queue wait (validated against this exact GPU model earlier in the
+  project).
 - **To retry on H200 later**: `sbatch slurm/run_cptac_distillation.slurm`
   once `sinfo -N -o "%N %G %C" | grep h200` shows a node with free GPUs,
   or just resubmit and accept the queue wait -- resumability means no
@@ -93,36 +90,36 @@ job's Step 1-2).
   (each holding a multi-hundred-MB DICOM pyramid + decompressed tile
   buffers) blew past it. `slurmstepd: error: Detected 4 oom_kill events`.
 - 18 additional WSIs got QC'd (70 -> 88) before the kill -- preserved by
-  the resumable cache, not lost.
-- **Fix applied**: added `#SBATCH --mem=220G` (and 20 CPUs instead of 28)
-  to `run_cptac_distillation_b40x4.slurm`; also added `--mem=700G` to the
+  the resumable cache.
+- **Fix**: added `#SBATCH --mem=220G` (and 20 CPUs instead of 28) to
+  `run_cptac_distillation_b40x4.slurm`; also added `--mem=700G` to the
   H200x4 script preemptively for the same reason.
 
 ### Job 83723 -- b40x4-09, RUNNING (started 2026-08-28T03:03:35)
 - Same script as 83721, with the `--mem=220G` fix.
-- **Step 1 completed successfully**: 598 initial WSIs / 598 patients ->
-  363 passed hard-filter QC -> 363 selected (below the ~500 target, so no
-  QC-score capping applied -- worth investigating exclusion_reasons in
-  `qc/cptac_wsi_selection_report.json` later, but not blocking).
+- **Step 1 completed**: 598 initial WSIs / 598 patients -> 363 passed
+  hard-filter QC -> 363 selected (below the ~500 target, so no QC-score
+  capping applied -- worth checking exclusion_reasons in
+  `qc/cptac_wsi_selection_report.json` later, not blocking).
 - **Step 2 (patch extraction) found a real bug**: `WsiDicomOutOfBoundsError`
   when a sampled patch center is close enough to a WSI's edge that the
   read region extends past the slide boundary (e.g. `position=Point(x=-3,
-  y=218)`). Because the per-WSI extraction function wraps its ENTIRE
-  patch loop in one try/except, a single edge-adjacent coordinate anywhere
-  in a WSI's sample list aborted that WSI's ENTIRE patch set, not just the
-  one bad patch. ~7/363 WSIs (~2%) lost to this before the fix landed.
+  y=218)`). The per-WSI extraction function wraps its ENTIRE patch loop in
+  one try/except, so a single edge-adjacent coordinate anywhere in a
+  WSI's sample list aborted that WSI's ENTIRE patch set, not just the one
+  bad patch. ~7/363 WSIs (~2%) lost to this before the fix landed.
   **Fixed** in `src/pathology_st/wsi_patches.py` (new `_clamp_region` helper, applied
   in both `WsiDicomReader.read_region_at_mpp` and
   `OpenSlideReader.read_region_at_mpp`): shifts the read region to stay
   within the level's bounds instead of raising, trading a small
   (sub-patch-width) shift in the exact patch center for keeping real
   tissue content instead of losing the whole WSI.
-- The fix was applied to the source while job 83723 kept running (its
-  already-started Python process doesn't pick up the change); the ~7
-  WSIs it lost never got a shard file written, so Step 2's resumability
-  means a **later resubmission will automatically retry them** -- no
-  manual intervention needed, just don't forget this when checking final
-  WSI/patch counts against the 363-selected number.
+- Fix applied to source while job 83723 kept running (its already-started
+  Python process doesn't pick it up). The ~7 lost WSIs never got a shard
+  file written, so Step 2's resumability means a **later resubmission
+  will automatically retry them** -- no manual intervention needed, just
+  don't forget this when checking final WSI/patch counts against the
+  363-selected number.
 - **Steps 1-3 complete** (as of 03:16): 363 WSIs selected -> 321 WSIs
   successfully patch-extracted (42 lost to the WsiDicomOutOfBoundsError
   bug above, now fixed for future runs) -> 494,268 total CPTAC patches ->
@@ -131,17 +128,17 @@ job's Step 1-2).
 - **Step 4 (GenBio-PathFM teacher embedding) started 03:16:10**: single
   GPU, 493,469 patches to embed (1,664 already cached from the earlier
   validation session). At the ~72 patches/sec measured earlier on this
-  GPU family, expect roughly ~1.9h, i.e. finishing around **05:10-05:20**.
+  GPU family, ~1.9h, finishing around **05:10-05:20**.
 - **This is the currently active real run as of 2026-08-28.** Check
   `squeue -j 83723` for live status, or `tail -f
   STS_src/logs/slurm_b40_83723.out` for progress.
-- Expected sequence once this job is healthy: Step 1 (WSI QC, ~598 WSIs)
-  -> Step 2 (patch extraction) -> Step 3 (patient split) -> Step 4
-  (GenBio-PathFM teacher embedding, single GPU, no sharding since b40x4
-  only granted 1 GPU here) -> Step 5 (ConvNeXt V2-Atto distillation
-  training, S1 seed 0 prioritized, time-budgeted to whatever remains of
-  the 8h wall clock) -> Step 6 (eval) -> Step 9 (lock student, strip
-  teacher-projection head, save final encoder to `persist_dir`).
+- Expected sequence once healthy: Step 1 (WSI QC, ~598 WSIs) -> Step 2
+  (patch extraction) -> Step 3 (patient split) -> Step 4 (GenBio-PathFM
+  teacher embedding, single GPU, no sharding since b40x4 only granted 1
+  GPU here) -> Step 5 (ConvNeXt V2-Atto distillation training, S1 seed 0
+  prioritized, time-budgeted to whatever remains of the 8h wall clock) ->
+  Step 6 (eval) -> Step 9 (lock student, strip teacher-projection head,
+  save final encoder to `persist_dir`).
 - Given a single-GPU teacher-embedding pass over ~500 WSIs x up to ~2000
   patches, Step 5 (the compute-dominant stage) will very likely NOT reach
   full convergence (spec wants 30-100 epochs) within the remaining 8h
@@ -153,35 +150,35 @@ job's Step 1-2).
   for full convergence (vs. 83723's partial run), 24h wall clock,
   **without cancelling 83723**.
 - `configs/base.yaml`'s `distillation.{max_epochs,min_epochs,
-  early_stop_patience}` raised 60/30/10 -> 100/50/15 to actually support
-  this target -- shared config, so 83723 also sees the higher ceiling
-  (harmless: 83723 is still bounded by its own much shorter
-  `--time-budget-hours`, so this doesn't change its real behavior).
+  early_stop_patience}` raised 60/30/10 -> 100/50/15 to support this
+  target -- shared config, so 83723 also sees the higher ceiling
+  (harmless: it's still bounded by its own much shorter
+  `--time-budget-hours`).
 - **Runs on `b40x4-long`, NOT h200x8-long as first attempted.**
   h200x8-02 showed 2/8 free H200s, but h200x8-long's backfill scheduler
   predicted a ~24h wait (reason: "reserved for jobs in higher priority
   partitions") -- **-long partitions sit behind their short-partition
   siblings for the same physical GPUs**, so a node showing free GPUs
-  right now does not mean a `-long` job can claim them immediately.
+  right now doesn't mean a `-long` job can claim them immediately.
   Switched to b40x4-long targeting b40x4-01 (1/4 GPUs free) instead.
-- **Also hit, and fixed, a resource-sizing mismatch**: first submission
+- **Also hit and fixed a resource-sizing mismatch**: first submission
   requested `--cpus-per-task=32 --mem=400G` (sized for the H200 node) and
   sat `PENDING(Resources)` indefinitely on b40x4-01, which only had ~25
   free CPUs and ~135GB free RAM. Reduced to `--cpus-per-task=20 --mem=100G`
   to match what was actually free; started running immediately after.
-  **Lesson: always check the SPECIFIC target node's free CPU/mem via
+  **Lesson: check the SPECIFIC target node's free CPU/mem via
   `scontrol show node <name> | grep -E "CPUAlloc|FreeMem"` before sizing
   `--cpus-per-task`/`--mem`, not just GPU availability.**
 - **Safety design**: this job's script begins with a poll loop (max 4h
   wait) checking `logs/slurm_b40_83723.out` for the `"=== Step 5"` marker
-  (or 83723 leaving the queue) before touching Steps 1-4 at all, since
-  83723 was still mid-Step-4 (writing directly to the canonical teacher-
-  embeddings cache, unsharded) at 83737's submission time. This avoids a
+  (or 83723 leaving the queue) before touching Steps 1-4, since 83723 was
+  still mid-Step-4 (writing directly to the canonical teacher-embeddings
+  cache, unsharded) at 83737's submission time. Avoids a
   concurrent-HDF5-writer conflict on
   `persist_dir/teacher_embeddings/cptac_teacher_embeddings.h5`. Once past
-  the wait, it reruns Steps 1-3 (safe, resumable, and recovers the ~42
-  WSIs 83723 lost to the WsiDicomOutOfBoundsError bug) then Step 4 (only
-  new patches) then Step 5 with the remaining ~23h budget.
+  the wait, it reruns Steps 1-3 (safe, resumable, recovers the ~42 WSIs
+  83723 lost to the WsiDicomOutOfBoundsError bug) then Step 4 (only new
+  patches) then Step 5 with the remaining ~23h budget.
 - Both 83723 and 83737 are `sbatch` batch jobs, not interactive
   `srun`/`salloc` sessions -- they run under the SLURM controller
   independent of any terminal/session, so they continue unattended even
@@ -200,7 +197,7 @@ if I disconnect"):
   estimate from earlier.
 - **83737** (24h budget): 10:59 elapsed, 0 error signatures, correctly
   parked in its wait loop for 83723's Step 5 marker (by design -- not
-  stuck, this is expected until 83723 clears Step 4).
+  stuck, expected until 83723 clears Step 4).
 - Both are `sbatch` batch jobs -- confirmed independent of terminal/session
   connection (see the note under Job 83737 above). Safe to disconnect.
 - **Next time you check in**: read this file's Run log top-to-bottom for
@@ -213,12 +210,12 @@ if I disconnect"):
 teacher-embeddings cache's `patch_id` HDF5 dataset with a FIXED-width
 numpy `dtype="S"` string type, sized from whatever the FIRST batch's
 longest patch_id string happened to be (71 bytes, as it turned out). This
-function is called repeatedly -- once per batch, thousands of times over
-a run -- and every subsequent write of a LONGER patch_id (CPTAC patch_ids
-are `{dicom_series_uid}_{x}_{y}`; the (x, y) pixel-coordinate suffix
-varies in digit count by slide, up to ~6 characters between a slide's
-smallest and largest coordinates) got **silently truncated to 71 bytes**,
-with h5py/numpy raising no error or warning.
+function runs once per batch, thousands of times over a run, so every
+subsequent write of a LONGER patch_id (CPTAC patch_ids are
+`{dicom_series_uid}_{x}_{y}`; the (x, y) pixel-coordinate suffix varies
+in digit count by slide, up to ~6 characters between a slide's smallest
+and largest coordinates) got **silently truncated to 71 bytes**, with
+h5py/numpy raising no error or warning.
 
 **Effects**:
 1. Different (long) patch_ids that happened to truncate to the same
@@ -238,14 +235,14 @@ with h5py/numpy raising no error or warning.
    the truncated cached ids never matched the full-length manifest ids
    for any long patch_id.
 
-Both `sacct` confirms FAILED, ExitCode 1:0. **No training epochs had run
+`sacct` confirms both FAILED, ExitCode 1:0. **No training epochs had run
 in either job** -- the crash happened during dataset construction, before
-any checkpoint was written, so there was nothing to lose on this front.
+any checkpoint was written, so nothing was lost on this front.
 
-**This was not fundamentally a concurrency bug** (though running two jobs
-against the shared cache surfaced it sooner) -- it would eventually have
-corrupted even a single solo run, the moment any one run's patch_id
-lengths varied enough from its own first batch.
+**Not fundamentally a concurrency bug** (running two jobs against the
+shared cache surfaced it sooner, but it would eventually have corrupted
+even a single solo run, the moment any one run's patch_id lengths varied
+enough from its own first batch).
 
 **Fix**: `src/pathology_st/teacher_genbio.cache_teacher_embeddings` now uses
 `h5py.string_dtype(encoding="utf-8")` (h5py variable-length strings)
@@ -269,10 +266,10 @@ class of bug; only the repeatedly-appended teacher-embeddings cache was.
   training step), so nothing to clean up there.
 - Resubmitted the 8h job fresh: **83815** (replaces 83723). Step 4 will
   re-embed everything from scratch (~2h again) since the cache was wiped
-  -- this is the real, unavoidable cost of the corruption, paid once.
-- Same lesson as before applies to node selection: had to explicitly
-  target free nodes via `--nodelist` again since availability shifts
-  quickly on this shared cluster.
+  -- the real, unavoidable cost of the corruption, paid once.
+- Same lesson as before on node selection: had to explicitly target free
+  nodes via `--nodelist` again since availability shifts quickly on this
+  shared cluster.
 
 ### The 24h job (`run_cptac_distillation_full_convergence.slurm` on b40x4-long) could not be scheduled at all -- switched to a job-dependency CHAIN instead
 
@@ -335,9 +332,9 @@ corruption -- only the teacher-embeddings cache needed rebuilding),
 re-embedded all 564,312 patches fresh in ~1h20min, and the truncation fix
 verified clean: `n_patches=564312, n_unique_patch_ids=564312,
 no_duplicate_patch_ids: True, passed: True`. Zero error signatures. Now in
-Step 5 (training) with a 6.3h budget. This is the first fully-clean
-teacher-embedding pass since the bug was introduced -- the fix holds under
-real load, not just the synthetic round-trip test.
+Step 5 (training) with a 6.3h budget. First fully-clean teacher-embedding
+pass since the bug was introduced -- the fix holds under real load, not
+just the synthetic round-trip test.
 
 ### Milestone checkpoints added (per user request, ~17:50)
 Only a rolling "best" checkpoint (`{baseline}_seed{seed}_best.pt`,
@@ -359,15 +356,15 @@ separate, lightweight (1 CPU, 4GB, no GPU) SLURM job, **83876**
 `S1_seed0_epoch{N}.pt` the moment the epoch count first crosses each new
 multiple of 10. Submitted as a real SLURM job (not a background shell
 process) so it survives terminal disconnection like everything else.
-Safe to let 83876 keep running/idling after link 1 ends -- it costs
-nothing and link 2/3 don't need it.
+Safe to let 83876 keep running/idling after link 1 ends -- costs nothing
+and link 2/3 don't need it.
 
 ### Chain completed (39 epochs); found a second timing gap; job 84150 continues toward 50
 The 3-link chain (83825/83826/83827) ran its full ~24h and ended normally
 (`sacct` shows `TIMEOUT`, expected -- Step 5 hits its internal time
-budget just before the SLURM wall clock, saves a resume checkpoint, and
-exits 0). Final state: **39 epochs completed** (epoch 0-38), S1 seed0,
-val cosine similarity climbing steadily 0.7646 -> 0.9019, train loss
+budget just before the SLURM wall clock, saves a resume checkpoint, exits
+0). Final state: **39 epochs completed** (epoch 0-38), S1 seed0, val
+cosine similarity climbing steadily 0.7646 -> 0.9019, train loss
 0.3479 -> 0.0731. No error signatures in any link. Milestone checkpoints
 present and correct: `S1_seed0_epoch10.pt` (val_cos 0.8832),
 `_epoch20.pt` (0.8940), `_epoch30.pt` (0.8994).
@@ -383,7 +380,7 @@ pipeline for that link. Consequence: **the "locked" final encoder is
 stale (frozen at epoch 14)** even though the raw best checkpoint
 (`S1_seed0_best.pt`) is current and correct (epoch 38 as of the chain's
 end). Not fixed yet since the user hasn't asked for it and nothing
-downstream is reading the locked encoder yet -- but re-run
+downstream reads the locked encoder yet -- but re-run
 `src/scripts/07_lock_student.py --mode A` manually (fast, no GPU compute
 needed beyond one forward pass to strip the head) once training is
 where you want it, or fix the time budget in the `.slurm` script to
@@ -407,9 +404,9 @@ samples total) became available together for the first time this session
 covers: (1) parallelizing Step 8 (the previous bottleneck), (2) building
 a second, independent frozen-GenBio-PathFM patch-only baseline for
 comparison, and (3) four real, previously-hidden bugs Step 10 hit the
-first time it ever ran end-to-end against the full 3-cancer dataset --
-Steps 8-12 had never gotten this far before (earlier attempts always hit
-an 8h wall-clock cutoff mid-Step-8).
+first time it ran end-to-end against the full 3-cancer dataset -- Steps
+8-12 had never gotten this far before (earlier attempts always hit an 8h
+wall-clock cutoff mid-Step-8).
 
 **Job chain**: 84327 (b40x4, 8h) -> hit wall-clock mid-Step-8 -> 84331
 (dependent resume) -> also hit wall-clock -> 84527/84530/84531 (manual
@@ -552,9 +549,9 @@ not aggregated into the summary before).
 elapsed) -- Steps 8/9b skipped instantly (already cached), Step 10 ran
 the full 9-ablation grid (see A1 bug below) across all 3 cancers with no
 crash, Step 12 ran and wrote both `primary_hypothesis_test.json` and
-`secondary_hypothesis_tests.json`. This is the first fully clean
-end-to-end pass this project has ever completed against the real 3-cancer
-dataset. Snapshotted to `experimental_runs/
+`secondary_hypothesis_tests.json`. First fully clean end-to-end pass this
+project has ever completed against the real 3-cancer dataset. Snapshotted
+to `experimental_runs/
 2026-08-30_job84733_hest_downstream_full_3cancer/` (the auto-snapshot
 step's stdout said "snapshot failed -- non-fatal", but the actual files
 were written correctly regardless -- worth checking why that step's own
@@ -633,18 +630,18 @@ treating this as a real negative result.
 - **Operational hiccup, not a code bug**: while resubmitting after the
   memory fix, `sbatch` returned `error: Unexpected message received`
   (a transient SLURM controller communication glitch) on two consecutive
-  attempts -- but both submissions actually succeeded server-side despite
+  attempts -- both submissions actually succeeded server-side despite
   the client-side error, and a third retry produced a THIRD job. Ended up
   with 3 concurrent `genbio_hest_baseline` jobs (84737, 84739, 84743)
   racing against the same shared embedding-cache/output paths for ~10
-  minutes before caught via `squeue`. Cancelled the two extras,
-  verified no corrupted `.h5` embedding shards resulted (checked every
-  cached file opens cleanly with `h5py`), then cancelled the
-  survivor too and did one single clean resubmit (**84744**) rather than
-  trust a run that spent part of its life racing another process --
-  cheap to redo since extraction is ~fully cached. **Lesson: an `sbatch`
-  client-side error does NOT reliably mean the submission failed on this
-  cluster -- always `squeue` and check for a duplicate before retrying.**
+  minutes before caught via `squeue`. Cancelled the two extras, verified
+  no corrupted `.h5` embedding shards resulted (checked every cached file
+  opens cleanly with `h5py`), then cancelled the survivor too and did one
+  single clean resubmit (**84744**) rather than trust a run that spent
+  part of its life racing another process -- cheap to redo since
+  extraction is ~fully cached. **Lesson: an `sbatch` client-side error
+  does NOT reliably mean the submission failed on this cluster -- always
+  `squeue` and check for a duplicate before retrying.**
 
 ### MILESTONE 2: job 84744 completed -- first real GenBio-PathFM baseline results (2026-08-30, ~20:46)
 
@@ -676,19 +673,19 @@ project's own distilled 3.4M-param CNN encoder, at least for this
 one-fold/one-seed run. PROGENy14 r is near-zero-to-slightly-negative for
 both approaches in IDC/COAD, essentially no pathway-level signal yet.
 
-**As of this entry**: both pipelines have now completed at least one
-full clean pass. Main pipeline (84733) and GenBio baseline (84744) real
+**As of this entry**: both pipelines have completed at least one full
+clean pass. Main pipeline (84733) and GenBio baseline (84744) real
 results are both above. Nothing currently running (`squeue -u
-schennareddy` shows only an unrelated `interactive` session, 84713).
-Six total real bugs found and fixed across both pipelines this session
+schennareddy` shows only an unrelated `interactive` session, 84713). Six
+total real bugs found and fixed across both pipelines this session
 (gene-symbol mapping, OOM x2, targeted-panel exclusion, duplicate
 var_names, NaN-assertion) plus the A1/Gate1 removal and one operational
-sbatch-reliability incident -- see above for details on each. Next
-steps (not started): more folds/seeds for a less noisy result (this was
-all `--max-folds-per-cancer 1 --seeds 0`, not the full V2 Phase 3
-5-fold x 3-seed design), and investigating why the GNN correction layer
-(A8) currently underperforms the patch-only anchor (A2) rather than
-improving on it.
+sbatch-reliability incident -- see above for details on each. Next steps
+(not started): more folds/seeds for a less noisy result (this was all
+`--max-folds-per-cancer 1 --seeds 0`, not the full V2 Phase 3 5-fold x
+3-seed design), and investigating why the GNN correction layer (A8)
+currently underperforms the patch-only anchor (A2) rather than improving
+on it.
 
 ## Recovery checklist (read this first after any interruption)
 

@@ -8,8 +8,8 @@ genes**. This doc lists both, per cancer, and explains why they diverge (see als
 
 **Official panel** (`<cancer>/var_50genes.json`, from the HEST-1k benchmark release,
 `mahmoodlab/HEST`, `src/hest/utils.py::get_k_genes(criteria='var')`):
-1. Take every sample belonging to the cancer (train **and** test pooled together -- this is
-   computed once, offline, before any fold split exists).
+1. Take every sample belonging to the cancer (train **and** test pooled together -- computed
+   once, offline, before any fold split exists).
 2. Restrict to genes present in >=10% of spots in every sample, then intersect across samples
    to get one common gene set for the cancer.
 3. Stack every sample's raw-count spots into one pooled expression matrix.
@@ -27,13 +27,13 @@ genes**. This doc lists both, per cancer, and explains why they diverge (see als
 2. Per-slide `normalize_total(target_sum=1e4)` + `log1p` (official has no `normalize_total`).
 3. Rank `common_genes` by plain `.var(axis=0)` (raw variance) across training spots, drop
    near-zero-variance genes, take the top 50 (official uses scanpy's dispersion-based HVG
-   statistic, not raw variance -- raw variance is dominated by highly-expressed genes; the
-   dispersion statistic specifically controls for the mean-variance relationship).
+   statistic instead of raw variance; raw variance is dominated by highly-expressed genes,
+   while the dispersion statistic controls for the mean-variance relationship).
 
 Neither is "wrong" in isolation -- the project's per-fold, train-only selection is the more
 conservative choice to avoid gene-selection leakage in the project's own from-scratch
-evaluation. But because the statistic, normalization, and data scope (train-only-per-fold vs.
-pooled-whole-cohort) all differ, the two procedures land on almost entirely different genes.
+evaluation. But statistic, normalization, and data scope (train-only-per-fold vs.
+pooled-whole-cohort) all differ, so the two procedures land on almost entirely different genes.
 
 The project's list below is job 84871's fold-0 selection (`experimental_runs/
 2026-08-31_job84871_final_5fold_3cancer_seed0_with_results_final/results/genbio_baseline/
@@ -114,5 +114,5 @@ The project's train-only variance selection is dominated by immunoglobulin genes
 train split. The official panel is a curated, cancer-relevant marker set (e.g. IDC: `ESR1`,
 `GATA3`, `ERBB2`, `KRT5/14`, immune markers `CD3E`/`PTPRC`/`MS4A1`; COAD: `GUCA2A/B`, `CA1/4`,
 enteroendocrine markers `CHGA/CHGB/GCG`; CCRCC: hypoxia/stress-response genes `HMOX1`,
-`GADD45B`, `NAMPT`). Any R-value comparison across the two protocols should be read as "same
-qualitative finding, different genes" rather than a like-for-like score.
+`GADD45B`, `NAMPT`). Read any R-value comparison across the two protocols as "same qualitative
+finding, different genes," not a like-for-like score.

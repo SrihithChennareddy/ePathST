@@ -5,8 +5,8 @@ of Steps 8-12 against the real 3-cancer HEST dataset
 (`src/scripts/10_run_patient_cv.py` / `src/scripts/12_primary_hypothesis_test.py`,
 job **84733**, 2026-08-30). Compiled directly from
 `results/cv_ablation_metrics.csv` and `results/primary_hypothesis_test.json`
-(mirrored into `experimental_runs/2026-08-30_job84733_hest_downstream_full_3cancer/`)
--- nothing here is estimated or reconstructed from memory. The separate,
+(mirrored into `experimental_runs/2026-08-30_job84733_hest_downstream_full_3cancer/`);
+nothing here is estimated or reconstructed from memory. The separate,
 standalone frozen-GenBio-PathFM comparison (job 84744) is documented in
 `docs/RUN_STATUS.md`'s "MILESTONE 2" entry, which also has the full
 operational narrative for this run (every bug found/fixed getting here).
@@ -31,11 +31,10 @@ controls (shuffled/random graphs, mean-expression floor)?
 | Test-set size | IDC 23 patients, COAD 11 patients, CCRCC 5 patients |
 | HVG1000 gene count | Full 1000 for every cancer (the targeted-panel exclusion above keeps this apples-to-apples across cancers -- before that fix, IDC's shared gene pool had silently collapsed to 171) |
 
-**This is ONE fold, ONE seed per cancer -- these numbers are real but
-noisy, provisional results from the first successful run, not a
-converged, statistically robust final result.** Treat differences
-smaller than the bootstrap CIs below (Gate section) as not distinguishable
-from noise at this sample size, especially for CCRCC (n=5 test patients).
+**One fold, one seed per cancer -- real but noisy, provisional numbers
+from the first successful run, not a converged final result.** Treat
+differences smaller than the bootstrap CIs below (Gate section) as
+noise at this sample size, especially for CCRCC (n=5 test patients).
 
 ## Ablation grid
 
@@ -71,18 +70,17 @@ mean of the 3 per-cancer numbers, not spot-weighted):
 | A4_random_graph | 0.0046 | 0.0282 | -0.0025 | 0.0101 | 1.2558 | 0.7956 | 1.2465 | 1.0993 | 0.9314 | 0.7164 | 0.9135 | 0.8538 |
 | A9_gatv2_multiscale | 0.0076 | 0.0271 | -0.0019 | 0.0110 | 1.2606 | 0.7964 | 1.2313 | 1.0961 | 0.9332 | 0.7219 | 0.9101 | 0.8551 |
 
-*A0's per-patient r is undefined (`NaN`) -- its prediction is a constant
+*A0's per-patient r is undefined (`NaN`): its prediction is a constant
 vector (the training mean) for every test spot, so Pearson correlation
-against a zero-variance predicted series is mathematically undefined,
-not a missing-data gap.
+against a zero-variance series is mathematically undefined, not a
+missing-data gap.
 
-**The patch-only models (A2, A3) score HIGHEST of every model in this
+**The patch-only models (A2, A3) score highest of every model in this
 table, including every graph variant, in every cancer.** All 6
 graph-corrected variants (A4-A9) score close to the shuffled-graph
-negative control (A5) and, for CCRCC, slightly *below* zero -- worse than
-the sanity floor. This is the opposite of what the project's hypothesis
-predicted (graph correction should beat patch-only via real spatial
-structure).
+negative control (A5) and, for CCRCC, slightly below zero -- worse than
+the sanity floor. This is the opposite of the project's hypothesis
+(graph correction should beat patch-only via real spatial structure).
 
 ## HVG50 (top-50 subset of HVG1000) and PROGENy14 pathway activity
 
@@ -95,13 +93,12 @@ above, all columns prefixed `hvg50_`).
 **PROGENy14 pathway activity -- a notable pattern**: A5 through A9 (all
 6 graph-corrected variants) produce **byte-identical** pathway r/MSE/MAE
 within each cancer (e.g. IDC pathway r = 0.0022 for every one of A4/A5/
-A6/A7/A8/A9). Worth investigating -- possibly the graph-correction models
-only correct the gene head's output and pass the pathway head's
-prediction through unchanged regardless of which graph/backend is used;
-not root-caused as part of this results writeup, flagged here rather
-than glossed over. Pathway signal is near-zero to slightly negative for
-every model in every cancer (mean r: A2 0.0261, best graph variant
-0.0019) -- essentially no pathway-level predictive signal in this run.
+A6/A7/A8/A9). Not root-caused here, but flagged: possibly the
+graph-correction models only correct the gene head's output and pass
+the pathway head's prediction through unchanged regardless of graph/backend.
+Pathway signal is near-zero to slightly negative for every model in
+every cancer (mean r: A2 0.0261, best graph variant 0.0019) --
+essentially no pathway-level predictive signal in this run.
 
 | Cancer | A2 pathway r | A5-A9 pathway r (identical) |
 |---|---|---|
@@ -113,13 +110,13 @@ every model in every cancer (mean r: A2 0.0261, best graph variant
 
 Patient-level bootstrap + paired sign-flip test,
 `n_bootstrap` iterations, CI as configured in `configs/base.yaml`'s
-`statistics` block. **Known limitation, printed by the script itself and
-repeated here**: the bootstrap resampling unit is (cancer, fold, seed)
-cells -- 3 units total for this 1-fold/1-seed/3-cancer run, NOT
-individual patients; a stricter implementation would bootstrap over
-per-patient R_p values directly (this project's Section 25 literal
-requirement). Interpret p-values/CIs below as a coarse pooled signal,
-not a rigorous patient-level test yet.
+`statistics` block. **Known limitation, printed by the script itself**:
+the bootstrap resampling unit is (cancer, fold, seed) cells -- 3 units
+total for this 1-fold/1-seed/3-cancer run, not individual patients; a
+stricter implementation would bootstrap over per-patient R_p values
+directly (this project's Section 25 literal requirement). Read the
+p-values/CIs below as a coarse pooled signal, not a rigorous
+patient-level test.
 
 | Gate | Comparison | Mean delta | 95% CI | Cohen's d | Result |
 |---|---|---|---|---|---|
@@ -127,36 +124,35 @@ not a rigorous patient-level test yet.
 | Gate 2 (spatial context) | A8_scale_aware_pna > A2_distilled_patch | **-0.0692** | [-0.0845, -0.0604] | -5.22 | **NOT SUPPORTED** -- A8 is substantially WORSE than the patch-only anchor, not better |
 | Gate 3 (true topology, decisive) | A8_scale_aware_pna > A5_shuffled_graph | +0.0024 | [0.0006, 0.0033] | 1.51 | **SUPPORTED** -- but both numbers are tiny (0.0075 vs 0.0043 mean r) and close to zero; a weak signal, not a strong one |
 
-**Overall reading**: right now, essentially all of the (modest, r~0.06-0.12)
+**Overall reading**: essentially all of the (modest, r~0.06-0.12)
 predictive signal for gene expression comes from the frozen patch
-encoder alone (A2/A3); the GNN spatial-correction layer is not adding
-value in this run -- it clears the weakest bar (beats a shuffled graph,
-Gate 3) but badly fails the bar that actually matters for the project's
-thesis (beat patch-only, Gate 2). Plausible explanations not yet
-investigated: only 1 fold/1 seed (high variance, especially CCRCC's
-n=5 test patients), limited GNN training epochs in a time-budgeted run,
-or a genuine architecture/training issue in the graph-correction path
-worth debugging before drawing a real scientific conclusion.
+encoder alone (A2/A3); the GNN spatial-correction layer isn't adding
+value here -- it clears the weakest bar (beats a shuffled graph, Gate 3)
+but fails the bar that matters for the project's thesis (beat
+patch-only, Gate 2). Plausible unexplored causes: only 1 fold/1 seed
+(high variance, especially CCRCC's n=5 test patients), limited GNN
+training epochs in a time-budgeted run, or a genuine architecture/
+training issue in the graph-correction path worth debugging before
+drawing a real scientific conclusion.
 
 ## Known caveats
 
 - **A1_imagenet_patch was REMOVED from the ablation grid** (and
   `gate1_distillation` from `configs/base.yaml`'s `primary_gates`) after
-  this run completed, once its results were found to be byte-identical
-  to A2's across all 3 cancers -- a real feature-loading bug (A1's
-  declared "ImageNet, no distillation" encoder was never actually
-  consulted; `src/scripts/10_run_patient_cv.py` always loaded the distilled
-  feature cache regardless of ablation spec). Confirmed every other
-  ablation (A0, A2-A9) already specs the encoder that's actually loaded,
-  so only A1's own row and Gate 1 were invalid -- everything in this
-  document is unaffected. See `docs/RUN_STATUS.md` for the full
-  writeup, including a `base.json`-vs-`base.yaml` sync gotcha this
-  surfaced.
+  this run completed, once its results were found byte-identical to
+  A2's across all 3 cancers -- a real feature-loading bug (A1's declared
+  "ImageNet, no distillation" encoder was never actually consulted;
+  `src/scripts/10_run_patient_cv.py` always loaded the distilled feature
+  cache regardless of ablation spec). Every other ablation (A0, A2-A9)
+  already specs the encoder that's actually loaded, so only A1's row
+  and Gate 1 were invalid -- everything else here is unaffected. See
+  `docs/RUN_STATUS.md` for the full writeup, including a
+  `base.json`-vs-`base.yaml` sync gotcha this surfaced.
 - **Single fold/seed per cancer** -- not the project's final 5-fold x
   3-seed design. Rerun with `--max-folds-per-cancer 5 --seeds 0 1 2`
   once there's a multi-job or longer-wall-clock budget, per the
-  original slurm script's own design note.
-- **Bootstrap unit is (cancer,fold,seed), not per-patient** -- see Gate
-  section above.
-- **CCRCC test set is only 5 patients** -- the noisiest of the 3 cancers
-  by a wide margin; treat its numbers with extra caution.
+  original slurm script's design note.
+- **Bootstrap unit is (cancer, fold, seed), not per-patient** -- see
+  Gate section above.
+- **CCRCC test set is only 5 patients** -- the noisiest of the 3
+  cancers by a wide margin; treat its numbers with extra caution.

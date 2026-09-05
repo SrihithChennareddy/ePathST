@@ -2,18 +2,18 @@
 
 This project consumes two independent real-world datasets. Neither is
 committed to this repo (both are large, DICOM/TIFF/HDF5 binary data) — this
-document is the reference for what they are, where they live on disk, and
-their exact schema, so the pipeline can be reasoned about without needing
-filesystem access. See `input_data/README.md` at the repo root for the
-short pointer version, and `configs/base.yaml`'s `paths:` block for the
-config keys that resolve to these locations at run time.
+document covers what they are, where they live on disk, and their exact
+schema, so the pipeline can be reasoned about without filesystem access. See
+`input_data/README.md` at the repo root for the short pointer version, and
+`configs/base.yaml`'s `paths:` block for the config keys that resolve to
+these locations at run time.
 
 ## 1. CPTAC (Phase 1 — teacher/student distillation)
 
 **What**: Whole-slide H&E histology images (WSIs) from the CPTAC-3 cohort,
 covering three cancer types — breast (BRCA), colon (COAD), clear-cell
 kidney (ccRCC). Used to train and evaluate the distilled student encoder;
-no molecular/expression data involved in this phase.
+no molecular/expression data in this phase.
 
 **Source / provenance**: Imaging Data Commons (IDC), `idc-open-data` public
 S3 bucket, collections `cptac_brca`, `cptac_coad`, `cptac_ccrcc`. One WSI
@@ -22,8 +22,8 @@ patient) using a metadata-based quality proxy — tumor-tagged specimen
 preferred over ambiguous/normal-tagged, then ranked by tissue-quantity/
 resolution proxy (`series_size_MB`, pyramid instance count) — with an
 additional pixel-level QC pass (tissue fraction, focus/Laplacian variance,
-pen-mark/artifact detection, stain-saturation outliers) used to re-verify
-or override that pick where multiple candidates existed. See
+pen-mark/artifact detection, stain-saturation outliers) to re-verify or
+override that pick where multiple candidates existed. See
 `src/pathology_st/cptac_select.py` for the QC/selection logic as implemented in this
 repo, and `src/scripts/01_select_cptac_wsi.py` for how it runs against the
 already-downloaded data below.
@@ -70,10 +70,10 @@ across all three cancer types (598 DICOM series, one per patient).
 
 **Known data gaps**: COAD has 43 patients where the *only* available slide
 in IDC is normal-tissue-labeled (no tumor slide exists for them at all) —
-included by necessity, not preference, flagged via `specimen_rank == 3`.
-One BRCA patient (`18BR003`) has a single candidate slide that fails to
-decode (OpenJPEG `SOC marker` error) — included with `qc_status == error`
-since it's the only candidate.
+included by necessity, flagged via `specimen_rank == 3`. One BRCA patient
+(`18BR003`) has a single candidate slide that fails to decode (OpenJPEG
+`SOC marker` error) — included with `qc_status == error` since it's the
+only candidate.
 
 ### Real post-QC selection funnel (job 83825, first clean run, 2026-08-28)
 
@@ -92,8 +92,8 @@ known / adequate tissue) were applied to all 598 candidates via
 **Why COAD's yield is disproportionately low (74% excluded vs. BRCA's 45%
 and CCRCC's 0%) — a documented limitation, not a pipeline bug.** The
 `not_tumor_specimen` filter checks whether `specimen_label` contains the
-substring "tumor". The raw label distributions differ sharply by cancer
-type in CPTAC/IDC's own metadata:
+substring "tumor". Raw label distributions differ sharply by cancer type
+in CPTAC/IDC's own metadata:
 
 | Cancer | `"HE tumor_tissue"` (passes) | `"HE"` bare (excluded) | `"HE normal_tissue"` (excluded) |
 |---|---|---|---|
@@ -101,20 +101,19 @@ type in CPTAC/IDC's own metadata:
 | BRCA | 108 | 90 | 0 |
 | COAD | 47 | 88 | 43 |
 
-Two distinct effects combine for COAD: (1) 43 patients' only available
-slide is genuinely matched-normal tissue (correctly excluded from a
-tumor-focused study — this is real, expected, and already noted above),
-and (2) a much larger fraction than BRCA (88/178 = 49% vs. 90/198 = 45%,
-comparable rate, but combined with (1) it compounds) carry only the bare,
+Two effects combine for COAD: (1) 43 patients' only available slide is
+genuinely matched-normal tissue (correctly excluded from a tumor-focused
+study), and (2) a larger fraction than BRCA (88/178 = 49% vs. 90/198 = 45%
+— comparable rate, but combined with (1) it compounds) carry only the bare,
 unqualified `"HE"` label with no explicit tumor/normal designation in this
-specific metadata field. **The current filter treats "no explicit 'tumor'
-substring" as "not a tumor specimen," which is a conservative
-approximation, not a verified fact** — some of these 88 (COAD) + 90 (BRCA)
-bare-`"HE"` specimens may well be genuine tumor sections that simply
-weren't tagged with that word in `specimen_label`. This has not been
-cross-checked against a more authoritative CPTAC diagnosis/pathology field
-and should be flagged as a limitation (or resolved, if a better field is
-found) before the final cohort composition is reported in the paper.
+metadata field. **The current filter treats "no explicit 'tumor' substring"
+as "not a tumor specimen," which is a conservative approximation, not a
+verified fact** — some of these 88 (COAD) + 90 (BRCA) bare-`"HE"` specimens
+may be genuine tumor sections simply not tagged with that word in
+`specimen_label`. Not yet cross-checked against a more authoritative CPTAC
+diagnosis/pathology field; should be flagged as a limitation (or resolved,
+if a better field is found) before final cohort composition is reported in
+the paper.
 
 ### Patient-level train/val/test split (seed 0, from the selected 363)
 
@@ -141,13 +140,13 @@ trained on as of this writing (see `docs/RUN_STATUS.md` /
 **What**: Paired H&E whole-slide images and spatial transcriptomics (ST)
 expression data (Visium-style spot arrays) from the HEST benchmark, across
 all three of this project's cancer types (colon/COAD, breast/IDC,
-kidney/CCRCC — all now confirmed present on disk, see below). Used to
+kidney/CCRCC — all confirmed present on disk, see below). Used to
 train/evaluate the graph-based molecular expression prediction — the
 locked CPTAC-distilled student encoder is applied here as a frozen feature
 extractor; no further distillation happens in this phase.
 
 **Source / provenance** (confirmed on-disk 2026-08-29 — all three cancers
-now available, two different provenances):
+available, two different provenances):
 
 | Cancer | Location | Provenance | Scale |
 |---|---|---|---|
@@ -197,9 +196,9 @@ real files actually are):
 - `uns['spatial']['ST']['scalefactors']['spot_diameter_fullres']` — the Visium 55µm spot's diameter in pixels; used as an independent cross-check of microns-per-pixel against `openslide.mpp-x` (confirmed to agree to 4 decimal places, e.g. 0.7257 vs. 0.7258 µm/px on sample `TENX28`)
 
 **Alignment QC**: before any patch extraction, `pathology_st.hest_prep
-.alignment_qc_sample` samples ST spot coordinates and confirms they
-actually land on real tissue in the paired WSI (`pct_spots_with_tissue`);
-a sample is excluded as `likely_misaligned` if this check fails, since a
+.alignment_qc_sample` samples ST spot coordinates and confirms they land
+on real tissue in the paired WSI (`pct_spots_with_tissue`); a sample is
+excluded as `likely_misaligned` if this check fails, since a
 coordinate-system mismatch would otherwise silently corrupt every
 downstream patch/graph.
 
@@ -219,8 +218,8 @@ scale — `src/scripts/08_prepare_hest_metadata.py` has only been exercised on a
 Everything under `runs/<experiment_name>/` (patch shards, manifests, QC
 reports, teacher embeddings, student checkpoints, graphs, predictions,
 results, figures) is *generated* from the two datasets above, not raw
-input — see `design/DESIGN.md` §3 for the full data-flow table. These are
-excluded from git (`.gitignore`: `runs/`, `logs/`, `*.h5`, `*.h5ad`,
-`*.pt`, `*.pth`) and, per `docs/RUN_STATUS.md`, are kept off `/home` and
-`/scratch` entirely (20GB per-user quota) in favor of the
-`YurovskyGroup-nvwulf` project space.
+input — see `design/DESIGN.md` §3 for the full data-flow table. Excluded
+from git (`.gitignore`: `runs/`, `logs/`, `*.h5`, `*.h5ad`, `*.pt`,
+`*.pth`) and, per `docs/RUN_STATUS.md`, kept off `/home` and `/scratch`
+entirely (20GB per-user quota) in favor of the `YurovskyGroup-nvwulf`
+project space.

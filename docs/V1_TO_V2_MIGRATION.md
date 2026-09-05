@@ -13,8 +13,8 @@ inference, or ConvNeXt V2-Atto distillation training was touched --
 `teacher:`/`student:`/`distillation:` sections are byte-for-byte unchanged
 except where an earlier, unrelated fix (the HDF5 truncation bug) already
 touched `src/pathology_st/teacher_genbio.py` before this migration started -- see
-`docs/RUN_STATUS.md`. This was verified by diffing those sections'
-resolved config values before/after (`distillation.max_epochs=100`,
+`docs/RUN_STATUS.md`. Verified by diffing those sections' resolved config
+values before/after (`distillation.max_epochs=100`,
 `teacher.hf_repo=genbio-ai/genbio-pathfm`, `student.backbone=
 convnextv2_atto` all confirmed unchanged) and by confirming the live
 training job (84150 at migration time) kept running throughout with zero
@@ -92,8 +92,8 @@ mandatory pathway auxiliary term). `pathway_loss_sweep: [0.0, 0.05, 0.10,
 yet wired into a driver script, see Known follow-ups).
 
 ### 5. Fold-completeness enforcement (V2 Phase 3) -- the PoC_5 fix
-This is the most consequential change. PoC_5's own cross-fold aggregate
-silently pooled only 3 of 4 completed folds (fold 3 finished but was never
+The most consequential change. PoC_5's own cross-fold aggregate silently
+pooled only 3 of 4 completed folds (fold 3 finished but was never
 included; fold 4 failed both/all 3 seeds on a broken script path -- see
 `docs/POC5_RESULTS.md` for the full forensic writeup). V2 Phase 3 requires
 a hard assertion against exactly this. Added:
@@ -189,8 +189,8 @@ an evaluation driver script.
   `primary_analysis_unit` and per-cancer reporting, but the pipeline
   doesn't yet physically separate outputs into per-cancer directories --
   current outputs stay in the shared `results/`/`predictions/` with a
-  `cancer` column, which achieves the same analysis separation without
-  the directory split V2 suggested as one option.
+  `cancer` column, achieving the same analysis separation without the
+  directory split V2 suggested as one option.
 - `src/scripts/12_primary_hypothesis_test.py`'s bootstrap resampling unit is
   (cancer, fold, seed) cells, not individual patients -- flagged explicitly
   in the script's own printed output; a stricter fix requires plumbing

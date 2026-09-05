@@ -1,6 +1,6 @@
 # HEST Final 5-Fold Experiment -- Results
 
-Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x 3-cancer x seed-0 experiment (SLURM job 84871, completed 2026-08-31, 03:15:54 elapsed). Metric: patient-level Fisher-z mean Pearson R (`pathology_st.metrics.patient_macro_fisher_z`). All CIs are bootstrap 95% intervals, n_bootstrap=10000, resampled over (cancer, fold, seed) cells -- see the Limitations section for what that does and does not mean. Every number below is read directly from `results/final/tables/`; nothing is re-derived or estimated in this document.
+Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x 3-cancer x seed-0 experiment (SLURM job 84871, completed 2026-08-31, 03:15:54 elapsed). Metric: patient-level Fisher-z mean Pearson R (`pathology_st.metrics.patient_macro_fisher_z`). All CIs are bootstrap 95% intervals, n_bootstrap=10000, resampled over (cancer, fold, seed) cells -- see Limitations for what that does and doesn't mean. Every number below is read directly from `results/final/tables/`, not re-derived or estimated.
 
 ## Contents
 
@@ -47,7 +47,7 @@ Pooled across IDC + COAD + CCRCC (15 cancer-fold-seed cells per model: 3 cancers
 | A4_random_graph | 0.0997 [0.0880, 0.1101] (n=15) | 0.1451 [0.1273, 0.1600] (n=15) | 0.1485 [0.1332, 0.1638] (n=15) |
 | A9_gatv2_multiscale | 0.1024 [0.0911, 0.1120] (n=15) | 0.1491 [0.1327, 0.1625] (n=15) | 0.1523 [0.1364, 0.1684] (n=15) |
 
-(A0_mean_expression's R is `n/a`: predicting the constant train-fold mean for every spot gives zero-variance predictions, and Pearson r is undefined against a constant -- this is the expected behavior of a sanity-floor baseline, not a bug.)
+(A0_mean_expression's R is `n/a`: it predicts the constant train-fold mean for every spot, giving zero-variance predictions -- Pearson r is undefined against a constant. Expected behavior for a sanity-floor baseline, not a bug.)
 
 ## 3. Per-cancer results
 
@@ -164,11 +164,11 @@ Same pathway-target column as sections 2-3 above, isolated for readers who only 
 
 ## 7. GenBio-PathFM reference numbers
 
-Two **separate protocol tracks** -- neither is directly comparable to the A0-A9 table above (different targets/splits/heads), and they are not comparable to *each other* either (different training protocol). Do not average across tracks.
+Two **separate protocol tracks**, neither comparable to the A0-A9 table above (different targets/splits/heads) or to each other (different training protocol). Do not average across tracks.
 
 ### 7a. Official HEST-Benchmark protocol
 
-log1p-only targets (no library-size normalization), StandardScaler+PCA(256)+Ridge, official published k-fold splits, seed=1. Distilled student and GenBio-PathFM teacher evaluated identically -- this isolates the effect of the *encoder* from everything else in the custom pipeline (no trained patch head, no GNN, no train-fold HVG selection).
+log1p-only targets (no library-size normalization), StandardScaler+PCA(256)+Ridge, official published k-fold splits, seed=1. Distilled student and GenBio-PathFM teacher evaluated identically, isolating the encoder's effect from everything else in the custom pipeline (no trained patch head, no GNN, no train-fold HVG selection).
 
 | Cancer | n folds | Distilled student R (std) | GenBio-PathFM teacher R (std) | Gap (teacher - student) |
 |---|---|---|---|---|
@@ -178,7 +178,7 @@ log1p-only targets (no library-size normalization), StandardScaler+PCA(256)+Ridg
 
 ### 7b. Custom-pipeline GenBio embedding -> trained MLP baseline (B1) -- PARTIAL
 
-Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no Ridge -- `src/scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused alternative), on the SAME HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table -- but **fold0/seed0 only, not the full 5-fold design**. Treat as preliminary; do not compare CI-to-CI against the bootstrapped A0-A9 numbers above (no CI is computable from a single fold).
+Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no Ridge -- `src/scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused alternative), on the SAME HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table, but **fold0/seed0 only, not the full 5-fold design**. Preliminary: no CI is computable from a single fold, so don't compare CI-to-CI against the bootstrapped A0-A9 numbers above.
 
 | Cancer | n train / test patients | HVG1000 R | HVG50 R | PROGENy14 R | Feature extract (s) | Head train (s) | Peak VRAM (GB) |
 |---|---|---|---|---|---|---|---|
@@ -200,18 +200,18 @@ Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head
 ## 9. Bottom line
 
 - **Spatial graph correction helps (Gate 2, SUPPORTED everywhere).** A8 beats A2 (patch-only) pooled (delta_R=+0.0253, 95% CI [0.011, 0.043]) and in all 3 cancers individually (IDC +0.060, COAD +0.006, CCRCC +0.011) -- the most robust positive result in the experiment.
-- **But not because of *real* tissue topology (Gate 3, NOT SUPPORTED everywhere).** A8 (real multiscale graph) is statistically indistinguishable from A5 (degree-preserving shuffled graph) pooled (delta_R=-0.002, CI crosses zero) and in every cancer. The A8-vs-A5 secondary comparison confirms the same null result. The GNN's benefit most plausibly comes from generic neighbor-averaging/regularization, not from encoding true spatial adjacency -- a genuine negative finding, reported as such per the FINAL STOP RULE.
-- **CPTAC->HEST distillation does not reliably help (Gate 1, NOT SUPPORTED pooled).** A2 (distilled) vs. A1 (ImageNet) pooled delta_R=+0.0115 but CI=[-0.004, 0.025] crosses zero (p=0.072, just short of one-sided significance). It flips sign across cancers: CCRCC SUPPORTED (+0.031), COAD marginal (+0.015, not supported), IDC actually reverses (-0.012, ImageNet ahead). The IDC reversal is flagged, not explained, in Limitations.
-- **A8 (proposed flagship) is not the single best ablation among the graph variants.** A7 (union multiscale, no scale-aware gating) and A9 (GATv2 architecture control) score marginally higher than A8 pooled on HVG1000 (A7: 0.1019, A9: 0.1024 vs. A8: 0.0981); the A8-vs-A7 and A8-vs-A9 secondary comparisons are both NOT SUPPORTED (A8 does not significantly beat either). A8 does significantly beat the parameter-matched MLP (A3) with no graph at all -- so *some* graph structure helps, but the scale-aware gating mechanism specifically does not show a measurable edge over simpler graph variants at this sample size.
-- **Distillation buys a real, large compression at a real, consistent accuracy cost.** Under the official protocol (encoder-only comparison, no GNN, no patch head), GenBio-PathFM beats the distilled student in all 3 cancers by 0.04-0.11 R, for 334.7x fewer parameters.
+- **But not because of real tissue topology (Gate 3, NOT SUPPORTED everywhere).** A8 (real multiscale graph) is statistically indistinguishable from A5 (degree-preserving shuffled graph) pooled (delta_R=-0.002, CI crosses zero) and in every cancer; the A8-vs-A5 secondary comparison confirms the same null result. The GNN's benefit most plausibly comes from generic neighbor-averaging/regularization, not true spatial adjacency -- a genuine negative finding, reported per the FINAL STOP RULE.
+- **CPTAC->HEST distillation does not reliably help (Gate 1, NOT SUPPORTED pooled).** A2 vs. A1 pooled delta_R=+0.0115, CI=[-0.004, 0.025] crosses zero (p=0.072, just short of significance). Sign flips across cancers: CCRCC SUPPORTED (+0.031), COAD marginal (+0.015, not supported), IDC reverses (-0.012, ImageNet ahead) -- the IDC reversal is flagged, not explained, in Limitations.
+- **A8 is not the single best ablation among the graph variants.** A7 (union multiscale, no gating) and A9 (GATv2) score marginally higher than A8 pooled on HVG1000 (A7: 0.1019, A9: 0.1024 vs. A8: 0.0981); A8-vs-A7 and A8-vs-A9 are both NOT SUPPORTED. A8 does beat the parameter-matched MLP (A3), so some graph structure helps -- but scale-aware gating specifically shows no measurable edge over simpler graph variants at this sample size.
+- **Distillation buys a real, large compression at a real, consistent accuracy cost.** Under the official protocol (encoder-only, no GNN, no patch head), GenBio-PathFM beats the distilled student in all 3 cancers by 0.04-0.11 R, for 334.7x fewer parameters.
 
 ## 10. Limitations (reported honestly, not omitted)
 
-1. **Bootstrap resampling unit.** All CIs above resample (cancer, fold, seed) cells (15 pooled, 5 per cancer), not literal per-patient R_p values -- script 10 does not persist per-patient predictions to disk. A stricter implementation would bootstrap over patients directly.
+1. **Bootstrap resampling unit.** All CIs above resample (cancer, fold, seed) cells (15 pooled, 5 per cancer), not literal per-patient R_p values -- script 10 doesn't persist per-patient predictions to disk. A stricter implementation would bootstrap over patients directly.
 2. **Seeds 1/2** were not run for the major models -- seed 0 only.
-3. **B1 (GenBio embedding -> MLP baseline)** is fold0/seed0 only per cancer, not the full 5-fold design the rest of this document uses.
+3. **B1 (GenBio embedding -> MLP baseline)** is fold0/seed0 only per cancer, not the full 5-fold design.
 4. **Efficiency**: only parameter counts and the derived compression ratio were measured; inference VRAM, throughput, and GNN wall-clock were not.
-5. **The IDC-specific distillation reversal** (Gate 1 section, A1 ahead of A2 in IDC specifically) has not been separately root-caused.
-6. **A8 vs. A7/A9** shows A8 is not clearly the best graph variant at this sample size (section 9) -- worth noting for anyone citing A8 as unambiguously superior.
+5. **The IDC-specific distillation reversal** (A1 ahead of A2 in IDC) has not been separately root-caused.
+6. **A8 vs. A7/A9** shows A8 is not clearly the best graph variant at this sample size -- worth noting for anyone citing A8 as unambiguously superior.
 
 Full machine-readable tables: `results/final/tables/*.csv`. Exact patient/fold manifest: `results/final/folds/cv_folds_used.csv`. Full run config: `experimental_runs/2026-08-31_job84871_final_5fold_3cancer_seed0_with_results_final/config_used.json`.
