@@ -83,13 +83,12 @@ def cache_teacher_embeddings(out_path: str | Path, patch_ids: list[str], embeddi
     are unit-norm, so FP16 precision is adequate).
 
     Uses h5py's variable-length string dtype for `patch_id`, not a
-    fixed-width numpy `dtype="S"` array. A fixed-width dtype freezes its
+    fixed-width numpy `dtype="S"` array: a fixed-width dtype freezes its
     per-element byte-width at the first call's longest string and
-    silently truncates any longer id appended later -- this previously
-    corrupted CPTAC patch_ids (which vary in length with pixel-coordinate
-    digit count) into collisions between unrelated patches, and broke
-    resumability (a fresh id never string-matches its truncated form on
-    disk). Variable-length strings have no such width limit."""
+    silently truncates any longer id appended later. This previously
+    corrupted CPTAC patch_ids (length varies with pixel-coordinate digit
+    count) into collisions between unrelated patches, and broke
+    resumability (a fresh id never matches its truncated form on disk)."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     str_dtype = h5py.string_dtype(encoding="utf-8")

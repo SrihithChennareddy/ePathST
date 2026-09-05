@@ -6,11 +6,10 @@ RESIDUAL correction on top of the (frozen) patch-only predictor:
     y_final,i  = y_patch,i + dy_graph,i
 
 The graph correction heads are zero-initialized so y_final == y_patch at
-initialization -- this is what makes the A0-A9 grid interpretable as "how
-much does spatial context add on top of the patch prediction," rather
-than the graph model re-deriving everything from scratch. An earlier
-project iteration (PoC_5) once regressed below patch-only performance
-because this wasn't enforced; `assert_zero_residual_at_init` below is the
+init -- this is what makes the A0-A9 grid interpretable as "how much does
+spatial context add," rather than the graph model re-deriving everything
+from scratch. PoC_5 once regressed below patch-only performance because
+this wasn't enforced; `assert_zero_residual_at_init` below is the
 init-time check that now guards against that class of bug on every
 graph-training call.
 
@@ -179,16 +178,15 @@ class ResidualGraphPredictor(nn.Module):
         self.patch_head = patch_head
         for p in self.patch_head.parameters():
             p.requires_grad_(False)
-        # frozen -> always eval mode; without this, patch_head's Dropout layer would make the
-        # "frozen" patch predictor non-deterministic across calls (caught by sanity check S1).
+        # frozen -> always eval mode; otherwise patch_head's Dropout makes the "frozen" patch
+        # predictor non-deterministic across calls (caught by sanity check S1).
         self.patch_head.eval()
         self.graph_correction = graph_correction
 
     def train(self, mode: bool = True):
-        """Keep patch_head in eval() even when the parent module's
-        .train() is called -- it's frozen and must reproduce y_patch
-        exactly, so it can never see BatchNorm/Dropout train-mode
-        stochasticity."""
+        """Keep patch_head in eval() even when the parent's .train() is
+        called -- frozen means it must reproduce y_patch exactly and can
+        never see BatchNorm/Dropout train-mode stochasticity."""
         super().train(mode)
         self.patch_head.eval()
         return self

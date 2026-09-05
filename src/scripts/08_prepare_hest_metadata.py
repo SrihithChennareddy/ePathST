@@ -27,13 +27,12 @@ from pathology_st.wsi_patches import open_slide, write_patch_shard
 #   wsi_dir/{id}.tif   pyramidal TIFF, openslide-readable
 #   st_dir/{id}.h5ad   Visium AnnData: obsm['spatial'] = (x_px, y_px), already filtered to
 #     in_tissue==1, X = raw counts, uns['spatial']['ST']['scalefactors']['spot_diameter_fullres']
-# There is no explicit patient_id column -- each `id` is one section from one patient, so
-# `id` doubles as `patient_id`.
+# No explicit patient_id column -- each `id` is one section from one patient, so `id`
+# doubles as `patient_id`.
 #
-# Oncotree -> cancer-bucket mapping: COAD/COADREAD/READ are all colorectal and collapse to
-# "COAD". SCCRCC (clear-cell RCC) maps to "CCRCC"; PRCC (papillary RCC, a distinct subtype)
-# and ILC (invasive lobular, distinct from this project's IDC target) are deliberately left
-# unmapped and excluded.
+# Oncotree -> cancer-bucket mapping: COAD/COADREAD/READ collapse to "COAD". SCCRCC
+# (clear-cell RCC) maps to "CCRCC"; PRCC (papillary RCC) and ILC (invasive lobular,
+# distinct from this project's IDC target) are left unmapped and excluded.
 ONCOTREE_TO_CANCER = {"IDC": "IDC", "COAD": "COAD", "COADREAD": "COAD", "READ": "COAD",
                        "CCRCC": "CCRCC", "SCCRCC": "CCRCC"}
 
@@ -77,8 +76,8 @@ def _process_one_sample(sample: dict, cfg: dict, patch_shard_dir: str, n_threads
     """Runs in a worker process: alignment QC + patch extraction + shard
     write for exactly ONE HEST sample. Self-contained (opens its own
     WSI/expression handles), writes only its own `{sample_id}.h5` shard,
-    and returns manifest rows only -- never the patch array, which is
-    already on disk and would otherwise get pickled back needlessly."""
+    and returns manifest rows only -- the patch array is already on disk
+    and doesn't need to be pickled back to the parent."""
     import anndata as ad
 
     reader = open_slide(sample["he_path"])

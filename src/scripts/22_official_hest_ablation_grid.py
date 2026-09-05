@@ -21,23 +21,22 @@ buried in the diff:
     There is no HVG1000/HVG50 distinction here (only one 50-gene panel);
     `n_hvg50` is passed as len(genes) (=all genes) so the "hvg50" slice
     src/scripts/10's run_ablation always computes is a no-op alias of the
-    full-panel ("hvg1000"-labeled) metrics -- both columns will be
-    identical in the output, which is expected, not a bug.
+    full-panel ("hvg1000"-labeled) metrics -- both columns are identical
+    in the output by design.
   - pathway (PROGENy14) target: NOT evaluated -- some official-split
     samples carry a targeted gene panel (a few hundred genes) rather than
-    whole-transcriptome, so decoupler's PROGENy scoring is not reliably
+    whole-transcriptome, so decoupler's PROGENy scoring isn't reliably
     computable here. A single all-NaN pathway column is passed through so
     the shared patch_head/graph_loss code (which expects some pathway_dim)
     runs unmodified: `patch_head_loss`/`graph_loss` mask by
-    `~isnan(target)`, so an all-NaN column always contributes exactly
-    zero loss regardless of `pathway_loss_weight`, and
-    `evaluate_predictions` always reports NaN/n-a for it (same convention
-    already used for A0_mean_expression's undefined Pearson r). The
-    pathway_* output columns are dropped before saving since they carry no
-    information.
+    `~isnan(target)`, so an all-NaN column always contributes zero loss
+    regardless of `pathway_loss_weight`, and `evaluate_predictions`
+    reports NaN/n-a for it (same convention as A0_mean_expression's
+    undefined Pearson r). pathway_* output columns are dropped before
+    saving since they carry no information.
   - "patient" unit for graph-building/evaluation: one official `sample_id`
-    -- the official splits are already sample/patient-level held-out, and
-    there is no multi-sample-per-patient concept in this data, so
+    -- the official splits are already sample/patient-level held-out and
+    there's no multi-sample-per-patient concept in this data, so
     `patient_id` is set equal to `sample_id` throughout.
   - physical spot coordinates (um): official patches only ship pixel
     coordinates (`patches/<sample>.h5`'s `coords` field); converted via
@@ -52,12 +51,11 @@ buried in the diff:
     train samples (`pathology_st.cv_folds.carve_validation_from_train`, treating
     sample_id like a patient_id) -- only for early stopping; the official
     split itself is what prevents train/test leakage. Some official folds
-    have as few as 1 train sample (COAD); when there aren't at least 2
-    train samples to split (or the normal carve would still zero out
-    train), the full train pool is used as BOTH train and val -- early
-    stopping then just monitors train loss, a real limitation flagged in
-    the run's own log output ("val==train fallback"), not silently
-    absorbed.
+    have as few as 1 train sample (COAD); when there aren't at least 2 to
+    split (or the normal carve would still zero out train), the full train
+    pool is used as BOTH train and val -- early stopping then just monitors
+    train loss, flagged in the run's own log output ("val==train fallback")
+    rather than silently absorbed.
 
 Output: `results/official_hest_ablation_grid/official_ablation_metrics.csv`
 (one row per cancer x fold x ablation, same metric columns

@@ -119,16 +119,16 @@ def evaluate_val_cosine(model, loader, device) -> float:
 def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, seed: int, device: str = "cuda",
                    time_budget_seconds: float | None = None) -> dict:
     """`baseline` in {"S1", "S2"} (S0 needs no training loop). Saves the
-    best checkpoint (selected by validation teacher-cosine similarity,
-    never test) to out_dir/{baseline}_seed{seed}_best.pt.
+    best checkpoint (by validation teacher-cosine similarity, never test)
+    to out_dir/{baseline}_seed{seed}_best.pt.
 
     Resumable and wall-clock-budgeted for SLURM: a full training-state
     snapshot (model+optimizer+scaler+step counters, not just best-val
     weights) is saved every epoch to out_dir/{baseline}_seed{seed}_resume.pt
     and reloaded automatically if present, so a job killed by the wall
     clock resumes on the next `sbatch` instead of restarting. If
-    `time_budget_seconds` is set, training stops (saving both checkpoints
-    first) once elapsed time exceeds it, returning with
+    `time_budget_seconds` is set, training stops (after saving both
+    checkpoints) once elapsed time exceeds it, returning
     `stopped_early_for_time=True` rather than raising."""
     import time
     from pathology_st.utils import seed_everything
@@ -211,12 +211,10 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
                     "best_epoch": best_epoch, "patience_ctr": patience_ctr, "global_step": global_step,
                     "history": history}, resume_path)
 
-        # Milestone snapshots (every 10 COMPLETED epochs -- epoch is
-        # 0-indexed, so epoch+1 is the completed-epoch count, covering
-        # e.g. 20/50/100): separate, permanent, never-overwritten files so
-        # the model at different training stages can be compared later,
-        # unlike `ckpt_path` (only ever the single best-so-far) or
-        # `resume_path` (overwritten every epoch, resume-only).
+        # Milestone snapshots every 10 completed epochs (epoch is 0-indexed,
+        # so epoch+1 = completed count): permanent, never-overwritten files
+        # so training stages can be compared later, unlike `ckpt_path`
+        # (only ever best-so-far) or `resume_path` (overwritten each epoch).
         completed = epoch + 1
         if completed % 10 == 0:
             milestone_path = out_dir / f"{baseline}_seed{seed}_epoch{completed}.pt"

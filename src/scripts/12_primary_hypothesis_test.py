@@ -63,11 +63,8 @@ def main():
     def patient_scores(ablation: str, cancer: str | None = None) -> dict:
         """Per-(fold,seed) Fisher-z patient-macro R for one ablation,
         optionally restricted to one cancer -- these fold/seed cells are
-        the bootstrap resampling unit here (see the Known limitation note
-        below: this is coarser than resampling true per-patient R_p
-        values directly, which would require plumbing per-patient
-        predictions through to this script rather than per-fold
-        aggregates)."""
+        the bootstrap resampling unit here (coarser than resampling true
+        per-patient R_p values directly; see Known limitation note below)."""
         sub = df[df["ablation"] == ablation]
         if cancer is not None:
             sub = sub[sub["cancer"] == cancer]

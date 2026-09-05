@@ -49,11 +49,10 @@ HIDDEN1, HIDDEN2 = 320, 128
 
 
 # ------------------------------------------------------------------ import src/scripts/10's
-# load_fold_expression WITHOUT copy-pasting it and WITHOUT modifying that file --
+# load_fold_expression WITHOUT copy-pasting or modifying that file --
 # `10_run_patient_cv.py` is not a valid module name for a normal `import`
-# statement (leading digit), so it is loaded by file path instead. The module's
-# own `if __name__ == "__main__": main()` guard means executing it as an
-# import has no side effects here.
+# (leading digit), so it's loaded by file path instead. Its own
+# `if __name__ == "__main__": main()` guard means this import has no side effects.
 def _import_scripts10():
     path = Path(__file__).resolve().parent / "10_run_patient_cv.py"
     spec = importlib.util.spec_from_file_location("_scripts10_run_patient_cv", path)
@@ -101,8 +100,8 @@ def extract_genbio_embeddings_for_sample(genbio: GenBioPathFMTeacher, sample_row
                                           patch_shard_dir: Path, out_path: Path, batch_size: int) -> dict:
     """Runs the frozen GenBio-PathFM teacher once over every ST spot's
     already-extracted 224x224@0.5um/px patch (src/scripts/08's patch shard) and
-    caches the 4608-D CLS embedding per spot. Returns timing/throughput
-    stats. Resumable at the call site via `_valid_cache`."""
+    caches the 4608-D CLS embedding per spot. Returns timing/throughput stats;
+    resumable at the call site via `_valid_cache`."""
     sample_id = sample_row["sample_id"]
     shard_path = patch_shard_dir / f"{sample_id}.h5"
     with h5py.File(shard_path, "r") as f:
@@ -151,8 +150,8 @@ def load_cached_genbio_features(path: Path) -> dict:
 def _read_csv_with_retry(path: Path, retries: int = 5, delay: float = 2.0) -> pd.DataFrame:
     """The HEST manifests are periodically rewritten in full by the
     concurrently-running src/scripts/08 job -- a read landing mid-rewrite can
-    see a truncated/partial CSV. Retries on parse failure rather than
-    crashing this independent, read-only job."""
+    see a truncated CSV. Retries on parse failure rather than crashing this
+    independent, read-only job."""
     last_err = None
     for _ in range(retries):
         try:
@@ -167,16 +166,16 @@ def _read_csv_with_retry(path: Path, retries: int = 5, delay: float = 2.0) -> pd
 def wait_for_hest_manifest_complete(cfg: dict, paths: dict, poll_seconds: float = 60.0,
                                      stable_checks: int = 3, timeout_seconds: float = 20 * 3600) -> None:
     """src/scripts/08 rewrites the HEST manifests in full at every checkpoint,
-    but partway through its run only a subset of cancers have any QC-passed
-    rows yet -- reading before it finishes Step 8 would silently give this
-    script an incomplete, single-cancer view. Polls until every configured
-    cancer has at least one QC-eligible sample AND the eligible-sample count
-    is unchanged across `stable_checks` consecutive polls. `timeout_seconds`
+    but partway through its run only a subset of cancers have QC-passed rows
+    -- reading before it finishes Step 8 would silently give this script an
+    incomplete, single-cancer view. Polls until every configured cancer has
+    at least one QC-eligible sample AND the eligible-sample count is
+    unchanged across `stable_checks` consecutive polls. `timeout_seconds`
     only lets this proceed early once every cancer is present but the count
-    hasn't gone stable yet -- it never proceeds while a whole cancer is
-    still missing (the smoke test hard-requires all cancers and would just
-    crash), so a cancer that never appears stalls until SLURM kills the job
-    -- a clean failure, not a silent partial run. Read-only."""
+    hasn't gone stable -- it never proceeds while a whole cancer is still
+    missing (the smoke test hard-requires all cancers and would crash), so a
+    cancer that never appears stalls until SLURM kills the job -- a clean
+    failure, not a silent partial run. Read-only."""
     expected_cancers = set(cfg["cancers"]["hest"])
     samples_path = paths["manifests"] / "hest_samples.csv"
     manifest_path = paths["manifests"] / "hest_spot_manifest.csv"
@@ -213,11 +212,11 @@ def load_or_recompute_split(cfg: dict, paths: dict, hest_samples: pd.DataFrame, 
     persisted manifests/hest_cv_folds.json that script 10 writes; if that
     job hasn't reached its Step 10 yet, falls back to calling the identical
     `pathology_st.cv_folds.build_cv_grid` on the current hest_samples.csv. This
-    fallback is not an approximation: GroupKFold has no RNG (it depends
-    only on the sorted patient-id list), and hest_samples.csv is written in
-    full at every checkpoint, so once script 10 does run it derives the
-    same patients_by_cancer from the same stable file and produces a
-    bit-identical fold."""
+    fallback is not an approximation: GroupKFold has no RNG (it depends only
+    on the sorted patient-id list), and hest_samples.csv is written in full
+    at every checkpoint, so script 10 will later derive the same
+    patients_by_cancer from the same stable file and produce a bit-identical
+    fold."""
     cv_path = paths["manifests"] / "hest_cv_folds.json"
     if cv_path.exists():
         cv_grid = json.loads(cv_path.read_text())

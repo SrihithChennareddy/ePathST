@@ -40,9 +40,9 @@ def audit_hest_samples(raw_meta: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame,
 
 def enforce_patient_section_grouping(df: pd.DataFrame) -> pd.DataFrame:
     """Multiple sections from one patient must stay in the same train/test
-    fold. No-op here beyond asserting the grouping key exists -- the
-    actual grouping happens in pathology_st.cv_folds, which splits on `patient_id`,
-    never `sample_id`."""
+    fold. No-op beyond asserting the grouping key exists -- actual
+    grouping happens in pathology_st.cv_folds, which splits on
+    `patient_id`, never `sample_id`."""
     assert "patient_id" in df.columns and df["patient_id"].notna().all()
     return df
 
@@ -51,9 +51,8 @@ def alignment_qc_sample(he_reader, spot_coords_px: np.ndarray, spot_ids: list[st
                          seed: int = 0) -> dict:
     """For a random subsample of spots, extract the ST-centered patch and
     check it overlaps tissue rather than background -- a cheap proxy for
-    correct H&E/ST registration. Returns per-spot tissue fraction so
-    systematic misregistration (near-zero tissue fraction across most
-    spots) can be flagged."""
+    correct H&E/ST registration. Systematic misregistration shows up as
+    near-zero tissue fraction across most spots."""
     from pathology_st.cptac_select import tissue_mask_from_thumbnail
 
     n = cfg["hest"]["n_alignment_qc_samples"]
@@ -104,7 +103,7 @@ def extract_hest_patches_for_sample(he_reader, spot_ids: list[str], coords_px: n
 def integrity_check_spot_alignment(spot_ids: list[str], patch_ids: list[str], coords: np.ndarray,
                                     expr_index: pd.Index) -> dict:
     """spot_id <-> patch <-> coordinate <-> expression vector must remain
-    exactly aligned; this is the check that would catch a silent reorder."""
+    exactly aligned; catches a silent reorder."""
     ok_patch = list(spot_ids) == list(patch_ids)
     ok_expr = list(spot_ids) == list(expr_index)
     ok_coords = coords.shape[0] == len(spot_ids)
