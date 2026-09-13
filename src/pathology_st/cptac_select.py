@@ -5,7 +5,6 @@ openslide-only so it can run on a CPU QC node ahead of any GPU work."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import numpy as np
 
@@ -35,7 +34,9 @@ class WSIQualityRecord:
 
 
 # ---------------------------------------------------------------- tissue --
-def tissue_mask_from_thumbnail(thumb_rgb: np.ndarray, sat_thresh: int = 15, val_thresh: int = 235) -> np.ndarray:
+def tissue_mask_from_thumbnail(
+    thumb_rgb: np.ndarray, sat_thresh: int = 15, val_thresh: int = 235,
+) -> np.ndarray:
     """Simple, dependency-light tissue mask: HSV saturation/value
     thresholding (glass background is low-saturation, near-white; tissue
     is saturated and darker). Reused for tile sampling and patch masking."""
@@ -76,7 +77,9 @@ def _rgb_to_sat(rgb: np.ndarray) -> np.ndarray:
     return np.where(maxc > 0, (maxc - minc) / np.clip(maxc, 1e-6, None), 0.0) * 255.0
 
 
-def stain_outlier_score(tile_rgbs: list[np.ndarray], reference_mean: np.ndarray | None = None) -> float:
+def stain_outlier_score(
+    tile_rgbs: list[np.ndarray], reference_mean: np.ndarray | None = None,
+) -> float:
     """Mean-color distance from a reference/global stain centroid, in
     normalized [0,1] where 0 = typical, 1 = extreme outlier. If no
     reference is given, uses this WSI's own tile-mean color (so the score
@@ -115,7 +118,10 @@ def compute_wsi_qc(wsi_path: str, cfg: dict, reader) -> dict:
         focus_vals = np.array([focus_score_laplacian(t.mean(axis=-1)) for t in tiles])
         artifact_vals = np.array([artifact_fraction_tile(t) for t in tiles])
         focus_score = float(np.median(focus_vals))
-        blurry_fraction = float((focus_vals < np.percentile(focus_vals, 20)).mean()) if len(focus_vals) > 4 else 0.0
+        blurry_fraction = (
+            float((focus_vals < np.percentile(focus_vals, 20)).mean())
+            if len(focus_vals) > 4 else 0.0
+        )
         artifact_fraction = float(artifact_vals.mean())
         stain_score = stain_outlier_score(tiles)
     else:
@@ -190,8 +196,13 @@ def compute_q_score(rec: dict, cfg: dict, cohort_stats: dict) -> float:
     median_tf = cohort_stats["tissue_fraction_median"]
     representativeness = float(np.clip(1.0 - abs(rec["tissue_fraction"] - median_tf), 0.0, 1.0))
 
-    q = (w["usable_tissue"] * usable_tissue + w["focus"] * focus + w["artifact_free"] * artifact_free
-         + w["stain_quality"] * stain_quality + w["representativeness"] * representativeness)
+    q = (
+        w["usable_tissue"] * usable_tissue
+        + w["focus"] * focus
+        + w["artifact_free"] * artifact_free
+        + w["stain_quality"] * stain_quality
+        + w["representativeness"] * representativeness
+    )
     return float(q)
 
 
@@ -200,7 +211,10 @@ def compute_cohort_stats(records: list[dict]) -> dict:
         vals = np.array([r[key] for r in records if np.isfinite(r.get(key, np.nan))])
         return (float(vals.min()), float(vals.max())) if len(vals) else (0.0, 1.0)
 
-    tf = np.array([r["tissue_fraction"] for r in records if np.isfinite(r.get("tissue_fraction", np.nan))])
+    tf = np.array([
+        r["tissue_fraction"] for r in records
+        if np.isfinite(r.get("tissue_fraction", np.nan))
+    ])
     return {
         "tissue_area_mm2": rng("tissue_area_mm2"),
         "focus_score": rng("focus_score"),
@@ -264,7 +278,9 @@ def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list
     exclusion_counts: dict[str, int] = {}
     for r in all_records:
         if r["excluded"]:
-            exclusion_counts[r["exclusion_reason"]] = exclusion_counts.get(r["exclusion_reason"], 0) + 1
+            exclusion_counts[r["exclusion_reason"]] = (
+                exclusion_counts.get(r["exclusion_reason"], 0) + 1
+            )
 
     report = {
         "n_initial_wsis": len(all_records),

@@ -15,7 +15,9 @@ import numpy as np
 from pathology_st.cptac_select import tissue_mask_from_thumbnail
 
 
-def _clamp_region(x0: int, y0: int, size: int, level_width: int, level_height: int) -> tuple[int, int]:
+def _clamp_region(
+    x0: int, y0: int, size: int, level_width: int, level_height: int,
+) -> tuple[int, int]:
     """Shifts (x0, y0) so the `size`x`size` box stays fully within
     [0, level_width) x [0, level_height). Patches sampled near a tissue
     edge routinely land within half a patch-width of the slide boundary;
@@ -84,7 +86,9 @@ class WsiDicomReader:
         region = self.slide.read_region((int(x_thumb), int(y_thumb)), lvl, (size_px, size_px))
         return np.asarray(region.convert("RGB"))
 
-    def sample_tissue_tile_coords(self, tissue_mask: np.ndarray, n_tiles: int, tile_px: int) -> list[tuple[int, int]]:
+    def sample_tissue_tile_coords(
+        self, tissue_mask: np.ndarray, n_tiles: int, tile_px: int,
+    ) -> list[tuple[int, int]]:
         ys, xs = np.where(tissue_mask)
         if len(xs) == 0:
             return []
@@ -173,11 +177,12 @@ class OpenSlideReader:
         """x_thumb/y_thumb are level-0 pixel coords already; reads a
         `size_px` square at the pyramid level nearest 0.5 um/px."""
         lvl = self.level_for_mpp(0.5)
-        downsample = self.slide.level_downsamples[lvl]
         region = self.slide.read_region((int(x_thumb), int(y_thumb)), lvl, (size_px, size_px))
         return np.asarray(region.convert("RGB"))
 
-    def sample_tissue_tile_coords(self, tissue_mask: np.ndarray, n_tiles: int, tile_px: int) -> list[tuple[int, int]]:
+    def sample_tissue_tile_coords(
+        self, tissue_mask: np.ndarray, n_tiles: int, tile_px: int,
+    ) -> list[tuple[int, int]]:
         """Uniformly samples up to n_tiles level-0 coordinates from tissue
         pixels in the thumbnail mask, spread across the tissue area rather
         than clustered."""
@@ -215,7 +220,9 @@ class OpenSlideReader:
         return np.asarray(region, dtype=np.uint8)
 
 
-def sample_patch_grid(reader: OpenSlideReader, tissue_mask_thumb: np.ndarray, cfg: dict, rng_seed: int) -> list[tuple[int, int]]:
+def sample_patch_grid(
+    reader: OpenSlideReader, tissue_mask_thumb: np.ndarray, cfg: dict, rng_seed: int,
+) -> list[tuple[int, int]]:
     """Spatial-coverage sampling: lays a regular grid at the target patch
     spacing across the WSI, keeps only grid points overlapping the
     thumbnail tissue mask above the tissue-fraction threshold, then
@@ -255,7 +262,9 @@ def patch_tissue_fraction(patch_rgb: np.ndarray) -> float:
     return float(mask.mean())
 
 
-def write_patch_shard(out_path: str | Path, patch_ids: list[str], patches: np.ndarray, meta: dict) -> None:
+def write_patch_shard(
+    out_path: str | Path, patch_ids: list[str], patches: np.ndarray, meta: dict,
+) -> None:
     """One HDF5 shard per WSI, with per-image chunking so single-row
     training reads stay cheap -- coordinate-based on-demand reading is
     preferred over millions of individual PNG files."""

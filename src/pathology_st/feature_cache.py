@@ -11,8 +11,10 @@ import torch
 
 
 @torch.no_grad()
-def extract_student_features(encoder, patches_uint8: np.ndarray, device: str, batch_size: int = 256,
-                               downstream_proj=None) -> np.ndarray:
+def extract_student_features(
+    encoder, patches_uint8: np.ndarray, device: str, batch_size: int = 256,
+    downstream_proj=None,
+) -> np.ndarray:
     """Runs the frozen encoder over patches in batches; image only, no
     expression data touches this path. Returns R^320 features (R^256 if
     `downstream_proj` is given)."""
@@ -21,13 +23,11 @@ def extract_student_features(encoder, patches_uint8: np.ndarray, device: str, ba
     encoder.eval()
     outs = []
     for i in range(0, len(patches_uint8), batch_size):
-        # normalize batch
         batch = patches_uint8[i:i + batch_size].astype(np.float32) / 255.0
         batch = (batch - IMAGENET_MEAN) / IMAGENET_STD
         batch = np.transpose(batch, (0, 3, 1, 2)).astype(np.float32)
         x = torch.from_numpy(batch).to(device)
 
-        # run encoder
         with torch.no_grad():
             feat = encoder(x)
             if downstream_proj is not None:
@@ -36,9 +36,11 @@ def extract_student_features(encoder, patches_uint8: np.ndarray, device: str, ba
     return np.concatenate(outs, axis=0)
 
 
-def cache_features(out_path: str | Path, spot_ids: list[str], features: np.ndarray, coords_um: np.ndarray,
-                    encoder_name: str | None = None, checkpoint_source: str | None = None,
-                    sample_id: str | None = None) -> None:
+def cache_features(
+    out_path: str | Path, spot_ids: list[str], features: np.ndarray, coords_um: np.ndarray,
+    encoder_name: str | None = None, checkpoint_source: str | None = None,
+    sample_id: str | None = None,
+) -> None:
     """Stores `encoder_name`/`checkpoint_source`/`sample_id` as h5 attrs so
     `load_cached_features` can assert a cache belongs to the encoder the
     caller expects -- without this, A1 (ImageNet) and A2 (distilled) can
@@ -79,7 +81,10 @@ def assert_full_alignment(spot_ids: list[str], embedding: np.ndarray, coords_um:
     """Checks that spot_id <-> patch <-> coordinate <-> embedding <->
     expression stay in identical order. `expr_df` is indexed (or has a
     column) by spot_id."""
-    expr_ids = expr_df.index.astype(str).tolist() if expr_spot_col is None else expr_df[expr_spot_col].astype(str).tolist()
+    expr_ids = (
+        expr_df.index.astype(str).tolist() if expr_spot_col is None
+        else expr_df[expr_spot_col].astype(str).tolist()
+    )
     checks = {
         "n_spot_ids": len(spot_ids),
         "n_embeddings": embedding.shape[0],

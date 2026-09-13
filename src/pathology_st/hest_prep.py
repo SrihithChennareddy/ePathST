@@ -2,8 +2,6 @@
 ST-spot-centered H&E patch extraction with visual alignment QC."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
@@ -21,7 +19,10 @@ def audit_hest_samples(raw_meta: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame,
     reasons = {}
 
     # drop mouse samples
-    mouse_mask = df["species"].str.lower().eq("mouse") if "species" in df else pd.Series(False, index=df.index)
+    mouse_mask = (
+        df["species"].str.lower().eq("mouse") if "species" in df
+        else pd.Series(False, index=df.index)
+    )
     reasons["mouse"] = int(mouse_mask.sum())
     df = df[~mouse_mask]
 
@@ -50,8 +51,10 @@ def enforce_patient_section_grouping(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def alignment_qc_sample(he_reader, spot_coords_px: np.ndarray, spot_ids: list[str], mpp: float, cfg: dict,
-                         seed: int = 0) -> dict:
+def alignment_qc_sample(
+    he_reader, spot_coords_px: np.ndarray, spot_ids: list[str], mpp: float, cfg: dict,
+    seed: int = 0,
+) -> dict:
     """For a random subsample of spots, extract the ST-centered patch and
     check it overlaps tissue rather than background -- a cheap proxy for
     correct H&E/ST registration. Systematic misregistration shows up as
@@ -67,23 +70,30 @@ def alignment_qc_sample(he_reader, spot_coords_px: np.ndarray, spot_ids: list[st
     for i in idx:
         patch = he_reader.read_region_at_mpp(
             spot_coords_px[i, 0], spot_coords_px[i, 1],
-            physical_size_um=cfg["hest"]["patch_um"], out_px=cfg["hest"]["patch_px"], source_mpp=mpp,
+            physical_size_um=cfg["hest"]["patch_um"], out_px=cfg["hest"]["patch_px"],
+            source_mpp=mpp,
         )
         tf = float(tissue_mask_from_thumbnail(patch).mean())
-        rows.append({"spot_id": spot_ids[i], "tissue_fraction": tf, "x_px": spot_coords_px[i, 0],
-                     "y_px": spot_coords_px[i, 1]})
+        rows.append({
+            "spot_id": spot_ids[i], "tissue_fraction": tf,
+            "x_px": spot_coords_px[i, 0], "y_px": spot_coords_px[i, 1],
+        })
     df = pd.DataFrame(rows)
     return {
         "n_sampled": len(df),
         "mean_tissue_fraction": float(df["tissue_fraction"].mean()) if len(df) else np.nan,
-        "pct_spots_with_tissue": float((df["tissue_fraction"] > 0.05).mean()) if len(df) else np.nan,
+        "pct_spots_with_tissue": (
+            float((df["tissue_fraction"] > 0.05).mean()) if len(df) else np.nan
+        ),
         "likely_misaligned": bool(len(df) and (df["tissue_fraction"] > 0.05).mean() < 0.5),
         "per_spot": df.to_dict(orient="records"),
     }
 
 
-def extract_hest_patches_for_sample(he_reader, spot_ids: list[str], coords_px: np.ndarray, mpp: float,
-                                     cfg: dict, n_threads: int = 8) -> np.ndarray:
+def extract_hest_patches_for_sample(
+    he_reader, spot_ids: list[str], coords_px: np.ndarray, mpp: float,
+    cfg: dict, n_threads: int = 8,
+) -> np.ndarray:
     """224x224 patch centered on every ST spot at ~0.5 um/px. Reads
     concurrently via a thread pool on one shared WSI handle -- openslide's
     `read_region` releases the GIL during tile decode, so this is real
@@ -91,7 +101,9 @@ def extract_hest_patches_for_sample(he_reader, spot_ids: list[str], coords_px: n
     `patches`, so no locking is needed."""
     from concurrent.futures import ThreadPoolExecutor
 
-    patches = np.empty((len(spot_ids), cfg["hest"]["patch_px"], cfg["hest"]["patch_px"], 3), dtype=np.uint8)
+    patches = np.empty(
+        (len(spot_ids), cfg["hest"]["patch_px"], cfg["hest"]["patch_px"], 3), dtype=np.uint8,
+    )
 
     def _read_one(i: int) -> None:
         patches[i] = he_reader.read_region_at_mpp(
@@ -104,13 +116,17 @@ def extract_hest_patches_for_sample(he_reader, spot_ids: list[str], coords_px: n
     return patches
 
 
-def integrity_check_spot_alignment(spot_ids: list[str], patch_ids: list[str], coords: np.ndarray,
-                                    expr_index: pd.Index) -> dict:
+def integrity_check_spot_alignment(
+    spot_ids: list[str], patch_ids: list[str], coords: np.ndarray, expr_index: pd.Index,
+) -> dict:
     """spot_id <-> patch <-> coordinate <-> expression vector must remain
     exactly aligned; catches a silent reorder."""
     ok_patch = list(spot_ids) == list(patch_ids)
     ok_expr = list(spot_ids) == list(expr_index)
     ok_coords = coords.shape[0] == len(spot_ids)
-    result = {"patch_alignment_ok": ok_patch, "expression_alignment_ok": ok_expr, "coord_count_ok": ok_coords}
+    result = {
+        "patch_alignment_ok": ok_patch, "expression_alignment_ok": ok_expr,
+        "coord_count_ok": ok_coords,
+    }
     result["all_ok"] = all(result.values())
     return result

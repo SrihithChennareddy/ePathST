@@ -30,7 +30,11 @@ def ensure_gene_symbol_index(adata):
     contains repeated feature names') -- the resulting suffixed duplicates
     (GENE-1, ...) simply won't match any symbol-keyed net/HVG list, same as
     any other absent gene."""
-    if adata.var.index.size and str(adata.var.index[0]).startswith("ENSG") and "SYMBOL" in adata.var.columns:
+    is_ensembl_indexed = (
+        adata.var.index.size and str(adata.var.index[0]).startswith("ENSG")
+        and "SYMBOL" in adata.var.columns
+    )
+    if is_ensembl_indexed:
         symbol = adata.var["SYMBOL"].astype(str)
         keep = symbol.notna() & (symbol != "nan") & ~symbol.duplicated(keep="first")
         adata = adata[:, keep.values].copy()
@@ -62,7 +66,10 @@ class TrainOnlyStandardizer:
 
     def assert_no_leakage(self, other_ids) -> None:
         overlap = self._fit_ids & set(other_ids)
-        assert not overlap, f"standardizer was fit using {len(overlap)} ids that also appear in this eval/test set"
+        assert not overlap, (
+            f"standardizer was fit using {len(overlap)} ids that also appear "
+            f"in this eval/test set"
+        )
 
 
 def cross_platform_gene_intersection(genes_by_slide: dict[str, set[str]]) -> list[str]:
@@ -73,8 +80,10 @@ def cross_platform_gene_intersection(genes_by_slide: dict[str, set[str]]) -> lis
     return sorted(common)
 
 
-def select_hvg_for_fold(train_expr: pd.DataFrame, common_genes: list[str], n_hvg1000: int, n_hvg50: int,
-                         min_variance: float = 1e-8) -> dict:
+def select_hvg_for_fold(
+    train_expr: pd.DataFrame, common_genes: list[str], n_hvg1000: int, n_hvg50: int,
+    min_variance: float = 1e-8,
+) -> dict:
     """Rank `common_genes` by variance across TRAINING spots only, drop
     near-zero-variance genes, take top n_hvg1000 as G_1000, and the top
     n_hvg50 of THAT ranking as G_50 (nested targets: G_50 subset G_1000, one

@@ -25,7 +25,6 @@ def cptac_patient_split(manifest: pd.DataFrame, cfg: dict, seed: int) -> pd.Data
         n_val = min(n_val, n - n_train)
         train, val, test = pids[:n_train], pids[n_train:n_train + n_val], pids[n_train + n_val:]
 
-        # flatten into rows
         for pid in train:
             rows.append({"patient_id": pid, "cancer_type": cancer, "split": "train"})
         for pid in val:
@@ -35,14 +34,20 @@ def cptac_patient_split(manifest: pd.DataFrame, cfg: dict, seed: int) -> pd.Data
 
     df = pd.DataFrame(rows)
     assert df["patient_id"].is_unique, "a patient appears more than once across splits"
-    assert set(df["patient_id"]) == set(manifest["patient_id"]), "split does not cover every selected patient"
+    assert set(df["patient_id"]) == set(manifest["patient_id"]), (
+        "split does not cover every selected patient"
+    )
     return df
 
 
 def assert_no_patch_leakage(patch_manifest: pd.DataFrame, split_df: pd.DataFrame) -> None:
     """Every patch's patient_id must map to exactly one split, and no
     patient may contribute patches to more than one split."""
-    merged = patch_manifest.merge(split_df[["patient_id", "split"]], on="patient_id", how="left", validate="m:1")
-    assert merged["split"].notna().all(), "patches exist for patients missing from the split file"
+    merged = patch_manifest.merge(
+        split_df[["patient_id", "split"]], on="patient_id", how="left", validate="m:1",
+    )
+    assert merged["split"].notna().all(), (
+        "patches exist for patients missing from the split file"
+    )
     per_patient_splits = merged.groupby("patient_id")["split"].nunique()
     assert (per_patient_splits == 1).all(), "some patient's patches span more than one split"

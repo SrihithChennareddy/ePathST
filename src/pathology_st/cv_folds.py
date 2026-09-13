@@ -9,7 +9,9 @@ import pandas as pd
 from sklearn.model_selection import GroupKFold
 
 
-def exclude_targeted_panel_samples(hest_samples: pd.DataFrame, min_genes: int = 2000) -> pd.DataFrame:
+def exclude_targeted_panel_samples(
+    hest_samples: pd.DataFrame, min_genes: int = 2000,
+) -> pd.DataFrame:
     """Drops samples run on a targeted gene panel (e.g. Xenium, ~541 genes)
     rather than whole-transcriptome ST, since a handful of such outliers
     would otherwise collapse the cross-sample HVG1000 gene intersection to
@@ -28,12 +30,17 @@ def exclude_targeted_panel_samples(hest_samples: pd.DataFrame, min_genes: int = 
     keep = counts >= min_genes
     dropped = hest_samples.loc[~keep]
     if len(dropped):
-        print(f"[exclude_targeted_panel_samples] dropping {len(dropped)} targeted-gene-panel sample(s) "
-              f"(<{min_genes} genes) from the CV split: {sorted(dropped['sample_id'].tolist())}")
+        print(
+            f"[exclude_targeted_panel_samples] dropping {len(dropped)} "
+            f"targeted-gene-panel sample(s) (<{min_genes} genes) from the CV split: "
+            f"{sorted(dropped['sample_id'].tolist())}"
+        )
     return hest_samples.loc[keep].reset_index(drop=True)
 
 
-def patient_level_kfold(patient_ids: list[str], n_splits_requested: int, min_folds: int) -> tuple[list[dict], int, str | None]:
+def patient_level_kfold(
+    patient_ids: list[str], n_splits_requested: int, min_folds: int,
+) -> tuple[list[dict], int, str | None]:
     """Returns (folds, n_splits_used, adaptation_reason). Each fold dict:
     {fold, train_patients, test_patients}. Uses sklearn's GroupKFold with
     each patient as its own group (one row per patient here, so grouping is
@@ -45,8 +52,11 @@ def patient_level_kfold(patient_ids: list[str], n_splits_requested: int, min_fol
     n_splits = n_splits_requested
     if n < n_splits_requested:
         n_splits = max(min_folds, min(n, min_folds))
-        reason = (f"cohort has only {n} independent patients (< requested {n_splits_requested} folds); "
-                  f"reduced to {n_splits} folds to keep every test fold non-trivial")
+        reason = (
+            f"cohort has only {n} independent patients "
+            f"(< requested {n_splits_requested} folds); reduced to {n_splits} folds "
+            f"to keep every test fold non-trivial"
+        )
     if n < n_splits:
         n_splits = max(2, n)
         reason = (reason or "") + f"; further reduced to {n_splits} because n_patients={n}"
@@ -65,7 +75,9 @@ def patient_level_kfold(patient_ids: list[str], n_splits_requested: int, min_fol
     return folds, n_splits, reason
 
 
-def carve_validation_from_train(train_patients: list[str], val_frac: float, seed: int) -> tuple[list[str], list[str]]:
+def carve_validation_from_train(
+    train_patients: list[str], val_frac: float, seed: int,
+) -> tuple[list[str], list[str]]:
     """Splits a fold's train pool into (train, val) patient sets, patient-
     level, for early stopping / checkpoint selection -- never touches the
     held-out test patients."""
@@ -83,16 +95,23 @@ def build_cv_grid(patient_ids_by_cancer: dict[str, list[str]], cfg: dict) -> dic
     cv = cfg["cross_validation"]
     per_cancer = {}
     for cancer, pids in patient_ids_by_cancer.items():
-        folds, n_used, reason = patient_level_kfold(pids, cv["n_outer_folds"], cv["min_folds_if_too_few_patients"])
-        per_cancer[cancer] = {"folds": folds, "n_folds_used": n_used, "adaptation_reason": reason,
-                               "n_patients": len(set(pids))}
+        folds, n_used, reason = patient_level_kfold(
+            pids, cv["n_outer_folds"], cv["min_folds_if_too_few_patients"],
+        )
+        per_cancer[cancer] = {
+            "folds": folds, "n_folds_used": n_used, "adaptation_reason": reason,
+            "n_patients": len(set(pids)),
+        }
     pooled_pids = sorted({p for pids in patient_ids_by_cancer.values() for p in pids})
-    pooled_folds, pooled_n, pooled_reason = patient_level_kfold(pooled_pids, cv["n_outer_folds"],
-                                                                 cv["min_folds_if_too_few_patients"])
+    pooled_folds, pooled_n, pooled_reason = patient_level_kfold(
+        pooled_pids, cv["n_outer_folds"], cv["min_folds_if_too_few_patients"],
+    )
     return {
         "per_cancer": per_cancer,
-        "pooled": {"folds": pooled_folds, "n_folds_used": pooled_n, "adaptation_reason": pooled_reason,
-                   "n_patients": len(pooled_pids)},
+        "pooled": {
+            "folds": pooled_folds, "n_folds_used": pooled_n, "adaptation_reason": pooled_reason,
+            "n_patients": len(pooled_pids),
+        },
         "seeds": cv["seeds"],
         # per-cancer results are the primary analysis unit; `pooled` is secondary.
         # Aggregation/reporting code should key off this flag, not a hard-coded assumption.
@@ -100,7 +119,9 @@ def build_cv_grid(patient_ids_by_cancer: dict[str, list[str]], cfg: dict) -> dic
     }
 
 
-def expected_run_keys(cv_grid: dict, ablation_names: list[str], unit: str = "per_cancer") -> set[tuple]:
+def expected_run_keys(
+    cv_grid: dict, ablation_names: list[str], unit: str = "per_cancer",
+) -> set[tuple]:
     """Enumerates every (cancer, fold, seed, ablation) -- or, for
     `unit='pooled'`, every (fold, seed, ablation) -- combination the CV
     design calls for, given the actual (possibly cohort-size-adapted)
@@ -137,7 +158,10 @@ def assert_run_completeness(expected: set[tuple], completed: set[tuple], context
     if missing:
         print(f"[assert_run_completeness] MISSING {len(missing)} run(s): {sorted(missing)}")
     if extra:
-        print(f"[assert_run_completeness] UNEXPECTED {len(extra)} extra run(s) not in the CV design: {sorted(extra)}")
+        print(
+            f"[assert_run_completeness] UNEXPECTED {len(extra)} extra run(s) "
+            f"not in the CV design: {sorted(extra)}"
+        )
     assert completed == expected, (
         f"run completeness check FAILED -- {len(missing)} missing, {len(extra)} unexpected "
         f"(see printed lists above). Refusing to aggregate a partial/mismatched set of runs."

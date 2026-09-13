@@ -3,7 +3,6 @@ capture (git commit, package versions, CUDA/GPU, wall-clock, peak VRAM)."""
 from __future__ import annotations
 
 import json
-import os
 import random
 import subprocess
 import sys
