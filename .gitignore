@@ -8,3 +8,11 @@ __pycache__/
 *.pth
 PIPELINE_NOTES.md
 *.h5ad
+
+# raw per-spot GenBio-PathFM baseline dumps (large, superseded by the summary
+# CSVs/tables committed alongside them) -- kept on disk, purged from history
+experimental_runs/*/results/genbio_baseline/genbio_gene_metrics.csv
+experimental_runs/*/results/genbio_baseline/per_cancer/*.json
+experimental_runs/*/results/genbio_gene_metrics.csv
+experimental_runs/*/results/per_cancer/*.json
+experimental_runs/*/results/official_hest_benchmark/official_hest_benchmark_full.json
