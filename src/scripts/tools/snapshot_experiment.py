@@ -14,8 +14,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.utils import load_config, resolve_run_paths
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from epathst.utils import load_config, resolve_run_paths
 
 
 def _headline_metric(results_dir: Path) -> str:
@@ -94,7 +94,7 @@ def main():
     today = date.today().isoformat()
     run_id = args.run_id or f"{today}_job{args.job_id or 'NA'}_{args.label}"
 
-    out_dir = Path(__file__).resolve().parents[2] / "experimental_runs" / run_id
+    out_dir = Path(__file__).resolve().parents[3] / "experimental_runs" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # copy results/figures
@@ -141,7 +141,7 @@ def main():
     headline = _headline_metric(out_dir / "results") if (out_dir / "results").exists() else "N/A"
 
     # append to index
-    index_path = Path(__file__).resolve().parents[2] / "experimental_runs" / "INDEX.csv"
+    index_path = Path(__file__).resolve().parents[3] / "experimental_runs" / "INDEX.csv"
     is_new = not index_path.exists()
     with open(index_path, "a", newline="") as f:
         writer = csv.writer(f)

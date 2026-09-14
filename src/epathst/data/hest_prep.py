@@ -51,7 +51,7 @@ def alignment_qc_sample(
     seed: int = 0,
 ) -> dict:
     """Cheap H&E/ST registration proxy: samples spots, checks the ST-centered patch overlaps tissue not background; systematic misregistration shows up as near-zero tissue fraction across most spots."""
-    from pathology_st.cptac_select import tissue_mask_from_thumbnail
+    from epathst.data.cptac_select import tissue_mask_from_thumbnail
 
     n = cfg["hest"]["n_alignment_qc_samples"]
     rng = np.random.RandomState(seed)

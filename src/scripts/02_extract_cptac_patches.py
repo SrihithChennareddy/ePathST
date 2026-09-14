@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths
-from pathology_st.wsi_patches import open_slide, patch_tissue_fraction, sample_patch_grid, write_patch_shard
+from epathst.utils import RunEnvironment, load_config, resolve_run_paths
+from epathst.data.wsi_patches import open_slide, patch_tissue_fraction, sample_patch_grid, write_patch_shard
 
 
 def _extract_one(wsi: dict, cfg: dict, shard_dir: str) -> list[dict]:
@@ -23,7 +23,7 @@ def _extract_one(wsi: dict, cfg: dict, shard_dir: str) -> list[dict]:
     try:
         reader = open_slide(wsi["wsi_path"])
         thumb = reader.get_thumbnail(cfg["wsi_selection"]["thumbnail_max_dim"])
-        from pathology_st.cptac_select import tissue_mask_from_thumbnail
+        from epathst.data.cptac_select import tissue_mask_from_thumbnail
         tissue_mask = tissue_mask_from_thumbnail(thumb)
 
         coords = sample_patch_grid(reader, tissue_mask, cfg, rng_seed=hash(wsi["wsi_id"]) % (2 ** 31))

@@ -1,5 +1,5 @@
-"""Distillation training loop and the S0/S1/S2 baseline definitions.
-S0 = ImageNet ConvNeXt V2-Atto, no distillation; S1 = ImageNet-init distilled against the GenBio teacher (main comparison target); S2 = random-init distilled against the same teacher."""
+"""Distillation objective (cosine + normalized feature-regression) and the training loop
+implementing the S0/S1/S2 baseline definitions: ImageNet-only, ImageNet-init distilled, random-init distilled."""
 from __future__ import annotations
 
 import math
@@ -8,14 +8,44 @@ from pathlib import Path
 import h5py
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-from pathology_st.distill_loss import distillation_loss
-from pathology_st.student_model import DistillationStudent
-from pathology_st.utils import save_json
+from epathst.models.student import DistillationStudent
+from epathst.utils import save_json
 
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+
+def cosine_distillation_loss(
+    student_projected: torch.Tensor, teacher_embedding: torch.Tensor
+) -> torch.Tensor:
+    """L_cos = 1 - cosine_similarity(normalize(student_proj), normalize(teacher))."""
+    s = F.normalize(student_projected, dim=-1)
+    t = F.normalize(teacher_embedding, dim=-1)
+    cos_sim = (s * t).sum(dim=-1)
+    return (1.0 - cos_sim).mean()
+
+
+def feature_regression_loss(student_projected: torch.Tensor, teacher_embedding: torch.Tensor,
+                             kind: str = "smooth_l1") -> torch.Tensor:
+    """Normalized feature-regression term (never raw unnormalized MSE)."""
+    s = F.normalize(student_projected, dim=-1)
+    t = F.normalize(teacher_embedding, dim=-1)
+    if kind == "smooth_l1":
+        return F.smooth_l1_loss(s, t)
+    if kind == "normalized_mse":
+        return F.mse_loss(s, t)
+    raise ValueError(f"unknown feature loss kind: {kind}")
+
+
+def distillation_loss(student_projected: torch.Tensor, teacher_embedding: torch.Tensor, lam: float,
+                       feature_kind: str = "smooth_l1") -> dict:
+    l_cos = cosine_distillation_loss(student_projected, teacher_embedding)
+    l_feat = feature_regression_loss(student_projected, teacher_embedding, feature_kind)
+    total = l_cos + lam * l_feat
+    return {"loss": total, "l_cos": l_cos.detach(), "l_feature": l_feat.detach()}
 
 
 def augment_train(patch_uint8: np.ndarray, rng: np.random.RandomState, cfg: dict) -> np.ndarray:
@@ -49,7 +79,7 @@ def to_tensor_normalized(img_float01: np.ndarray) -> np.ndarray:
 
 
 class CPTACDistillDataset(Dataset):
-    """Reads patches on-demand from per-WSI HDF5 shards (pathology_st.wsi_patches format) and pairs each with its cached teacher embedding by patch_id; asserts every manifest patch has a cached embedding before training starts."""
+    """Reads patches on-demand from per-WSI HDF5 shards (epathst.data.wsi_patches format) and pairs each with its cached teacher embedding by patch_id; asserts every manifest patch has a cached embedding before training starts."""
 
     def __init__(
         self, patch_manifest, teacher_h5_path: str, shard_dir: str, train: bool, cfg: dict
@@ -126,7 +156,7 @@ def train_student(
 ) -> dict:
     """`baseline` in {"S1", "S2"} (S0 needs no training loop); saves the best checkpoint (by validation teacher-cosine similarity, never test) to out_dir/{baseline}_seed{seed}_best.pt, and is resumable/wall-clock-budgeted for SLURM: a full training-state snapshot (model+optimizer+scaler+step counters) is saved every epoch to out_dir/{baseline}_seed{seed}_resume.pt and reloaded automatically if present, so a job killed by the wall clock resumes on the next `sbatch`; if `time_budget_seconds` is set, training stops (after saving both checkpoints) once elapsed time exceeds it, returning `stopped_early_for_time=True` rather than raising."""
     import time
-    from pathology_st.utils import seed_everything
+    from epathst.utils import seed_everything
     seed_everything(seed)
 
     # build model, optimizer, dataloaders

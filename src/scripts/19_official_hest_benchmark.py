@@ -25,10 +25,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.feature_cache import extract_student_features
-from pathology_st.student_model import load_locked_encoder
-from pathology_st.teacher_genbio import GenBioPathFMTeacher
-from pathology_st.utils import load_config, resolve_run_paths, save_json
+from epathst.data.feature_cache import extract_student_features
+from epathst.models.student import load_locked_encoder
+from epathst.models.teacher import GenBioPathFMTeacher
+from epathst.utils import load_config, resolve_run_paths, save_json
 
 
 def _decode_barcodes(raw: np.ndarray) -> list[str]:

@@ -11,8 +11,8 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.analysis import per_cancer_consistency
-from pathology_st.utils import load_config, resolve_run_paths, save_json
+from epathst.evaluation.analysis import per_cancer_consistency
+from epathst.utils import load_config, resolve_run_paths, save_json
 
 
 def main():
@@ -57,8 +57,8 @@ def main():
         "note": (
             "Moran's I vs delta_r correlation and per-pathway delta ranking need the full "
             "per-gene/per-pathway per-patient r tables from "
-            "pathology_st.metrics.per_patient_per_column_pearson during script 10's run -- "
-            "not yet wired to pathology_st.analysis.ground_truth_morans_i_per_gene / "
+            "epathst.evaluation.metrics.per_patient_per_column_pearson during script 10's run -- "
+            "not yet wired to epathst.evaluation.analysis.ground_truth_morans_i_per_gene / "
             "spatial_benefit_vs_autocorrelation / per_pathway_delta."
         ),
     }

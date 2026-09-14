@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from pathology_st.pathways import compute_progeny_scores
+from epathst.data.pathways import compute_progeny_scores
 
 
 def posthoc_pathway_scores(

@@ -1,10 +1,10 @@
-"""Edge-aware Principal Neighbourhood Aggregation block: edge-conditioned PNAConv -> LayerNorm -> GELU -> Dropout -> residual, two blocks stacked.
-Adapted from STS_PoC/PoC_5/crcspatial/pna.py (identical hyperparameters: hidden=128, aggregators mean/max/min/std, scalers identity/amplification/attenuation)."""
+"""Edge-aware message-passing blocks for the graph correction model: PNA (A4-A8) and
+GATv2 (A9), structurally mirrored so the A7/A8-vs-A9 ablation isolates only the operator."""
 from __future__ import annotations
 
 import torch
 import torch.nn as nn
-from torch_geometric.nn import PNAConv
+from torch_geometric.nn import GATv2Conv, PNAConv
 from torch_geometric.utils import degree
 
 
@@ -78,6 +78,49 @@ class MultiLayerPNA(nn.Module):
             PNABlock(hidden_dim, aggregators, scalers, deg, edge_dim, dropout)
             for _ in range(n_layers)
         ])
+
+    def forward(
+        self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor
+    ) -> torch.Tensor:
+        for block in self.blocks:
+            x = block(x, edge_index, edge_attr)
+        return x
+
+
+class GATv2Block(nn.Module):
+    """For the A9 architecture-control ablation; mirrors PNABlock's structure exactly (edge-aware conv -> LayerNorm -> GELU -> Dropout -> residual)."""
+
+    def __init__(self, hidden_dim: int, edge_dim: int, heads: int = 4, dropout: float = 0.1):
+        super().__init__()
+        assert hidden_dim % heads == 0, (
+            "hidden_dim must be divisible by heads for GATv2Conv's concat output"
+        )
+        self.conv = GATv2Conv(hidden_dim, hidden_dim // heads, heads=heads, edge_dim=edge_dim,
+                               dropout=dropout, concat=True)
+        self.norm = nn.LayerNorm(hidden_dim)
+        self.act = nn.GELU()
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(
+        self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor
+    ) -> torch.Tensor:
+        h = self.conv(x, edge_index, edge_attr)
+        h = self.norm(h)
+        h = self.act(h)
+        h = self.dropout(h)
+        return x + h  # residual addition, matching PNABlock
+
+
+class MultiLayerGATv2(nn.Module):
+    """Same depth as MultiLayerPNA for a fair, approximately parameter-matched architecture comparison."""
+
+    def __init__(
+        self, hidden_dim: int, n_layers: int, edge_dim: int, heads: int = 4, dropout: float = 0.1
+    ):
+        super().__init__()
+        self.blocks = nn.ModuleList(
+            [GATv2Block(hidden_dim, edge_dim, heads, dropout) for _ in range(n_layers)]
+        )
 
     def forward(
         self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor

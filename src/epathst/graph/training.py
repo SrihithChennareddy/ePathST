@@ -1,5 +1,5 @@
 """Residual-graph-model training loop; one shared train/eval/predict path for three interchangeable
-backends (pna_union/scale_aware/gatv2, see graph_model.py) -- one graph per patient, 1-4 per optimizer step."""
+backends (pna_union/scale_aware/gatv2, see models/graph_model.py) -- one graph per patient, 1-4 per optimizer step."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +8,8 @@ import numpy as np
 import torch
 from torch_geometric.data import Batch, Data
 
-from pathology_st.graph_model import (
+from epathst.models.graph_layers import compute_degree_histogram
+from epathst.models.graph_model import (
     GATv2CorrectionModel,
     GraphCorrectionModel,
     ResidualGraphPredictor,
@@ -16,8 +17,7 @@ from pathology_st.graph_model import (
     assert_zero_residual_at_init,
     graph_loss,
 )
-from pathology_st.pna_block import compute_degree_histogram
-from pathology_st.utils import save_json, seed_everything
+from epathst.utils import save_json, seed_everything
 
 
 def make_pyg_data(

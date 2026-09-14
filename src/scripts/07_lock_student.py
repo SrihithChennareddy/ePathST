@@ -11,9 +11,9 @@ import pandas as pd
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.distill_train import CPTACDistillDataset, train_student
-from pathology_st.student_model import DistillationStudent
-from pathology_st.utils import RunEnvironment, count_parameters, load_config, resolve_run_paths, save_json
+from epathst.distillation.training import CPTACDistillDataset, train_student
+from epathst.models.student import DistillationStudent
+from epathst.utils import RunEnvironment, count_parameters, load_config, resolve_run_paths, save_json
 
 
 def main():

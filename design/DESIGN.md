@@ -51,7 +51,7 @@ graph variant 0.1317, HVG50 patient-macro R). PoC_5 also surfaced a
 methodological bug worth carrying forward as a hard rule: its own
 cross-fold aggregation script silently pooled only 3 of 4 completed folds,
 because nothing enforced that a run's result set matched its intended
-design. This project's `pathology_st.cv_folds.assert_run_completeness`
+design. This project's `epathst.data.splits.assert_run_completeness`
 (§7) exists specifically to make that class of bug impossible.
 
 This project extends PoC_5 in three ways: (1) replaces the patch encoder
@@ -92,7 +92,7 @@ collections `cptac_brca`, `cptac_coad`, `cptac_ccrcc`. Whole-slide H&E
 images (WSIs) only — no expression data in this phase.
 
 **Selection**: one WSI per patient, from all available candidate slides,
-via `src/pathology_st/cptac_select.py`. Hard filters applied to 598 initial
+via `src/epathst/data/cptac_select.py`. Hard filters applied to 598 initial
 candidates (tumor-specimen label required, ≥5% tissue fraction, ≤50%
 blurry-tissue fraction, ≤35% artifact fraction, mpp ∈ [0.1, 1.0]),
 followed by ranking on a deterministic composite quality score:
@@ -123,7 +123,7 @@ and a higher fraction of ambiguously-labeled bare-`"HE"` specimens that may
 or may not be real tumor sections. Full breakdown: `docs/INPUT_DATA.md` §1.
 
 **Split**: patient-level, 80/10/10, stratified per cancer type
-(`src/pathology_st/patient_split.py`), computed before any patch is
+(`src/epathst/data/splits.py`), computed before any patch is
 extracted; no patient's patches cross a split boundary
 (`assert_no_patch_leakage`). Real counts (seed 0): BRCA 85/11/10, COAD
 38/5/4, CCRCC 168/21/21 (train/val/test), 363 total. Three independent
@@ -231,7 +231,7 @@ this phase.
 ### 5.1 Targets
 
 Per fold, per cancer, using **training-fold spots only** (leakage-free by
-construction — `pathology_st.expression.select_hvg_for_fold`):
+construction — `epathst.data.expression.select_hvg_for_fold`):
 
 1. Genes common to all samples in that cancer's fold, ranked by raw
    variance across training spots after `normalize_total(target_sum=1e4)`
@@ -344,7 +344,7 @@ isolates the message-passing operator, not model size.
 
 ## 6. Ablation grid
 
-`pathology_st.ablations.ABLATION_GRID` — each entry is a (feature source,
+`epathst.ablations.ABLATION_GRID` — each entry is a (feature source,
 graph source, backend) triple, so every ablation reuses identical patient
 folds, training procedure, and evaluation code; only the inputs/backend
 differ. Ordered primary block first (A1, A2, A5, A6, A7, A8), secondary
@@ -365,7 +365,7 @@ the scientifically essential block.
 | A9 — GATv2 multiscale | secondary | distilled | real, local+meso+macro | GATv2 | Architecture control (PNA vs. GATv2) |
 
 A separate, methodologically stricter GenBio-teacher-vs-student comparison
-(`pathology_st.genbio_pca`: train-fold-only PCA(256) of the teacher's raw
+(`epathst.evaluation.genbio_comparison`: train-fold-only PCA(256) of the teacher's raw
 4608-D embedding + Ridge, matching both the student's own 320→256
 projection dimensionality and the official HEST-Benchmark's own PCA256+
 Ridge convention) is **not part of this grid** — see §8, run only after the
@@ -394,7 +394,7 @@ bootstrap distribution of the mean delta between two models' scores.
 (10,000 iterations) on the same paired deltas, testing H1: mean(delta) > 0.
 
 **Fold-completeness gate**: before any statistic is aggregated,
-`pathology_st.cv_folds.assert_run_completeness` enumerates every expected
+`epathst.data.splits.assert_run_completeness` enumerates every expected
 (cancer, fold, seed, ablation) combination and **raises** (not warns) on
 any mismatch against what actually completed — the direct fix for PoC_5's
 silent-partial-pool bug (§1).
@@ -409,7 +409,7 @@ Phase 1):
 | 2 — Spatial context | R(A8) > R(A2) | Does the graph correction help at all? |
 | 3 — True topology (decisive) | R(A8) > R(A5) | Does the *specific spatial structure* matter, or would any local averaging do? |
 
-**Benjamini-Hochberg FDR correction** (`pathology_st.stats_tests.bh_fdr`,
+**Benjamini-Hochberg FDR correction** (`epathst.statistics.stats_tests.bh_fdr`,
 q=0.05) is implemented and unit-tested but **not yet called** by
 `12_primary_hypothesis_test.py` — a real follow-up, not part of the
 currently reported statistics.
@@ -649,11 +649,13 @@ per job, on a SLURM-managed institutional cluster."
 ## 13. Repository structure and reproducibility
 
 ```
-src/pathology_st/    the package (31 modules — data/patching, models,
-                     graph, targets/evaluation, utils; see below)
-src/scripts/         25 numbered pipeline stages (01-18 custom protocol,
-                     19-23 official-benchmark suite) + debug/baseline/
-                     snapshot tools
+src/epathst/         the package (28 modules across 8 subpackages —
+                     data/patching, models, graph, distillation,
+                     evaluation, statistics, efficiency, reporting;
+                     see below)
+src/scripts/         23 numbered pipeline stages (01-18 custom protocol,
+                     19-23 official-benchmark suite) + tools/ (debug/
+                     baseline/snapshot utilities)
 configs/base.yaml    every hyperparameter cited above; nothing structural
                      is hard-coded in the scripts
 tests/               unit tests for deterministic numeric code (graph
@@ -665,34 +667,41 @@ experimental_runs/   dated, git-committed snapshots of completed jobs'
                      results table in this document)
 ```
 
-**Module map** (`src/pathology_st/`):
-- **Data/patching**: `cptac_select.py` (WSI QC+selection), `wsi_patches.py`
+**Module map** (`src/epathst/`):
+- **`data/`**: `cptac_select.py` (WSI QC+selection), `wsi_patches.py`
   (patch extraction, DICOM via `wsidicom` or plain openslide-readable
   formats), `hest_prep.py` (HEST metadata audit, alignment QC, ST-spot
-  patch extraction), `patient_split.py` (leakage-free patient splitting),
-  `feature_cache.py` (runs a frozen encoder over patches, caches
-  embeddings, with spot/patch/coordinate/embedding/expression integrity
-  checks).
-- **Models**: `teacher_genbio.py`, `student_model.py`, `distill_loss.py`/
-  `distill_train.py`, `patch_head.py`, `graph_model.py` (the three
-  backends, §5.4), `pna_block.py`, `gatv2_block.py`, `genbio_pca.py`
-  (train-only PCA + Ridge fair-comparison library), `pathway_posthoc.py`.
-- **Graph**: `graph_builder.py` (§5.3), `graph_training.py`,
+  patch extraction), `splits.py` (leakage-free patient splitting and
+  cross-validation folds), `feature_cache.py` (runs a frozen encoder over
+  patches, caches embeddings, with spot/patch/coordinate/embedding/
+  expression integrity checks), `expression.py`, `pathways.py`.
+- **`models/`**: `teacher.py`, `student.py`, `patch_head.py`,
+  `graph_layers.py` (PNA + GATv2 message-passing blocks),
+  `graph_model.py` (the three backends, §5.4).
+- **`graph/`**: `builder.py` (§5.3), `training.py`,
   `destruction.py` (edge-randomization dose-response controls).
-- **Targets/evaluation**: `expression.py`, `pathways.py`, `metrics.py`,
-  `stats_tests.py` (§7), `distill_eval.py`, `efficiency.py`, `cv_folds.py`
-  (§6, §7), `ablations.py` (§6), `analysis.py`/`report.py`/`figures.py`.
-- **`utils.py`**: config loading, path resolution, shared helpers.
+- **`distillation/`**: `training.py` (loss + training loop),
+  `evaluation.py`.
+- **`evaluation/`**: `metrics.py`, `analysis.py`, `pathway_posthoc.py`,
+  `genbio_comparison.py` (train-only PCA + Ridge fair-comparison
+  library).
+- **`statistics/`**: `stats_tests.py` (§7).
+- **`efficiency/`**: `efficiency.py`.
+- **`reporting/`**: `report.py`, `figures.py`.
+- **package root**: `ablations.py` (§6), `utils.py` (config loading, path
+  resolution, shared helpers) — both cross-cutting, used across nearly
+  every subpackage.
 
-`graph_builder.py`, `pna_block.py`, `destruction.py`, `stats_tests.py`,
-`expression.py`, `pathways.py`, and `metrics.py` are adapted from the
+`graph/builder.py`, `models/graph_layers.py`, `graph/destruction.py`,
+`statistics/stats_tests.py`, `data/expression.py`, `data/pathways.py`,
+and `evaluation/metrics.py` are adapted from the
 already-validated PoC_5 package (same graph radii/caps/RBF/PNA
 hyperparameters). The GNN head diverges: PoC_5 used a gated PNA+APPNP
 fusion; this project uses the residual-correction design (§5.4) instead.
 
 **To reproduce**: every path/hyperparameter above resolves from
 `configs/base.yaml` (mirrored as `base.json`) via
-`pathology_st.utils.load_config`/`resolve_run_paths` — nothing is
+`epathst.utils.load_config`/`resolve_run_paths` — nothing is
 hard-coded in the scripts. SLURM job scripts for every stage live in
 `slurm/`. Full verification performed at each migration step: `python3 -m
 py_compile` clean across the package, the full pytest suite green, and
@@ -704,7 +713,7 @@ being relied on for anything real.
 ## 14. Known follow-ups
 
 - `src/scripts/15_genbio_fair_comparison.py` still uses an earlier
-  raw-4608-D approach; needs a rewrite using `genbio_pca.py`'s
+  raw-4608-D approach; needs a rewrite using `genbio_comparison.py`'s
   `TrainOnlyPCA` for the three-head (Ridge/MLP/PNA) × two-encoder
   (GenBio-PCA256 vs. student-256) comparison the design calls for.
 - `pathway_posthoc.py` and the `pathway_loss_sweep` config value exist but

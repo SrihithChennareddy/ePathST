@@ -21,16 +21,16 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.cv_folds import (
+from epathst.data.splits import (
     build_cv_grid,
     carve_validation_from_train,
     exclude_targeted_panel_samples,
 )
-from pathology_st.expression import TrainOnlyStandardizer, select_hvg_for_fold
-from pathology_st.metrics import per_patient_per_column_pearson, target_summary
-from pathology_st.patch_head import patch_head_loss
-from pathology_st.teacher_genbio import GenBioPathFMTeacher
-from pathology_st.utils import (
+from epathst.data.expression import TrainOnlyStandardizer, select_hvg_for_fold
+from epathst.evaluation.metrics import per_patient_per_column_pearson, target_summary
+from epathst.models.patch_head import patch_head_loss
+from epathst.models.teacher import GenBioPathFMTeacher
+from epathst.utils import (
     RunEnvironment,
     load_config,
     resolve_run_paths,
@@ -244,7 +244,7 @@ def load_or_recompute_split(
     uses -- never regenerates a new random split. Prefers loading the
     persisted manifests/hest_cv_folds.json that script 10 writes; if that
     job hasn't reached its Step 10 yet, falls back to calling the identical
-    `pathology_st.cv_folds.build_cv_grid` on the current hest_samples.csv. This
+    `epathst.data.splits.build_cv_grid` on the current hest_samples.csv. This
     fallback is not an approximation: GroupKFold has no RNG (it depends only
     on the sorted patient-id list), and hest_samples.csv is written in full
     at every checkpoint, so script 10 will later derive the same
@@ -264,7 +264,7 @@ def load_or_recompute_split(
         print(
             f"[run_genbio_hest_baseline] WARNING: {cv_path} not found yet "
             f"(CNN/GNN job hasn't reached Step 10) -- recomputed the identical deterministic "
-            f"split via pathology_st.cv_folds.build_cv_grid instead of loading it."
+            f"split via epathst.data.splits.build_cv_grid instead of loading it."
         )
     fold_info = cv_grid["per_cancer"][cancer]["folds"][fold]
     assert fold_info["fold"] == fold
@@ -548,7 +548,7 @@ def main():
             gene_t = gene_std.transform(expr[hvg["hvg1000"]].reindex(columns=hvg["hvg1000"]).values)
             path_t = path_std.transform(progeny.reindex(columns=pathway_names).values)
             # NaN is expected here, not a bug: decoupler returns NaN for spots it drops as degenerate
-            # (pathology_st.pathways.compute_progeny_scores), and patch_head_loss already masks NaN via
+            # (epathst.data.pathways.compute_progeny_scores), and patch_head_loss already masks NaN via
             # gene_mask/path_mask. Only Inf would indicate a real standardization bug.
             split_name = "train" if is_train else "eval"
             assert not np.isinf(gene_t).any() and not np.isinf(path_t).any(), (
@@ -690,7 +690,7 @@ def main():
             "n_test_patients": len(test_patients),
             "n_train_spots": len(ids_train), "n_test_spots": len(ids_test),
             "HVG50_r": r_hvg50, "HVG1000_r": r_hvg1000, "PROGENy14_r": r_pathway,
-            # mirrors pathology_st.metrics.evaluate_predictions's mean_mse/mean_mae
+            # mirrors epathst.evaluation.metrics.evaluate_predictions's mean_mse/mean_mae
             # (target_summary doesn't surface these) so this table has the same columns
             # as cv_ablation_metrics.csv.
             "HVG50_mse": float(pp_hvg50["mse"].mean()) if len(pp_hvg50) else float("nan"),

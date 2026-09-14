@@ -16,9 +16,9 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.ablations import ABLATION_GRID
-from pathology_st.stats_tests import patient_bootstrap_ci
-from pathology_st.utils import load_config, resolve_run_paths
+from epathst.ablations import ABLATION_GRID
+from epathst.statistics.stats_tests import patient_bootstrap_ci
+from epathst.utils import load_config, resolve_run_paths
 
 MODEL_DESC = {a.name: a.description for a in ABLATION_GRID}
 MODEL_PRIORITY = {a.name: a.priority for a in ABLATION_GRID}

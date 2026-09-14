@@ -13,8 +13,8 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.ablations import ABLATION_GRID
-from pathology_st.utils import load_config, resolve_run_paths
+from epathst.ablations import ABLATION_GRID
+from epathst.utils import load_config, resolve_run_paths
 
 MODEL_ORDER = [a.name for a in ABLATION_GRID]
 MODEL_LABEL = {a.name: a.description for a in ABLATION_GRID}
@@ -54,7 +54,7 @@ def main():
     lines += ["# HEST Final 5-Fold Experiment -- Results\n",
           "Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x "
           "3-cancer x seed-0 experiment (SLURM job 84871, completed 2026-08-31, 03:15:54 elapsed). "
-          "Metric: patient-level Fisher-z mean Pearson R (`pathology_st.metrics.patient_macro_fisher_z`). "
+          "Metric: patient-level Fisher-z mean Pearson R (`epathst.evaluation.metrics.patient_macro_fisher_z`). "
           f"All CIs are bootstrap 95% intervals, n_bootstrap={n_boot}, resampled over "
           "(cancer, fold, seed) cells -- see the Limitations section for what that does and does "
           "not mean. Every number below is read directly from `results/final/tables/`; nothing is "
@@ -105,7 +105,7 @@ def main():
     lines += ["## 4. Primary statistical gates\n",
           "The three pre-registered pass/fail tests (configs/base.yaml `primary_gates`). "
           "`delta_R` = mean(better) - mean(worse) over shared cells; CI/p-value from "
-          "`pathology_st.stats_tests.patient_bootstrap_ci` / `paired_sign_flip_test`; **SUPPORTED** requires "
+          "`epathst.statistics.stats_tests.patient_bootstrap_ci` / `paired_sign_flip_test`; **SUPPORTED** requires "
           "the 95% CI to lie entirely above zero.\n"]
     for gate_key in ("gate1_distillation", "gate2_spatial_context", "gate3_true_topology"):
         g = gates[gates.gate == gate_key]

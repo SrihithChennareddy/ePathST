@@ -5,8 +5,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from pathology_st.gatv2_block import MultiLayerGATv2
-from pathology_st.pna_block import MultiLayerPNA
+from epathst.models.graph_layers import MultiLayerGATv2, MultiLayerPNA
 
 
 class GraphCorrectionModel(nn.Module):
@@ -243,7 +242,7 @@ def assert_zero_residual_at_init(model: ResidualGraphPredictor, x: torch.Tensor,
 
 def graph_loss(pred: dict, gene_target: torch.Tensor, pathway_target: torch.Tensor,
                pathway_weight: float = 0.0) -> dict:
-    """Primary loss is gene-only by default (pathway_weight=0.0); pathway loss weight is swept separately as an ablation once the architecture is locked (see src/pathology_st/patch_head.py's matching default)."""
-    from pathology_st.patch_head import patch_head_loss
+    """Primary loss is gene-only by default (pathway_weight=0.0); pathway loss weight is swept separately as an ablation once the architecture is locked (see src/epathst/models/patch_head.py's matching default)."""
+    from epathst.models.patch_head import patch_head_loss
     fake_pred = {"gene": pred["gene"], "pathway": pred["pathway"]}
     return patch_head_loss(fake_pred, gene_target, pathway_target, pathway_weight)

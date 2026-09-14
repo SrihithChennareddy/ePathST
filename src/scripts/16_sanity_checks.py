@@ -17,22 +17,22 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.ablations import (
+from epathst.ablations import (
     build_graph_for_ablation,
     edge_features_for_ablation,
     scale_aware_edge_data,
 )
-from pathology_st.cv_folds import assert_run_completeness
-from pathology_st.graph_model import (
+from epathst.data.splits import assert_run_completeness
+from epathst.models.graph_model import (
     GraphCorrectionModel,
     ResidualGraphPredictor,
     ScaleAwareGraphCorrectionModel,
     assert_zero_residual_at_init,
 )
-from pathology_st.graph_training import make_pyg_data, train_graph_model
-from pathology_st.patch_head import build_patch_head
-from pathology_st.pna_block import compute_degree_histogram
-from pathology_st.utils import load_config, resolve_run_paths, save_json
+from epathst.graph.training import make_pyg_data, train_graph_model
+from epathst.models.patch_head import build_patch_head
+from epathst.models.graph_layers import compute_degree_histogram
+from epathst.utils import load_config, resolve_run_paths, save_json
 
 
 def synthetic_toy_data(cfg, n_nodes=60, in_dim=320, gene_dim=20, pathway_dim=14, seed=0):

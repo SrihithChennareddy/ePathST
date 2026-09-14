@@ -13,10 +13,10 @@ import pandas as pd
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.hest_prep import (HEST_SAMPLE_COLUMNS, alignment_qc_sample, audit_hest_samples,
+from epathst.data.hest_prep import (HEST_SAMPLE_COLUMNS, alignment_qc_sample, audit_hest_samples,
                             enforce_patient_section_grouping, extract_hest_patches_for_sample)
-from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json
-from pathology_st.wsi_patches import open_slide, write_patch_shard
+from epathst.utils import RunEnvironment, load_config, resolve_run_paths, save_json
+from epathst.data.wsi_patches import open_slide, write_patch_shard
 
 # HEST layout is documented in docs/INPUT_DATA.md; note `id` doubles as `patient_id` (no separate column), and PRCC/ILC oncotree codes are intentionally excluded (unmapped, not a bug).
 ONCOTREE_TO_CANCER = {"IDC": "IDC", "COAD": "COAD", "COADREAD": "COAD", "READ": "COAD",

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from pathology_st import destruction, graph_builder
+from epathst.graph import builder as graph_builder, destruction
 
 
 @dataclass

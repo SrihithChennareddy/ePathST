@@ -15,7 +15,7 @@ def extract_student_features(
     downstream_proj=None,
 ) -> np.ndarray:
     """Runs the frozen encoder over patches in batches (image only, no expression data touches this path); returns R^320 features, or R^256 if `downstream_proj` is given."""
-    from pathology_st.distill_train import IMAGENET_MEAN, IMAGENET_STD
+    from epathst.distillation.training import IMAGENET_MEAN, IMAGENET_STD
 
     encoder.eval()
     outs = []
@@ -66,7 +66,7 @@ def load_cached_features(path: str | Path, expected_encoder_name: str | None = N
         assert out["encoder_name"] == expected_encoder_name, (
             f"cache routing error: {path} was cached by encoder "
             f"'{out['encoder_name']}', but the caller required '{expected_encoder_name}' -- "
-            f"this is the A1/A2 feature-mixup bug class, see src/pathology_st/ablations.py")
+            f"this is the A1/A2 feature-mixup bug class, see src/epathst/ablations.py")
     return out
 
 

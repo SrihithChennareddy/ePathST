@@ -7,7 +7,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from pathology_st.cptac_select import tissue_mask_from_thumbnail
+from epathst.data.cptac_select import tissue_mask_from_thumbnail
 
 
 def _clamp_region(

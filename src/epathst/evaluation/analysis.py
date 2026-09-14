@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr
 
-from pathology_st.metrics import morans_i
+from epathst.evaluation.metrics import morans_i
 
 
 def multiscale_contribution(

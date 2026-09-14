@@ -2,7 +2,7 @@
 """Standalone diagnostic reproducing and verifying the fix for a real
 target/prediction misalignment bug in src/scripts/10_run_patient_cv.py's
 run_ablation() (affected graph ablations A4-A9); uses the actual
-pathology_st.metrics implementation rather than a reimplementation. Writes
+epathst.evaluation.metrics implementation rather than a reimplementation. Writes
 results/debug_idc_pipeline/T1_alignment_bug.json."""
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.metrics import evaluate_predictions
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from epathst.evaluation.metrics import evaluate_predictions
 
-OUT_DIR = Path(__file__).resolve().parents[1] / "results" / "debug_idc_pipeline"
+OUT_DIR = Path(__file__).resolve().parents[2] / "results" / "debug_idc_pipeline"
 
 
 def _fake_cfg():

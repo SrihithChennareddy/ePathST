@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Direct test of whether A8's per-gene gain over A2 tracks each gene's ground-truth
 Moran's I (vs. Gate 3's indirect shuffled-graph control), replicating POC_5's
-`pathology_st.analysis.spatial_benefit_vs_autocorrelation` diagnostic (which found
+`epathst.evaluation.analysis.spatial_benefit_vs_autocorrelation` diagnostic (which found
 Corr(delta, MoranI) = 0.1148, p = 0.630 -- no relationship) on the current official
 HEST-1k protocol/data, per-cancer and pooled."""
 from __future__ import annotations
@@ -16,14 +16,14 @@ import pandas as pd
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.ablations import ABLATION_GRID
-from pathology_st.analysis import ground_truth_morans_i_per_gene, spatial_benefit_vs_autocorrelation
-from pathology_st.cv_folds import carve_validation_from_train
-from pathology_st.expression import TrainOnlyStandardizer
-from pathology_st.feature_cache import extract_student_features
-from pathology_st.metrics import per_patient_per_column_pearson
-from pathology_st.student_model import ConvNeXtV2AttoStudent, load_locked_encoder
-from pathology_st.utils import load_config, resolve_run_paths, save_json, seed_everything
+from epathst.ablations import ABLATION_GRID
+from epathst.evaluation.analysis import ground_truth_morans_i_per_gene, spatial_benefit_vs_autocorrelation
+from epathst.data.splits import carve_validation_from_train
+from epathst.data.expression import TrainOnlyStandardizer
+from epathst.data.feature_cache import extract_student_features
+from epathst.evaluation.metrics import per_patient_per_column_pearson
+from epathst.models.student import ConvNeXtV2AttoStudent, load_locked_encoder
+from epathst.utils import load_config, resolve_run_paths, save_json, seed_everything
 
 # reuse script 22's already-built official-protocol plumbing (SampleCache, official_target,
 # gather, build_manifest_rows, run_ablation, train_patch_head) instead of reimplementing it --

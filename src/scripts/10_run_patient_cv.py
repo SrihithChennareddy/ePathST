@@ -14,19 +14,19 @@ import torch
 from torch_geometric.data import Data
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.ablations import (ABLATION_GRID, build_graph_for_ablation, edge_features_for_ablation,
+from epathst.ablations import (ABLATION_GRID, build_graph_for_ablation, edge_features_for_ablation,
                             matched_mlp_hidden_dim, scale_aware_edge_data)
-from pathology_st.cv_folds import (assert_run_completeness, build_cv_grid, carve_validation_from_train,
+from epathst.data.splits import (assert_run_completeness, build_cv_grid, carve_validation_from_train,
                            exclude_targeted_panel_samples, expected_run_keys)
-from pathology_st.expression import TrainOnlyStandardizer, ensure_gene_symbol_index, normalize_log1p_slide, select_hvg_for_fold
-from pathology_st.feature_cache import load_cached_features
-from pathology_st.graph_model import ResidualGraphPredictor
-from pathology_st.graph_training import _build_correction_model, make_pyg_data, predict_graph_model, train_graph_model
-from pathology_st.metrics import evaluate_predictions
-from pathology_st.pathways import check_pathway_gene_coverage, compute_progeny_scores, fetch_and_cache_progeny_net
-from pathology_st.patch_head import MolecularBottleneckHead, build_patch_head, patch_head_loss
-from pathology_st.pna_block import compute_degree_histogram
-from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json, seed_everything
+from epathst.data.expression import TrainOnlyStandardizer, ensure_gene_symbol_index, normalize_log1p_slide, select_hvg_for_fold
+from epathst.data.feature_cache import load_cached_features
+from epathst.models.graph_model import ResidualGraphPredictor
+from epathst.graph.training import _build_correction_model, make_pyg_data, predict_graph_model, train_graph_model
+from epathst.evaluation.metrics import evaluate_predictions
+from epathst.data.pathways import check_pathway_gene_coverage, compute_progeny_scores, fetch_and_cache_progeny_net
+from epathst.models.patch_head import MolecularBottleneckHead, build_patch_head, patch_head_loss
+from epathst.models.graph_layers import compute_degree_histogram
+from epathst.utils import RunEnvironment, load_config, resolve_run_paths, save_json, seed_everything
 
 
 def load_fold_expression(hest_samples, spot_manifest, hest_root, patients, cfg):
@@ -384,7 +384,7 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
     metrics = {f"hvg1000_{k}": v for k, v in m_hvg1000.items()}
     metrics.update({f"hvg50_{k}": v for k, v in m_hvg50.items()})
     metrics.update({f"pathway_{k}": v for k, v in m_pathway.items()})
-    # pathology_st.cv_folds' completeness gate and the Gate 1-3 tests key off this exact unprefixed name.
+    # epathst.data.splits' completeness gate and the Gate 1-3 tests key off this exact unprefixed name.
     metrics["fisher_z_mean_patient_R"] = m_hvg1000.get("fisher_z_mean_patient_R")
     return {"gene": gene_pred, "pathway": path_pred}, metrics, ids_test
 

@@ -13,9 +13,9 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.cptac_select import compute_wsi_qc, select_one_wsi_per_patient, to_manifest_rows
-from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json
-from pathology_st.wsi_patches import open_slide
+from epathst.data.cptac_select import compute_wsi_qc, select_one_wsi_per_patient, to_manifest_rows
+from epathst.utils import RunEnvironment, load_config, resolve_run_paths, save_json
+from epathst.data.wsi_patches import open_slide
 
 # Cancer-dir casing on disk (BRCA/COAD/ccRCC) differs from cfg.cancers.cptac's (BRCA/COAD/CCRCC).
 CANCER_DIR_ALIASES = {"BRCA": "BRCA", "COAD": "COAD", "CCRCC": "ccRCC"}

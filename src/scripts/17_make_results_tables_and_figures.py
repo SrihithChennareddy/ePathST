@@ -15,9 +15,9 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st import figures
-from pathology_st.stats_tests import patient_bootstrap_ci
-from pathology_st.utils import load_config, resolve_run_paths
+from epathst.reporting import figures
+from epathst.statistics.stats_tests import patient_bootstrap_ci
+from epathst.utils import load_config, resolve_run_paths
 
 MODEL_ORDER = [
     "A0_mean_expression", "A1_imagenet_patch", "A2_distilled_patch", "A5_shuffled_graph",
@@ -113,7 +113,7 @@ def main():
         perf = [a2_rows["hvg1000_r_mean"].values[0]] if len(a2_rows) else [0]
         labels = ["distilled student"]
         # GenBio-PathFM teacher point intentionally not added here -- its performance lives in a
-        # separate PCA256-based comparison (src/pathology_st/genbio_pca.py), not in cv_ablation_metrics.csv.
+        # separate PCA256-based comparison (src/epathst/evaluation/genbio_comparison.py), not in cv_ablation_metrics.csv.
         figures.fig7_efficiency_vs_performance(
             params, perf, labels, paths["figures"] / "fig7_efficiency.png"
         )

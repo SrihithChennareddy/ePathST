@@ -11,9 +11,9 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.cv_folds import assert_run_completeness, build_cv_grid, expected_run_keys
-from pathology_st.stats_tests import paired_sign_flip_test, patient_bootstrap_ci
-from pathology_st.utils import load_config, resolve_run_paths, save_json
+from epathst.data.splits import assert_run_completeness, build_cv_grid, expected_run_keys
+from epathst.statistics.stats_tests import paired_sign_flip_test, patient_bootstrap_ci
+from epathst.utils import load_config, resolve_run_paths, save_json
 
 
 def main():
@@ -77,7 +77,7 @@ def main():
     gates_cfg = cfg["primary_gates"]
     gate_names = {"gate1_distillation": "Gate 1: Distillation (A2 > A1)",
                   "gate2_spatial_context": "Gate 2: Spatial context (A8 > A2)",
-                  # A5 is the degree-preserving shuffled-graph negative control (see pathology_st.ablations)
+                  # A5 is the degree-preserving shuffled-graph negative control (see epathst.ablations)
                   "gate3_true_topology": "Gate 3: True topology (A8 > A5, THE decisive test)"}
 
     # run the 3 primary gates, pooled + per cancer

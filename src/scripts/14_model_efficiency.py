@@ -11,15 +11,15 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.efficiency import (
+from epathst.efficiency.efficiency import (
     compression_ratio,
     count_model_params,
     measure_flops_macs,
     stored_embedding_size_bytes,
 )
-from pathology_st.student_model import load_locked_encoder
-from pathology_st.teacher_genbio import GenBioPathFMTeacher
-from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json
+from epathst.models.student import load_locked_encoder
+from epathst.models.teacher import GenBioPathFMTeacher
+from epathst.utils import RunEnvironment, load_config, resolve_run_paths, save_json
 
 
 def main():
