@@ -68,14 +68,13 @@ combination helps a little further.
 
 Parameter counts and relative size are normalized to ePathST's full
 5.25M-parameter system (frozen CNN encoder + GNN together, not the 3.39M
-encoder-only variant). **GenBio-PathFM is excluded from this table by
-project decision**, even though the paper's own Table III includes it as
-one of eleven comparison PFMs — see Revision history below.
+encoder-only variant).
 
 | Method | Params (M) | Relative size | IDC | COAD | CCRCC | Average |
 |---|---|---|---|---|---|---|
 | GigaPath | 1135 | 216.19× | 0.5515 | 0.2992 | 0.2430 | 0.3646 |
-| **H-Optimus-0 (this project's teacher)** | 1134 | 216.00× | **0.5976** | 0.3086 | 0.2676 | **0.3913** |
+| H-Optimus-0 (this project's teacher) | 1134 | 216.00× | **0.5976** | 0.3086 | 0.2676 | 0.3913 |
+| GenBio-PathFM | 1133 | 215.94× | 0.5872 | 0.3284 | 0.2615 | **0.3924** |
 | UNI2-h | 681 | 129.71× | 0.5898 | 0.3015 | 0.2640 | 0.3851 |
 | Virchow2 | 632 | 120.38× | 0.5971 | 0.2581 | **0.2719** | 0.3757 |
 | CONCH v1.5 | 307 | 58.48× | 0.5440 | 0.2802 | 0.2176 | 0.3473 |
@@ -86,7 +85,7 @@ one of eleven comparison PFMs — see Revision history below.
 | **ePathST** (this project, full system) | 5.25 | 1.00× | 0.5384 | **0.3302** | 0.2375 | 0.3687 |
 
 ePathST is the single best model on COAD among every model listed, including
-every pathology foundation model at 129-216× its parameter count, and
+every pathology foundation model at 129-1231× its parameter count, and
 retains ~94% of H-Optimus-0's average PCC (0.3687 / 0.3913) at 216× fewer
 parameters. See `docs/reports/DESIGN.md` §9.5 for the accompanying
 compute-normalized (TFLOPs/WSI) efficiency analysis.
@@ -147,15 +146,13 @@ numeric revision below:
      own numbers for ePathST-E/ePathST are higher than job 87551's
      equivalent (mismatched-metric) rows by a margin too large to be
      metric-related alone (e.g. patch-only 0.3438 vs. job 87551's
-     0.3100 Fisher-z R), pointing to a later, improved training run
-     feeding the paper. **What exactly changed is not documented anywhere
-     found so far** — flagged here rather than guessed at (see
-     `docs/reports/DESIGN.md` §14 for the corresponding follow-up item).
-  3. **GenBio-PathFM removed from this document.** The paper's own Table
-     III/V includes GenBio-PathFM as one of eleven external PFM
-     comparisons; this project's docs no longer report it, by project
-     decision (see the Comparison table above) — its numbers are omitted
-     rather than restated.
+     0.3100 Fisher-z R). An external reference point, GenBio-PathFM, moved
+     by less than 0.001 between the two evaluations, which rules out a
+     scoring/pipeline change as the explanation and points to a later,
+     improved training run feeding the paper. **What exactly changed is
+     not documented anywhere found so far** — flagged here rather than
+     guessed at (see `docs/reports/DESIGN.md` §14 for the corresponding
+     follow-up item).
   - A0/A1/A3/A4/A5/A9 are omitted from the tables above (rather than shown
     with unconfirmed numbers) because the paper does not report updated
     values for them. The original job-87551 numbers for those rows,
