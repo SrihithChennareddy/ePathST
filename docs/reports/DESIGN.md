@@ -777,7 +777,7 @@ gap directly.
    per-patient predictions to disk. A stricter implementation would
    bootstrap over patients directly.
 2. **Seeds 1/2** were not run for the custom-protocol grid — seed 0 only.
-3. **The GenBio-embedding→MLP baseline (B1)** is fold0/seed0 only per
+3. **The H-Optimus-0-embedding→MLP baseline (B1)** is fold0/seed0 only per
    cancer under the custom protocol, not the full 5-fold design.
 4. **Efficiency**: only parameter counts and the derived compression ratio
    have been measured; inference VRAM, throughput, and GNN wall-clock have
