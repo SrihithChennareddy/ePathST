@@ -90,7 +90,7 @@ python3 src/scripts/02_extract_cptac_patches.py --config "$CONFIG" --workers "${
 log "=== Step 3: CPTAC patient split (x3 seeds) ==="
 python3 src/scripts/03_cptac_patient_split.py --config "$CONFIG"
 
-log "=== Step 4: GenBio-PathFM teacher embedding (only NEW patches not already cached) ==="
+log "=== Step 4: H-Optimus-0 teacher embedding (only NEW patches not already cached) ==="
 python3 src/scripts/04_run_teacher_genbio.py --config "$CONFIG" --device cuda --shard-index 0 --num-shards 1
 
 ELAPSED=$((SECONDS - JOB_START))

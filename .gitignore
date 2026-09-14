@@ -16,3 +16,4 @@ experimental_runs/*/results/genbio_baseline/per_cancer/*.json
 experimental_runs/*/results/genbio_gene_metrics.csv
 experimental_runs/*/results/per_cancer/*.json
 experimental_runs/*/results/official_hest_benchmark/official_hest_benchmark_full.json
+docs/style_references/

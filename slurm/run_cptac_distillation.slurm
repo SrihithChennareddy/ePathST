@@ -11,7 +11,7 @@
 #SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_%j.out
 #SBATCH --error=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_%j.err
 
-# Runs Final_Project.txt Steps 1-9 (CPTAC WSI selection -> GenBio-PathFM
+# Runs Final_Project.txt Steps 1-9 (CPTAC WSI selection -> H-Optimus-0
 # teacher embedding -> ConvNeXt V2-Atto distillation -> lock) inside a
 # single 8-hour H200x4 allocation. Every stage is resumable (see
 # src/scripts/01, 02, 04, 05's docstrings) -- if this job runs out of wall
@@ -53,7 +53,7 @@ python3 src/scripts/02_extract_cptac_patches.py --config "$CONFIG" --workers "${
 log "=== Step 3: CPTAC patient split (x3 seeds) ==="
 python3 src/scripts/03_cptac_patient_split.py --config "$CONFIG"
 
-log "=== Step 4: GenBio-PathFM teacher embedding, sharded across 4 GPUs ==="
+log "=== Step 4: H-Optimus-0 teacher embedding, sharded across 4 GPUs ==="
 NUM_SHARDS=4
 PIDS=()
 for i in $(seq 0 $((NUM_SHARDS - 1))); do

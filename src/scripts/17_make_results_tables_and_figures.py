@@ -112,8 +112,8 @@ def main():
         a2_rows = valid[valid["model"] == "A2_distilled_patch"]
         perf = [a2_rows["hvg1000_r_mean"].values[0]] if len(a2_rows) else [0]
         labels = ["distilled student"]
-        # GenBio-PathFM teacher point intentionally not added here -- its performance lives in a
-        # separate PCA256-based comparison (src/epathst/evaluation/genbio_comparison.py), not in cv_ablation_metrics.csv.
+        # H-Optimus-0 teacher point intentionally not added here -- its performance lives in a
+        # separate PCA256-based comparison (src/epathst/evaluation/hoptimus_comparison.py), not in cv_ablation_metrics.csv.
         figures.fig7_efficiency_vs_performance(
             params, perf, labels, paths["figures"] / "fig7_efficiency.png"
         )

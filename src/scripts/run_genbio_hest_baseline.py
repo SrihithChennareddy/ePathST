@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Standalone GenBio-PathFM patch-only baseline for the HEST IDC/COAD/CCRCC
+"""Standalone H-Optimus-0 patch-only baseline for the HEST IDC/COAD/CCRCC
 downstream experiment: the frozen teacher embeds every ST spot once
 (cached, resumable), then a small trainable head is fit on the exact
 train/fold patient split src/scripts/10_run_patient_cv.py uses, for
-comparison against the CNN/GNN pipeline (never fine-tunes GenBio, builds
+comparison against the CNN/GNN pipeline (never fine-tunes H-Optimus-0, builds
 no graph, and never writes to that job's own output locations)."""
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from epathst.data.splits import (
 from epathst.data.expression import TrainOnlyStandardizer, select_hvg_for_fold
 from epathst.evaluation.metrics import per_patient_per_column_pearson, target_summary
 from epathst.models.patch_head import patch_head_loss
-from epathst.models.teacher import GenBioPathFMTeacher
+from epathst.models.teacher import HOptimusTeacher
 from epathst.utils import (
     RunEnvironment,
     load_config,
@@ -38,7 +38,7 @@ from epathst.utils import (
     seed_everything,
 )
 
-GENBIO_EMBED_DIM = 4608
+TEACHER_EMBED_DIM = 1536
 HIDDEN1, HIDDEN2 = 320, 128
 
 
@@ -56,15 +56,15 @@ def _import_scripts10():
 
 
 # --------------------------------------------------------------------------- model
-class GenBioDownstreamHead(nn.Module):
-    """Frozen-GenBio-embedding -> {HVG1000, PROGENy14} predictor. Only this
-    module's parameters ever receive gradients; GenBio itself is never in
+class HOptimusDownstreamHead(nn.Module):
+    """Frozen-H-Optimus-0-embedding -> {HVG1000, PROGENy14} predictor. Only this
+    module's parameters ever receive gradients; H-Optimus-0 itself is never in
     the autograd graph (embeddings are loaded from disk as plain tensors)."""
 
     def __init__(self, gene_dim: int, pathway_dim: int, dropout: float = 0.1):
         super().__init__()
         self.trunk = nn.Sequential(
-            nn.Linear(GENBIO_EMBED_DIM, HIDDEN1), nn.LayerNorm(HIDDEN1), nn.GELU(),
+            nn.Linear(TEACHER_EMBED_DIM, HIDDEN1), nn.LayerNorm(HIDDEN1), nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(HIDDEN1, HIDDEN2), nn.GELU(),
         )
@@ -76,14 +76,14 @@ class GenBioDownstreamHead(nn.Module):
         return {"latent": z, "gene": self.gene_head(z), "pathway": self.pathway_head(z)}
 
 
-# --------------------------------------------------------------- GenBio feature extraction
+# --------------------------------------------------------------- H-Optimus-0 feature extraction
 def _valid_cache(path: Path, expected_n_spots: int) -> bool:
     if not path.exists():
         return False
     try:
         with h5py.File(path, "r") as f:
             emb = f["embedding"]
-            if emb.shape[0] != expected_n_spots or emb.shape[1] != GENBIO_EMBED_DIM:
+            if emb.shape[0] != expected_n_spots or emb.shape[1] != TEACHER_EMBED_DIM:
                 return False
             e = emb[:].astype(np.float32)
             return bool(np.isfinite(e).all())
@@ -91,11 +91,11 @@ def _valid_cache(path: Path, expected_n_spots: int) -> bool:
         return False
 
 
-def extract_genbio_embeddings_for_sample(
-    genbio: GenBioPathFMTeacher, sample_row: pd.Series, spot_manifest: pd.DataFrame,
+def extract_hoptimus_embeddings_for_sample(
+    teacher_h: HOptimusTeacher, sample_row: pd.Series, spot_manifest: pd.DataFrame,
     patch_shard_dir: Path, out_path: Path, batch_size: int,
 ) -> dict:
-    """Runs the frozen GenBio-PathFM teacher once over every ST spot's
+    """Runs the frozen H-Optimus-0 teacher once over every ST spot's
     already-extracted 224x224@0.5um/px patch (src/scripts/08's patch shard) and
     caches the 4608-D CLS embedding per spot. Returns timing/throughput stats;
     resumable at the call site via `_valid_cache`."""
@@ -113,18 +113,18 @@ def extract_genbio_embeddings_for_sample(
     with torch.inference_mode():
         for i in range(0, len(shard_spot_ids), batch_size):
             batch = patches[i:i + batch_size]
-            is_cuda = genbio.device.startswith("cuda")
+            is_cuda = teacher_h.device.startswith("cuda")
             with torch.autocast(
                 device_type="cuda" if is_cuda else "cpu", dtype=torch.bfloat16, enabled=is_cuda
             ):
-                embs.append(genbio.embed_batch(batch))
+                embs.append(teacher_h.embed_batch(batch))
     elapsed = time.time() - t0
     emb = np.concatenate(embs, axis=0)
-    assert emb.shape == (len(shard_spot_ids), GENBIO_EMBED_DIM), (
-        f"{sample_id}: expected GenBio embedding shape "
-        f"({len(shard_spot_ids)}, {GENBIO_EMBED_DIM}), got {emb.shape}"
+    assert emb.shape == (len(shard_spot_ids), TEACHER_EMBED_DIM), (
+        f"{sample_id}: expected H-Optimus-0 embedding shape "
+        f"({len(shard_spot_ids)}, {TEACHER_EMBED_DIM}), got {emb.shape}"
     )
-    assert np.isfinite(emb).all(), f"{sample_id}: NaN/Inf in GenBio embeddings"
+    assert np.isfinite(emb).all(), f"{sample_id}: NaN/Inf in H-Optimus-0 embeddings"
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     str_dtype = h5py.string_dtype(encoding="utf-8")
@@ -155,7 +155,7 @@ def extract_genbio_embeddings_for_sample(
     }
 
 
-def load_cached_genbio_features(path: Path) -> dict:
+def load_cached_hoptimus_features(path: Path) -> dict:
     with h5py.File(path, "r") as f:
         return {
             "spot_id": f["spot_id"][:].astype(str),
@@ -275,7 +275,7 @@ def load_or_recompute_split(
 
 # --------------------------------------------------------------------------- smoke test
 def run_smoke_test(
-    cfg: dict, paths: dict, genbio: GenBioPathFMTeacher, embed_dir: Path, patch_shard_dir: Path,
+    cfg: dict, paths: dict, teacher_h: HOptimusTeacher, embed_dir: Path, patch_shard_dir: Path,
     hest_samples: pd.DataFrame, spot_manifest: pd.DataFrame, batch_size: int,
 ) -> None:
     print("[smoke-test] running 1 sample per cancer ...")
@@ -288,16 +288,16 @@ def run_smoke_test(
         out_path = embed_dir / f"{sample_id}.h5"
         n_spots = int((spot_manifest["sample_id"] == sample_id).sum())
 
-        stats = extract_genbio_embeddings_for_sample(
-            genbio, row, spot_manifest, patch_shard_dir, out_path, batch_size
+        stats = extract_hoptimus_embeddings_for_sample(
+            teacher_h, row, spot_manifest, patch_shard_dir, out_path, batch_size
         )
         print(
             f"[smoke-test] {cancer}/{sample_id}: extracted {stats['n_spots']} spots "
             f"in {stats['seconds']:.1f}s ({stats['patches_per_sec']:.1f} patches/sec)"
         )
 
-        reloaded = load_cached_genbio_features(out_path)
-        assert reloaded["embedding"].shape[1] == GENBIO_EMBED_DIM
+        reloaded = load_cached_hoptimus_features(out_path)
+        assert reloaded["embedding"].shape[1] == TEACHER_EMBED_DIM
         assert reloaded["embedding"].shape[0] == n_spots
         assert np.isfinite(reloaded["embedding"]).all()
         expected_spot_ids = set(spot_manifest[spot_manifest["sample_id"] == sample_id]["spot_id"])
@@ -310,21 +310,21 @@ def run_smoke_test(
         expr_spot_ids = set(adata.obs_names.astype(str))
         overlap = expr_spot_ids & set(reloaded["spot_id"])
         assert len(overlap) > 0, (
-            f"[smoke-test] {sample_id}: GenBio spot_ids don't overlap expression spot_ids at all"
+            f"[smoke-test] {sample_id}: H-Optimus-0 spot_ids don't overlap expression spot_ids at all"
         )
         print(
             f"[smoke-test] {cancer}/{sample_id}: {len(overlap)}/{len(reloaded['spot_id'])} "
             f"spot_ids align with ST expression spot IDs"
         )
 
-        head = GenBioDownstreamHead(gene_dim=1000, pathway_dim=14).to(genbio.device)
+        head = HOptimusDownstreamHead(gene_dim=1000, pathway_dim=14).to(teacher_h.device)
         opt = torch.optim.AdamW(head.parameters(), lr=cfg["patch_head"]["lr"])
         n = min(8, reloaded["embedding"].shape[0])
         x_smoke_batch = torch.tensor(
-            reloaded["embedding"][:n], dtype=torch.float32, device=genbio.device
+            reloaded["embedding"][:n], dtype=torch.float32, device=teacher_h.device
         )
-        gene_dummy_target = torch.zeros(n, 1000, device=genbio.device)
-        pathway_dummy_target = torch.zeros(n, 14, device=genbio.device)
+        gene_dummy_target = torch.zeros(n, 1000, device=teacher_h.device)
+        pathway_dummy_target = torch.zeros(n, 14, device=teacher_h.device)
         opt.zero_grad()
         out = head(x_smoke_batch)
         loss = patch_head_loss(
@@ -352,7 +352,7 @@ def main():
     ap.add_argument("--fold", type=int, default=0)
     ap.add_argument(
         "--extract-only", action="store_true",
-        help="only run GenBio feature extraction, then exit",
+        help="only run H-Optimus-0 feature extraction, then exit",
     )
     ap.add_argument(
         "--train-only", action="store_true",
@@ -367,7 +367,7 @@ def main():
     )
     ap.add_argument(
         "--head", choices=["mlp", "ridge"], default="mlp",
-        help="downstream head on the frozen GenBio embeddings: 'mlp' (default, this project's "
+        help="downstream head on the frozen H-Optimus-0 embeddings: 'mlp' (default, this project's "
              "small trained neural head) or 'ridge' (closed-form RidgeCV linear probe, the "
              "standard downstream head most published HEST-1k-style benchmarks use)",
     )
@@ -379,11 +379,11 @@ def main():
     # student_embeddings/, results/cv_ablation_metrics.csv, hest_patches/, or manifests/,
     # which belong to the concurrently-running CNN/GNN job (src/scripts/10)
     persist_dir = Path(cfg["paths"].get("persist_dir") or cfg["paths"]["work_dir"])
-    embed_dir = persist_dir / "genbio_baseline_embeddings"
+    embed_dir = persist_dir / "hoptimus0_baseline_embeddings"
     # read-only: owned by src/scripts/08
     patch_shard_dir = Path(cfg["paths"]["work_dir"]) / "hest_patches"
     # separate results dir per --head so a ridge run never clobbers the mlp run's cached results
-    results_subdir = "genbio_baseline" if args.head == "mlp" else f"genbio_baseline_{args.head}"
+    results_subdir = "hoptimus0_baseline" if args.head == "mlp" else f"hoptimus0_baseline_{args.head}"
     results_dir = paths["results"] / results_subdir
     hvg_lists_dir = results_dir / "hvg_lists"
     splits_dir = results_dir / "splits_used"
@@ -414,36 +414,36 @@ def main():
     )
 
     print(
-        "[run_genbio_hest_baseline] loading frozen GenBio-PathFM teacher "
+        "[run_genbio_hest_baseline] loading frozen H-Optimus-0 teacher "
         f"({cfg['teacher']['hf_repo']}, dtype={cfg['teacher']['dtype']}, "
         f"embedding_dim={cfg['teacher']['embedding_dim']}) ..."
     )
     if device == "cuda":
         torch.cuda.reset_peak_memory_stats()
-    genbio = GenBioPathFMTeacher(cfg, device=device)  # load frozen teacher
-    assert cfg["teacher"]["embedding_dim"] == GENBIO_EMBED_DIM
-    for p in genbio.model.parameters():
-        assert not p.requires_grad, "GenBio-PathFM must be fully frozen"
-    assert not genbio.model.training, "GenBio-PathFM must be in eval() mode"
+    teacher_h = HOptimusTeacher(cfg, device=device)  # load frozen teacher
+    assert cfg["teacher"]["embedding_dim"] == TEACHER_EMBED_DIM
+    for p in teacher_h.model.parameters():
+        assert not p.requires_grad, "H-Optimus-0 must be fully frozen"
+    assert not teacher_h.model.training, "H-Optimus-0 must be in eval() mode"
     print(
-        f"[run_genbio_hest_baseline] GenBio-PathFM loaded, frozen, "
-        f"{genbio.n_parameters / 1e9:.2f}B params"
+        f"[run_genbio_hest_baseline] H-Optimus-0 loaded, frozen, "
+        f"{teacher_h.n_parameters / 1e9:.2f}B params"
     )
 
     if not args.skip_smoke_test:
         run_smoke_test(
-            cfg, paths, genbio, embed_dir, patch_shard_dir, hest_samples, spot_manifest,
+            cfg, paths, teacher_h, embed_dir, patch_shard_dir, hest_samples, spot_manifest,
             batch_size=cfg["teacher"]["batch_size"],
         )
         if args.smoke_test_only:
             print("[run_genbio_hest_baseline] --smoke-test-only: done.")
             return
 
-    # ------------------------------------------------------------ Step: GenBio feature extraction (resumable)
+    # ------------------------------------------------------------ Step: H-Optimus-0 feature extraction (resumable)
     extraction_stats_by_cancer = {}
     if not args.train_only:
-        extraction_env_log = paths["logs"] / "genbio_baseline_extraction_env.json"
-        with RunEnvironment("genbio_baseline_extraction", extraction_env_log):
+        extraction_env_log = paths["logs"] / "hoptimus0_baseline_extraction_env.json"
+        with RunEnvironment("hoptimus0_baseline_extraction", extraction_env_log):
             for cancer in cfg["cancers"]["hest"]:
                 samples = hest_samples[hest_samples["cancer"] == cancer]
                 t0 = time.time()
@@ -455,8 +455,8 @@ def main():
                     out_path = embed_dir / f"{sample_id}.h5"
                     if _valid_cache(out_path, n_spots):
                         continue  # resumable: already-cached sample, skip
-                    extract_genbio_embeddings_for_sample(
-                        genbio, row, spot_manifest, patch_shard_dir, out_path,
+                    extract_hoptimus_embeddings_for_sample(
+                        teacher_h, row, spot_manifest, patch_shard_dir, out_path,
                         batch_size=cfg["teacher"]["batch_size"],
                     )
                     n_extracted_now += 1
@@ -567,17 +567,17 @@ def main():
             for uid in spot_uids:
                 sample_id, bare_spot_id = spot_by_uid.loc[uid, ["sample_id", "spot_id"]]
                 if sample_id not in feat_cache:
-                    feat_cache[sample_id] = load_cached_genbio_features(embed_dir / f"{sample_id}.h5")
+                    feat_cache[sample_id] = load_cached_hoptimus_features(embed_dir / f"{sample_id}.h5")
                 c = feat_cache[sample_id]
                 pos = list(c["spot_id"]).index(bare_spot_id)
                 out.append(c["embedding"][pos])
             return np.stack(out)
 
-        # load cached GenBio embeddings
+        # load cached H-Optimus-0 embeddings
         x_train, x_val, x_test = load_feats(ids_train), load_feats(ids_val), load_feats(ids_test)
         for name, x in (("train", x_train), ("val", x_val), ("test", x_test)):
-            assert x.shape[1] == GENBIO_EMBED_DIM
-            assert np.isfinite(x).all(), f"{cancer}: NaN/Inf in {name} GenBio embeddings"
+            assert x.shape[1] == TEACHER_EMBED_DIM
+            assert np.isfinite(x).all(), f"{cancer}: NaN/Inf in {name} H-Optimus-0 embeddings"
 
         print(
             f"[run_genbio_hest_baseline] {cancer}: train={len(train_p)}pat/{len(ids_train)}spots "
@@ -606,7 +606,7 @@ def main():
             path_pred = path_ridge.predict(x_test)
             peak_vram_gb = float("nan")  # sklearn, CPU-only, no CUDA allocation to report
         else:
-            head = GenBioDownstreamHead(
+            head = HOptimusDownstreamHead(
                 gene_dim=len(hvg["hvg1000"]), pathway_dim=14,
                 dropout=cfg["patch_head"].get("dropout", 0.1),
             ).to(device)
@@ -720,9 +720,9 @@ def main():
 
     # ------------------------------------------------------------ save & print final results
     summary_df = pd.DataFrame(summary_rows)
-    summary_df.to_csv(results_dir / "genbio_summary.csv", index=False)
-    pd.DataFrame(gene_metric_rows).to_csv(results_dir / "genbio_gene_metrics.csv", index=False)
-    pd.DataFrame(pathway_metric_rows).to_csv(results_dir / "genbio_pathway_metrics.csv", index=False)
+    summary_df.to_csv(results_dir / "hoptimus0_summary.csv", index=False)
+    pd.DataFrame(gene_metric_rows).to_csv(results_dir / "hoptimus0_gene_metrics.csv", index=False)
+    pd.DataFrame(pathway_metric_rows).to_csv(results_dir / "hoptimus0_pathway_metrics.csv", index=False)
 
     print("\n[run_genbio_hest_baseline] ================= FINAL RESULTS =================")
     print(f"{'Cancer':<8} {'HVG50 r':>10} {'HVG1000 r':>10} {'PROGENy14 r':>12}")

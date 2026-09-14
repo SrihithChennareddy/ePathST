@@ -16,7 +16,7 @@ def fig1_pipeline_diagram(out_path: Path) -> None:
     fig, ax = plt.subplots(figsize=(10, 3))
     stages = [
         "CPTAC H&E\npatch",
-        "GenBio-PathFM\n(1.1B, frozen)",
+        "H-Optimus-0\n(1.1B, frozen)",
         "ConvNeXt V2-Atto\nstudent (3.7M)",
         "320-D\nembedding",
         "PNA graph\ncorrection",
@@ -55,7 +55,7 @@ def fig2_wsi_patch_examples(
 
 
 def fig3_representation_agreement(cosine_sims: dict[str, np.ndarray], out_path: Path) -> None:
-    """GenBio vs student cosine-similarity distribution, split by cancer."""
+    """H-Optimus-0 vs student cosine-similarity distribution, split by cancer."""
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.boxplot([v for v in cosine_sims.values()], labels=list(cosine_sims.keys()))
     ax.set_ylabel("cosine similarity (student proj vs teacher)")

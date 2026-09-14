@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Runs the frozen GenBio-PathFM teacher once per CPTAC patch, caching FP16 embeddings; resumable and
+"""Runs the frozen H-optimus-0 teacher once per CPTAC patch, caching FP16 embeddings; resumable and
 GPU-shardable via --shard-index/--num-shards, folded back with --merge-shards."""
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import pandas as pd
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from epathst.models.teacher import GenBioPathFMTeacher, cache_teacher_embeddings, verify_teacher_cache
+from epathst.models.teacher import HOptimusTeacher, cache_teacher_embeddings, verify_teacher_cache
 from epathst.utils import RunEnvironment, load_config, resolve_run_paths, save_json
 
 
@@ -98,8 +98,8 @@ def main():
     stage = f"04_run_teacher_genbio_shard{args.shard_index}"
     with RunEnvironment(stage, paths["logs"] / f"{stage}_env.json"):
         # load teacher
-        teacher = GenBioPathFMTeacher(cfg, device=args.device)
-        print(f"[04_run_teacher_genbio] GenBio-PathFM loaded: {teacher.n_parameters:,} parameters")
+        teacher = HOptimusTeacher(cfg, device=args.device)
+        print(f"[04_run_teacher_genbio] H-optimus-0 loaded: {teacher.n_parameters:,} parameters")
 
         # run inference, batched per WSI
         bs = cfg["teacher"]["batch_size"]

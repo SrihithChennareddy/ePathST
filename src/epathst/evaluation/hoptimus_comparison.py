@@ -1,4 +1,4 @@
-"""Fair GenBio-teacher-vs-student comparison: raw 4608-D GenBio embedding reduced via training-fold-only
+"""Fair teacher-vs-student comparison: raw 1536-D H-Optimus-0 embedding reduced via training-fold-only
 PCA to 256-D (matches student's 320->256 projection) so both feed identical Ridge/MLP/PNA heads."""
 from __future__ import annotations
 
@@ -42,12 +42,12 @@ def fit_ridge_baseline(X_train: np.ndarray, y_train: np.ndarray, alpha: float = 
     return model
 
 
-def genbio_pca_comparison_report(
-    genbio_ridge_r: float,
+def hoptimus_pca_comparison_report(
+    hoptimus_ridge_r: float,
     student_ridge_r: float,
-    genbio_mlp_r: float,
+    hoptimus_mlp_r: float,
     student_mlp_r: float,
-    genbio_pna_r: float,
+    hoptimus_pna_r: float,
     student_pna_r: float,
     pca_explained_variance: float,
 ) -> dict:
@@ -55,18 +55,18 @@ def genbio_pca_comparison_report(
     return {
         "pca_explained_variance_ratio": pca_explained_variance,
         "ridge": {
-            "genbio_pca256": genbio_ridge_r,
+            "hoptimus_pca256": hoptimus_ridge_r,
             "student_256": student_ridge_r,
-            "retention": student_ridge_r / genbio_ridge_r if genbio_ridge_r else float("nan"),
+            "retention": student_ridge_r / hoptimus_ridge_r if hoptimus_ridge_r else float("nan"),
         },
         "molecular_mlp": {
-            "genbio_pca256": genbio_mlp_r,
+            "hoptimus_pca256": hoptimus_mlp_r,
             "student_256": student_mlp_r,
-            "retention": student_mlp_r / genbio_mlp_r if genbio_mlp_r else float("nan"),
+            "retention": student_mlp_r / hoptimus_mlp_r if hoptimus_mlp_r else float("nan"),
         },
         "residual_multiscale_pna": {
-            "genbio_pca256": genbio_pna_r,
+            "hoptimus_pca256": hoptimus_pna_r,
             "student_256": student_pna_r,
-            "retention": student_pna_r / genbio_pna_r if genbio_pna_r else float("nan"),
+            "retention": student_pna_r / hoptimus_pna_r if hoptimus_pna_r else float("nan"),
         },
     }

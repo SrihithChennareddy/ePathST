@@ -98,10 +98,10 @@ cptac_split:
 
 # ---------------------------------------------------------------- Step 4 --
 teacher:
-  name: genbio-pathfm
-  hf_repo: genbio-ai/genbio-pathfm
-  embedding_dim: 4608
-  dtype: bf16
+  name: h-optimus-0
+  hf_repo: bioptimus/H-optimus-0
+  embedding_dim: 1536
+  dtype: fp16
   batch_size: 64
   normalize_l2: true
 
@@ -110,7 +110,7 @@ student:
   backbone: convnextv2_atto
   pretrained: imagenet
   backbone_dim: 320
-  projection_head: [320, 1024, 4608]   # training-only, deleted after distillation (Step 9)
+  projection_head: [320, 1024, 1536]   # training-only, deleted after distillation (Step 9); last dim must match cfg.teacher.embedding_dim
   downstream_projection: [320, 256]    # optional, learned during HEST downstream training
 
 # ---------------------------------------------------------------- Step 6 --

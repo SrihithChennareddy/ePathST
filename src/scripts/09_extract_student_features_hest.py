@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Runs the locked GenBio-distilled ConvNeXt V2-Atto and the ImageNet baseline (A1) on every HEST
+"""Runs the locked H-optimus-0-distilled ConvNeXt V2-Atto and the ImageNet baseline (A1) on every HEST
 patch, caching 320-D node features with full spot_id<->patch<->embedding integrity checks."""
 from __future__ import annotations
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""Extracts GenBio-PathFM (teacher) features on the same HEST patches used
+"""Extracts H-Optimus-0 (teacher) features on the same HEST patches used
 for the student, cached in the same format so they can be dropped into
 src/scripts/10_run_patient_cv.py's ablation loop for a like-for-like
 teacher-vs-student comparison (same patients/genes/folds/normalization/
 graph/metric). Superseded by the train-fold-only PCA256 comparison in
-src/epathst/evaluation/genbio_comparison.py for the locked final experiment; kept for reference."""
+src/epathst/evaluation/hoptimus_comparison.py for the locked final experiment; kept for reference."""
 from __future__ import annotations
 
 import argparse
@@ -18,7 +18,7 @@ from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from epathst.data.feature_cache import cache_features
-from epathst.models.teacher import GenBioPathFMTeacher
+from epathst.models.teacher import HOptimusTeacher
 from epathst.utils import RunEnvironment, load_config, resolve_run_paths
 
 
@@ -32,14 +32,14 @@ def main():
 
     spot_manifest = pd.read_csv(paths["manifests"] / "hest_spot_manifest.csv")
     patch_shard_dir = paths["work_dir"] / "hest_patches"
-    out_dir = paths["student_embeddings"] / "genbio_teacher"
+    out_dir = paths["student_embeddings"] / "hoptimus0_teacher"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     env_log = paths["logs"] / "15_genbio_fair_comparison_env.json"
     with RunEnvironment("15_genbio_fair_comparison_extract", env_log):
-        teacher = GenBioPathFMTeacher(cfg, device=args.device)
+        teacher = HOptimusTeacher(cfg, device=args.device)
         bs = cfg["teacher"]["batch_size"]
-        for sample_id, group in tqdm(spot_manifest.groupby("sample_id"), desc="GenBio features on HEST"):
+        for sample_id, group in tqdm(spot_manifest.groupby("sample_id"), desc="H-Optimus-0 features on HEST"):
             with h5py.File(patch_shard_dir / f"{sample_id}.h5", "r") as f:
                 shard_pids = f["patch_id"][:].astype(str)
                 shard_patches = f["patches"][:]
@@ -52,9 +52,9 @@ def main():
             coords = group[["x_um", "y_um"]].values
             cache_features(out_dir / f"{sample_id}.h5", shard_pids.tolist(), feats, coords)
 
-    print(f"[15_genbio_fair_comparison] cached GenBio-teacher (4608-D) HEST features under {out_dir}")
+    print(f"[15_genbio_fair_comparison] cached H-Optimus-0-teacher (1536-D) HEST features under {out_dir}")
     print("[15_genbio_fair_comparison] to compare against the student, rerun the patch-only/graph "
-          "ablations with feature_source='genbio_teacher' in place of the distilled-student "
+          "ablations with feature_source='hoptimus0_teacher' in place of the distilled-student "
           "features, keeping every fold/target/graph identical.")
 
 

@@ -1,5 +1,5 @@
 """Physical multiscale graph construction: one graph per tissue section, with
-GenBio-embedding-only ST-spot nodes joined by distance-bucketed edges (local/meso/macro, capped per scale)."""
+encoder-embedding-only ST-spot nodes joined by distance-bucketed edges (local/meso/macro, capped per scale)."""
 from __future__ import annotations
 
 import numpy as np

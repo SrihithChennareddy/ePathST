@@ -18,7 +18,7 @@ from epathst.efficiency.efficiency import (
     stored_embedding_size_bytes,
 )
 from epathst.models.student import load_locked_encoder
-from epathst.models.teacher import GenBioPathFMTeacher
+from epathst.models.teacher import HOptimusTeacher
 from epathst.utils import RunEnvironment, load_config, resolve_run_paths, save_json
 
 
@@ -49,14 +49,14 @@ def main():
 
         # best-effort teacher param count
         try:
-            teacher = GenBioPathFMTeacher(cfg, device=args.device)
+            teacher = HOptimusTeacher(cfg, device=args.device)
             teacher_params = {
                 "total_parameters": teacher.n_parameters,
                 "trainable_parameters": 0,
             }
         except Exception as e:
             print(
-                f"[14_model_efficiency] could not load GenBio teacher for a live param "
+                f"[14_model_efficiency] could not load H-optimus-0 teacher for a live param "
                 f"count ({e}); reporting teacher params as unmeasured rather than guessing."
             )
             teacher_params = {

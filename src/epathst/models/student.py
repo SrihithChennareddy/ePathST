@@ -1,4 +1,4 @@
-"""ConvNeXt V2-Atto student backbone + training-only projection head to the 4608-D GenBio teacher space.
+"""ConvNeXt V2-Atto student backbone + training-only projection head to the 1536-D H-Optimus-0 teacher space.
 The head is never counted in the reported final-encoder parameter count and is physically deleted after distillation (see `strip_to_encoder`)."""
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class ConvNeXtV2AttoStudent(nn.Module):
 
 
 class ProjectionHead(nn.Module):
-    """320 -> 1024 -> GELU -> 4608, training-only match to the teacher embedding dimension."""
+    """320 -> 1024 -> GELU -> 1536, training-only match to the teacher embedding dimension."""
 
     def __init__(self, in_dim: int, hidden_dim: int, out_dim: int):
         super().__init__()
@@ -63,7 +63,7 @@ class DistillationStudent(nn.Module):
         return {"backbone_feature": feat, "projected": proj}
 
     def strip_to_encoder(self) -> dict:
-        """Deletes the 4608-D teacher projection head; returns a state_dict containing only the ConvNeXt V2-Atto backbone."""
+        """Deletes the 1536-D teacher projection head; returns a state_dict containing only the ConvNeXt V2-Atto backbone."""
         return {
             k[len("encoder."):]: v
             for k, v in self.state_dict().items()

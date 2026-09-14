@@ -25,7 +25,7 @@ ABLATION_GRID = [
     AblationSpec("A1_imagenet_patch", "imagenet", "none", "none", "primary",
                  "ImageNet ConvNeXt, no distillation, patch-only"),
     AblationSpec("A2_distilled_patch", "distilled", "none", "none", "primary",
-                 "GenBio-distilled ConvNeXt, patch-only (=y_patch, the anchor)"),
+                 "H-Optimus-0-distilled ConvNeXt, patch-only (=y_patch, the anchor)"),
     AblationSpec("A5_shuffled_graph", "distilled", "shuffled", "pna_union", "primary",
                  "degree-preserving rewire -- CRITICAL negative control (Gate 3)"),
     AblationSpec("A6_local_pna", "distilled", "local", "pna_union", "primary",

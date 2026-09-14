@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Trains the S1 (GenBio-distilled) and S2 (random-init distilled) students per seed; S0 (ImageNet,
+"""Trains the S1 (H-optimus-0-distilled) and S2 (random-init distilled) students per seed; S0 (ImageNet,
 no distillation) needs no training loop and is handled directly by script 06."""
 from __future__ import annotations
 

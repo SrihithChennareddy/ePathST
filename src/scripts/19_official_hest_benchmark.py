@@ -27,7 +27,7 @@ from sklearn.preprocessing import StandardScaler
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from epathst.data.feature_cache import extract_student_features
 from epathst.models.student import load_locked_encoder
-from epathst.models.teacher import GenBioPathFMTeacher
+from epathst.models.teacher import HOptimusTeacher
 from epathst.utils import load_config, resolve_run_paths, save_json
 
 
@@ -154,17 +154,17 @@ def main():
         map_location=args.device,
     )
     distilled = load_locked_encoder(checkpoint["encoder_state_dict"], args.device)
-    teacher = GenBioPathFMTeacher(cfg, device=args.device)
+    teacher = HOptimusTeacher(cfg, device=args.device)
 
     def embed_distilled(imgs):
         return extract_student_features(distilled, imgs, args.device)
 
-    def embed_genbio(imgs):
+    def embed_hoptimus(imgs):
         bs = cfg["teacher"]["batch_size"]
         batches = [teacher.embed_batch(imgs[s:s + bs]) for s in range(0, len(imgs), bs)]
         return np.concatenate(batches, axis=0)
 
-    encoders = {"distilled_convnextv2_atto": embed_distilled, "genbio_pathfm": embed_genbio}
+    encoders = {"distilled_convnextv2_atto": embed_distilled, "h_optimus_0": embed_hoptimus}
 
     all_results = []
     for cancer in args.cancers:

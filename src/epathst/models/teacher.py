@@ -1,4 +1,4 @@
-"""Frozen GenBio-PathFM teacher (https://huggingface.co/genbio-ai/genbio-pathfm); inference only, no gradients.
+"""Frozen H-optimus-0 teacher (https://huggingface.co/bioptimus/H-optimus-0); inference only, no gradients.
 Each CPTAC patch is embedded once and its embedding cached to disk (FP16), since re-running the teacher per epoch would be prohibitively expensive."""
 from __future__ import annotations
 
@@ -8,35 +8,41 @@ import h5py
 import numpy as np
 
 
-class GenBioPathFMTeacher:
-    """Follows the model card's usage, not the generic HF AutoModel/AutoImageProcessor pattern: no `preprocessor_config.json` (manual Resize/Normalize with GenBio-PathFM stats, not ImageNet's), and `model(x)` returns the [B, 4608] CLS tensor directly, not a ModelOutput with `.last_hidden_state`."""
+class HOptimusTeacher:
+    """Loaded via timm's hf-hub loader (the model card's own recommended path), not
+    transformers.AutoModel: `timm.create_model("hf-hub:bioptimus/H-optimus-0", ...)`
+    with `global_pool="token"` returns the [B, 1536] CLS tensor directly, not a
+    ModelOutput with `.last_hidden_state`."""
 
-    GENBIO_MEAN = (0.697, 0.575, 0.728)
-    GENBIO_STD = (0.188, 0.240, 0.187)
+    HOPTIMUS_MEAN = (0.707223, 0.578729, 0.703617)
+    HOPTIMUS_STD = (0.211883, 0.230117, 0.177517)
 
     def __init__(self, cfg: dict, device: str = "cuda"):
+        import timm
         import torch
-        from transformers import AutoModel
 
         self.device = device
         repo = cfg["teacher"]["hf_repo"]
         dtype = torch.bfloat16 if cfg["teacher"]["dtype"] == "bf16" else torch.float16
         self.dtype = dtype
-        self.model = AutoModel.from_pretrained(repo, torch_dtype=dtype, trust_remote_code=True)
+        self.model = timm.create_model(
+            f"hf-hub:{repo}", pretrained=True, init_values=1e-5, dynamic_img_size=False
+        )
         self.model.to(device).eval()
         for p in self.model.parameters():
             p.requires_grad_(False)
         self.embedding_dim = cfg["teacher"]["embedding_dim"]
         self._n_params = sum(p.numel() for p in self.model.parameters())
-        self._mean = np.array(self.GENBIO_MEAN, dtype=np.float32)
-        self._std = np.array(self.GENBIO_STD, dtype=np.float32)
+        self._mean = np.array(self.HOPTIMUS_MEAN, dtype=np.float32)
+        self._std = np.array(self.HOPTIMUS_STD, dtype=np.float32)
 
     @property
     def n_parameters(self) -> int:
         return self._n_params
 
     def _preprocess(self, patches_uint8: np.ndarray):
-        """patches_uint8: (B, 224, 224, 3) uint8 RGB. Resize is applied anyway as a safety net in case a patch isn't exactly 224x224."""
+        """patches_uint8: (B, 224, 224, 3) uint8 RGB. Resize is applied anyway as a safety net in case a patch isn't exactly 224x224.
+        Kept in fp32 -- the model card recommends mixed precision via autocast at forward time, not casting weights/inputs to fp16 up front (the weights themselves stay fp32)."""
         import torch
         import torch.nn.functional as F
 
@@ -47,14 +53,14 @@ class GenBioPathFMTeacher:
             x = F.interpolate(x, size=(224, 224), mode="bilinear", align_corners=False)
         mean = torch.from_numpy(self._mean).to(self.device).view(1, 3, 1, 1)
         std = torch.from_numpy(self._std).to(self.device).view(1, 3, 1, 1)
-        return ((x - mean) / std).contiguous().to(self.dtype)
+        return ((x - mean) / std).contiguous()
 
     def embed_batch(self, patches_uint8: np.ndarray) -> np.ndarray:
-        """patches_uint8: (B, H, W, 3) uint8 RGB; returns (B, 4608) float32 L2-normalized CLS embeddings."""
+        """patches_uint8: (B, H, W, 3) uint8 RGB; returns (B, 1536) float32 L2-normalized CLS embeddings."""
         import torch
         x = self._preprocess(patches_uint8)
-        with torch.no_grad():
-            cls = self.model(x)  # [B, 4608] tensor, returned directly (see class docstring)
+        with torch.autocast(device_type=self.device.split(":")[0], dtype=self.dtype), torch.no_grad():
+            cls = self.model(x)  # [B, 1536] tensor, returned directly (see class docstring)
         cls = cls.float().cpu().numpy()
         assert cls.shape[1] == self.embedding_dim, (
             f"expected teacher embedding dim {self.embedding_dim}, got {cls.shape[1]}"
