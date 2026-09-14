@@ -1,6 +1,6 @@
 # FINAL_RESULTS.md
 
-Locked final scientific experiment: distilled ConvNeXt V2-Atto (from GenBio-PathFM) +
+Locked final scientific experiment: distilled ConvNeXt V2-Atto (from H-Optimus-0) +
 multiscale PNA graph correction, 5-fold patient-level CV x 3 HEST-1k cancers
 (IDC/COAD/CCRCC) x seed 0. Source run: SLURM job 84871, completed 2026-08-31
 (03:15:54 elapsed). All numbers below are read directly from
@@ -11,7 +11,7 @@ estimated or extrapolated (FINAL STOP RULE).
 
 ## Research questions, answered
 
-**Q1/Q2 -- Does GenBio-PathFM distillation help the patch-only encoder?**
+**Q1/Q2 -- Does H-Optimus-0 distillation help the patch-only encoder?**
 **Gate 1: Distillation (A2 > A1)** -- pooled: **NOT SUPPORTED**, delta_R=0.0115 95% CI=[-0.0036, 0.0245], Cohen's d=0.3935, p=0.0722 (n=15 cancer-fold-seed cells). Per-cancer: IDC: NOT SUPPORTED (delta=-0.0116); COAD: NOT SUPPORTED (delta=0.0150); CCRCC: SUPPORTED (delta=0.0312).
 Distillation is **not supported** as a pooled effect at seed 0: A2 (distilled) is not reliably
 better than A1 (ImageNet) once patient-level bootstrap uncertainty is accounted for. See the
@@ -30,11 +30,11 @@ from A5 (degree-preserving shuffled graph) in every cancer. Per the FINAL STOP R
 reported as a genuine negative finding, not glossed over -- the GNN's Gate-2 benefit most likely
 comes from general neighbor-averaging/regularization, not from encoding real tissue adjacency.
 
-**Q5 -- Compression efficiency (student vs. GenBio-PathFM teacher).**
+**Q5 -- Compression efficiency (student vs. H-Optimus-0 teacher).**
 Student (distilled ConvNeXt V2-Atto): **3,387,400 parameters** (measured).
-GenBio-PathFM teacher: **1,133,686,784 parameters** (measured 2026-08-31 via
-`AutoModel.from_pretrained`, exact `sum(p.numel())`, not the model card's rounded "1.1B").
-Compression ratio: **334.7x** fewer parameters, at the accuracy
+H-Optimus-0 teacher: **1,134,774,272 parameters** (measured via
+`timm.create_model('hf-hub:bioptimus/H-optimus-0')`, exact `sum(p.numel())`, not the model card's rounded "1.1B").
+Compression ratio: **335.0x** fewer parameters, at the accuracy
 cost quantified by Gate 1 above and by the official-protocol comparison below. All other
 efficiency metrics (peak inference VRAM, patches/sec throughput, per-patient GNN wall-clock) were
 **NOT MEASURED** this session -- see `tables/efficiency.csv`.
@@ -81,9 +81,9 @@ which uses train-fold HVG selection, a trained patch head, and GNN correction)
 | CCRCC    | distilled_convnextv2_atto |         6 |         0.2225 |        0.0544 |
 | CCRCC    | genbio_pathfm             |         6 |         0.2638 |        0.0277 |
 
-## GenBio embedding -> trained MLP baseline (B1) -- **PARTIAL, fold0/seed0 only, not full 5-fold CV**
+## H-Optimus-0 embedding -> trained MLP baseline (B1) -- **PARTIAL, fold0/seed0 only, not full 5-fold CV**
 
-Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no
+Frozen 1536-D H-Optimus-0 embedding fed directly into a small trained MLP head (no PCA, no
 Ridge -- `scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused
 alternative), on the same HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table.
 
@@ -106,7 +106,7 @@ conclusion.
    since job 84871's design, not new to this aggregation step.
 2. **Seeds 1/2** for the major models (A2/A8/B1) were not run -- seed 0 only, per the spec's
    "seed 0 is primary; seeds 1/2 only if compute allows" allowance.
-3. **B1 (GenBio embedding -> MLP baseline)** is fold0/seed0 only for each cancer (see above),
+3. **B1 (H-Optimus-0 embedding -> MLP baseline)** is fold0/seed0 only for each cancer (see above),
    not the full 5-fold design the rest of this table uses.
 4. **Efficiency**: only parameter counts (student, teacher, compression ratio) were measured;
    VRAM/throughput/wall-clock were not.

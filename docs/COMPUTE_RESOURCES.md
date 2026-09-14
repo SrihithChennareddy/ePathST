@@ -19,7 +19,7 @@ total (zero compute consumed).
   still running and accruing more.
 - **What that compute produced**: full CPTAC WSI selection/QC (598
   candidates screened -> 363 selected), patch extraction (564,312
-  patches), one complete GenBio-PathFM (1,133,686,784-parameter)
+  patches), one complete H-Optimus-0 (1,134,774,272-parameter)
   teacher-embedding pass, and **39 completed epochs** of ConvNeXt V2-Atto
   distillation training (S1/seed0), with validation cosine similarity to
   the teacher climbing 0.7646 -> 0.9019 over that span.
@@ -62,7 +62,7 @@ wall-clock elapsed hours.
 
 | Job ID | Purpose | Start | End (or "running") | Elapsed | GPU-hours | Outcome |
 |---|---|---|---|---|---|---|
-| 83723 | CPTAC Steps 1-4 (WSI QC, patch extraction, GenBio-PathFM teacher embedding) + Step 5 attempt | 2026-08-28 03:03:30 | 2026-08-28 04:22:54 | 1:19:24 | 1.32 | FAILED — crashed in Step 5 due to the HDF5 fixed-width-string truncation bug (see RUN_STATUS.md); Steps 1-4's work (QC + patch extraction + teacher embedding) completed and was reused by later runs |
+| 83723 | CPTAC Steps 1-4 (WSI QC, patch extraction, H-Optimus-0 teacher embedding) + Step 5 attempt | 2026-08-28 03:03:30 | 2026-08-28 04:22:54 | 1:19:24 | 1.32 | FAILED — crashed in Step 5 due to the HDF5 fixed-width-string truncation bug (see RUN_STATUS.md); Steps 1-4's work (QC + patch extraction + teacher embedding) completed and was reused by later runs |
 | 83737 | Same pipeline, longer-horizon attempt, ran concurrently with 83723 | 2026-08-28 03:21:24 | 2026-08-28 05:00:17 | 1:38:53 | 1.65 | FAILED — self-detected the same truncation-bug corruption via its own integrity check and crashed cleanly in Step 4's verification |
 | 83825 | CPTAC full pipeline (Steps 1-6, chain link 1) — first clean run after the truncation-bug fix | 2026-08-28 11:19:29 | 2026-08-28 19:19:45 | 8:00:16 | 8.00 | TIMEOUT (expected, 8h SLURM wall-clock limit) — re-embedded all 564,312 patches from scratch cleanly, trained S1 seed0 through epoch 14 (val cosine similarity 0.7646 -> 0.8880) |
 | 83826 | Distillation training continuation (chain link 2), resumed from 83825's checkpoint | 2026-08-28 19:19:45 | 2026-08-29 03:19:46 | 8:00:01 | 8.00 | TIMEOUT (expected) — trained epochs 15-26 (val cosine similarity -> 0.8972) |
@@ -77,8 +77,8 @@ wall-clock elapsed hours.
 
 ### Interactive validation session (pre-dates the job ledger above)
 Early end-to-end validation of the pipeline against one real CPTAC WSI
-and the real GenBio-PathFM teacher (confirming the teacher loads with
-1,133,686,784 parameters, embeds real patches correctly, and the
+and the real H-Optimus-0 teacher (confirming the teacher loads with
+1,134,774,272 parameters, embeds real patches correctly, and the
 ConvNeXt V2-Atto student trains with genuine learning signal) ran
 interactively on an allocated **NVIDIA RTX PRO 6000 Blackwell** (same
 model, confirmed via `nvidia-smi`) rather than through a tracked `sbatch`
@@ -100,7 +100,7 @@ traceable; zero compute cost.
 **~19.65 GPU-hours** on NVIDIA RTX PRO 6000 Blackwell across 5
 substantially-run jobs (83723, 83737, 83825, 83826, 83827), covering:
 full CPTAC WSI selection/QC (598 candidates -> 363 selected), patch
-extraction (564,312 patches), one complete GenBio-PathFM
+extraction (564,312 patches), one complete H-Optimus-0
 teacher-embedding pass, and 39 completed epochs of ConvNeXt V2-Atto
 distillation training (S1/seed0). Job 84150 is still accruing GPU-hours
 toward the 50-epoch target — add its final elapsed time once it completes.

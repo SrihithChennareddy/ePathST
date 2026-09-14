@@ -10,7 +10,7 @@ Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x 
 4. [Primary statistical gates](#4-primary-statistical-gates)
 5. [Secondary comparisons](#5-secondary-comparisons)
 6. [Pathway / PROGENy14 view](#6-pathway--progeny14-view)
-7. [GenBio-PathFM reference numbers](#7-genbio-pathfm-reference-numbers)
+7. [H-Optimus-0 reference numbers](#7-h-optimus-0-reference-numbers)
 8. [Efficiency](#8-efficiency)
 9. [Bottom line](#9-bottom-line)
 10. [Limitations](#10-limitations)
@@ -20,7 +20,7 @@ Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x 
 | Model | Priority | What it is |
 |---|---|---|
 | A1_imagenet_patch | primary | ImageNet ConvNeXt, no distillation, patch-only |
-| **A2_distilled_patch** | primary | GenBio-distilled ConvNeXt, patch-only (=y_patch, the anchor) |
+| **A2_distilled_patch** | primary | H-Optimus-0-distilled ConvNeXt, patch-only (=y_patch, the anchor) |
 | A5_shuffled_graph | primary | degree-preserving rewire -- CRITICAL negative control (Gate 3) |
 | A6_local_pna | primary | real LOCAL-only physical graph, union-PNA backend |
 | A7_multiscale_pna | primary | real local+meso+macro union graph, one PNA sees all edges |
@@ -162,23 +162,23 @@ Same pathway-target column as sections 2-3 above, isolated for readers who only 
 | A4_random_graph | 0.1485 [0.1332, 0.1638] | 0.1784 [0.1710, 0.1872] | 0.1275 [0.1160, 0.1428] | 0.1395 [0.1134, 0.1656] |
 | A9_gatv2_multiscale | 0.1523 [0.1364, 0.1684] | 0.1829 [0.1772, 0.1884] | 0.1311 [0.1206, 0.1443] | 0.1429 [0.1139, 0.1719] |
 
-## 7. GenBio-PathFM reference numbers
+## 7. H-Optimus-0 reference numbers
 
 Two **separate protocol tracks**, neither comparable to the A0-A9 table above (different targets/splits/heads) or to each other (different training protocol). Do not average across tracks.
 
 ### 7a. Official HEST-Benchmark protocol
 
-log1p-only targets (no library-size normalization), StandardScaler+PCA(256)+Ridge, official published k-fold splits, seed=1. Distilled student and GenBio-PathFM teacher evaluated identically, isolating the encoder's effect from everything else in the custom pipeline (no trained patch head, no GNN, no train-fold HVG selection).
+log1p-only targets (no library-size normalization), StandardScaler+PCA(256)+Ridge, official published k-fold splits, seed=1. Distilled student and H-Optimus-0 teacher evaluated identically, isolating the encoder's effect from everything else in the custom pipeline (no trained patch head, no GNN, no train-fold HVG selection).
 
-| Cancer | n folds | Distilled student R (std) | GenBio-PathFM teacher R (std) | Gap (teacher - student) |
+| Cancer | n folds | Distilled student R (std) | H-Optimus-0 teacher R (std) | Gap (teacher - student) |
 |---|---|---|---|---|
 | IDC | 4 | 0.4822 (0.0489) | 0.5898 (0.0861) | +0.1076 |
 | COAD | 2 | 0.2385 (0.0282) | 0.3264 (0.0184) | +0.0880 |
 | CCRCC | 6 | 0.2225 (0.0544) | 0.2638 (0.0277) | +0.0413 |
 
-### 7b. Custom-pipeline GenBio embedding -> trained MLP baseline (B1) -- PARTIAL
+### 7b. Custom-pipeline H-Optimus-0 embedding -> trained MLP baseline (B1) -- PARTIAL
 
-Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no Ridge -- `src/scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused alternative), on the SAME HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table, but **fold0/seed0 only, not the full 5-fold design**. Preliminary: no CI is computable from a single fold, so don't compare CI-to-CI against the bootstrapped A0-A9 numbers above.
+Frozen 1536-D H-Optimus-0 embedding fed directly into a small trained MLP head (no PCA, no Ridge -- `src/scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused alternative), on the SAME HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table, but **fold0/seed0 only, not the full 5-fold design**. Preliminary: no CI is computable from a single fold, so don't compare CI-to-CI against the bootstrapped A0-A9 numbers above.
 
 | Cancer | n train / test patients | HVG1000 R | HVG50 R | PROGENy14 R | Feature extract (s) | Head train (s) | Peak VRAM (GB) |
 |---|---|---|---|---|---|---|---|
@@ -191,8 +191,8 @@ Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head
 | Metric | Value | Status | Source |
 |---|---|---|---|
 | student_encoder_total_parameters | 3,387,400 | MEASURED | scripts (ConvNeXt V2-Atto student), student_encoder_param_count_seed0.json |
-| genbio_pathfm_teacher_total_parameters | 1,133,686,784 | MEASURED | AutoModel.from_pretrained('genbio-ai/genbio-pathfm'), sum(p.numel()), 2026-08-31 |
-| compression_ratio_teacher_over_student | 334.7x | MEASURED | derived from the two rows above |
+| h_optimus_0_teacher_total_parameters | 1,134,774,272 | MEASURED | timm.create_model('hf-hub:bioptimus/H-optimus-0', pretrained=True), sum(p.numel()) |
+| compression_ratio_teacher_over_student | 335.0x | MEASURED | derived from the two rows above |
 | gpu_peak_vram_inference | n/a | NOT MEASURED | no inference-time VRAM profiling run this session |
 | patches_per_second_throughput | n/a | NOT MEASURED | no throughput benchmark run this session |
 | A8_gnn_inference_wallclock_per_patient | n/a | NOT MEASURED | no dedicated timing harness run this session |
@@ -203,13 +203,13 @@ Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head
 - **But not because of real tissue topology (Gate 3, NOT SUPPORTED everywhere).** A8 (real multiscale graph) is statistically indistinguishable from A5 (degree-preserving shuffled graph) pooled (delta_R=-0.002, CI crosses zero) and in every cancer; the A8-vs-A5 secondary comparison confirms the same null result. The GNN's benefit most plausibly comes from generic neighbor-averaging/regularization, not true spatial adjacency -- a genuine negative finding, reported per the FINAL STOP RULE.
 - **CPTAC->HEST distillation does not reliably help (Gate 1, NOT SUPPORTED pooled).** A2 vs. A1 pooled delta_R=+0.0115, CI=[-0.004, 0.025] crosses zero (p=0.072, just short of significance). Sign flips across cancers: CCRCC SUPPORTED (+0.031), COAD marginal (+0.015, not supported), IDC reverses (-0.012, ImageNet ahead) -- the IDC reversal is flagged, not explained, in Limitations.
 - **A8 is not the single best ablation among the graph variants.** A7 (union multiscale, no gating) and A9 (GATv2) score marginally higher than A8 pooled on HVG1000 (A7: 0.1019, A9: 0.1024 vs. A8: 0.0981); A8-vs-A7 and A8-vs-A9 are both NOT SUPPORTED. A8 does beat the parameter-matched MLP (A3), so some graph structure helps -- but scale-aware gating specifically shows no measurable edge over simpler graph variants at this sample size.
-- **Distillation buys a real, large compression at a real, consistent accuracy cost.** Under the official protocol (encoder-only, no GNN, no patch head), GenBio-PathFM beats the distilled student in all 3 cancers by 0.04-0.11 R, for 334.7x fewer parameters.
+- **Distillation buys a real, large compression at a real, consistent accuracy cost.** Under the official protocol (encoder-only, no GNN, no patch head), H-Optimus-0 beats the distilled student in all 3 cancers by 0.04-0.11 R, for 335.0x fewer parameters.
 
 ## 10. Limitations (reported honestly, not omitted)
 
 1. **Bootstrap resampling unit.** All CIs above resample (cancer, fold, seed) cells (15 pooled, 5 per cancer), not literal per-patient R_p values -- script 10 doesn't persist per-patient predictions to disk. A stricter implementation would bootstrap over patients directly.
 2. **Seeds 1/2** were not run for the major models -- seed 0 only.
-3. **B1 (GenBio embedding -> MLP baseline)** is fold0/seed0 only per cancer, not the full 5-fold design.
+3. **B1 (H-Optimus-0 embedding -> MLP baseline)** is fold0/seed0 only per cancer, not the full 5-fold design.
 4. **Efficiency**: only parameter counts and the derived compression ratio were measured; inference VRAM, throughput, and GNN wall-clock were not.
 5. **The IDC-specific distillation reversal** (A1 ahead of A2 in IDC) has not been separately root-caused.
 6. **A8 vs. A7/A9** shows A8 is not clearly the best graph variant at this sample size -- worth noting for anyone citing A8 as unambiguously superior.

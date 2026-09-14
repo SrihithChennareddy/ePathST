@@ -23,7 +23,7 @@ alone should be enough to reconstruct "what do I do next."
 | HEST input data | `/lustre/nvwulf/projects/YurovskyGroup-nvwulf/simons_2026` (colon/COAD only so far) |
 | **ephemeral work_dir** (patch shards, manifests, QC cache, logs) | `/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_genbio_distill_hest_pna_work/` |
 | **persistent artifacts** (reusable across runs) | `/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_genbio_distill_hest_pna/` |
-| &nbsp;&nbsp;-- GenBio-PathFM teacher embeddings (run-once cache) | `.../cptac_genbio_distill_hest_pna/teacher_embeddings/cptac_teacher_embeddings.h5` |
+| &nbsp;&nbsp;-- H-Optimus-0 teacher embeddings (run-once cache) | `.../cptac_genbio_distill_hest_pna/teacher_embeddings/cptac_teacher_embeddings.h5` |
 | &nbsp;&nbsp;-- student checkpoints (S1/S2 best, locked encoders) | `.../cptac_genbio_distill_hest_pna/student_checkpoints/` |
 | SLURM job scripts | `STS_src/slurm/run_cptac_distillation.slurm` (H200x4), `run_cptac_distillation_b40x4.slurm` (b40x4, 1 GPU) |
 | SLURM stdout/stderr | `STS_src/logs/slurm_b40_<jobid>.{out,err}` or `slurm_<jobid>.{out,err}` |
@@ -45,7 +45,7 @@ group quota (~150GB used as of 2026-08-28).
 - **Step 4** (`04_run_teacher_genbio.py`): skips any `patch_id` already
   present in the canonical `teacher_embeddings/cptac_teacher_embeddings.h5`
   cache (or, when GPU-sharded, its own shard's partial file). Never
-  recomputes an existing embedding -- the "run GenBio only once" guarantee.
+  recomputes an existing embedding -- the "run the teacher only once" guarantee.
 - **Step 5** (`05_train_student_distill.py` / `src/pathology_st/distill_train.train_student`):
   saves a full training-state snapshot (`{baseline}_seed{seed}_resume.pt`
   -- model+optimizer+scaler+step counters) every epoch, separate from the
@@ -125,7 +125,7 @@ log for "=== Step 3:" before starting a second job's Step 1-2).
   bug above, now fixed for future runs) -> 494,268 total CPTAC patches ->
   patient split written for all 3 seeds (e.g. seed2: BRCA 85/11/10
   train/val/test, CCRCC 168/21/21, COAD 38/5/4).
-- **Step 4 (GenBio-PathFM teacher embedding) started 03:16:10**: single
+- **Step 4 (H-Optimus-0 teacher embedding) started 03:16:10**: single
   GPU, 493,469 patches to embed (1,664 already cached from the earlier
   validation session). At the ~72 patches/sec measured earlier on this
   GPU family, ~1.9h, finishing around **05:10-05:20**.
@@ -133,7 +133,7 @@ log for "=== Step 3:" before starting a second job's Step 1-2).
   `squeue -j 83723` for live status, or `tail -f
   STS_src/logs/slurm_b40_83723.out` for progress.
 - Expected sequence once healthy: Step 1 (WSI QC, ~598 WSIs) -> Step 2
-  (patch extraction) -> Step 3 (patient split) -> Step 4 (GenBio-PathFM
+  (patch extraction) -> Step 3 (patient split) -> Step 4 (H-Optimus-0
   teacher embedding, single GPU, no sharding since b40x4 only granted 1
   GPU here) -> Step 5 (ConvNeXt V2-Atto distillation training, S1 seed 0
   prioritized, time-budgeted to whatever remains of the 8h wall clock) ->

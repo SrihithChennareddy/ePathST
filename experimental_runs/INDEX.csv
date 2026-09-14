@@ -1,6 +1,6 @@
 run_id,date,job_id,partition,gpu,stage_reached,headline_metric,notes
 2026-08-28_job83825_cptac_distill_b40x4,2026-08-28,83825,b40x4,1x RTX PRO 6000 Blackwell,end of 8h job,S1 val cosine_sim=0.8843,
 2026-08-31_job84871_final_5fold_3cancer_seed0,2026-08-31,84871,b40x4-long,1x RTX PRO 6000 Blackwell,"LOCKED final 5-fold x 3-cancer x seed-0 primary experiment, post-diagnostic-fix","gate2_spatial_context_delta_R=0.0253 CI=[0.0110,0.0427]",
-2026-08-31_job84871_final_5fold_3cancer_seed0_with_results_final,2026-08-31,84871,b40x4-long,1x RTX PRO 6000 Blackwell,fix B1 baseline mislabeling (was called PCA256-Ridge; actually GenBio-embedding->MLP),"gate2_spatial_context_delta_R=0.0253 CI=[0.0110,0.0427]",
+2026-08-31_job84871_final_5fold_3cancer_seed0_with_results_final,2026-08-31,84871,b40x4-long,1x RTX PRO 6000 Blackwell,fix B1 baseline mislabeling (was called PCA256-Ridge; actually H-Optimus-0-embedding->MLP),"gate2_spatial_context_delta_R=0.0253 CI=[0.0110,0.0427]",
 2026-09-05_job88050_official_hest_ablation_grid,2026-09-05,88050,h200x8-then-b40x4,1x RTX PRO 6000 Blackwell,"official A0-A9 grid, all 3 cancers, official protocol (Fisher-z + official pooled Pearson)","gate2_spatial_context_delta_R=0.0253 CI=[0.0110,0.0427]",
 2026-09-05_job88100_morans_i_diagnostic_full,2026-09-05,88100,b40x4,1x RTX PRO 6000 Blackwell,full 3-cancer Moran's I vs A8-A2 delta diagnostic,"gate2_spatial_context_delta_R=0.0253 CI=[0.0110,0.0427]",

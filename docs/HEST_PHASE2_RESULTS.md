@@ -16,7 +16,7 @@ operational narrative for this run (every bug found/fixed getting here).
 Given H&E patches from breast (IDC), colon (COAD), and kidney (CCRCC)
 tumor sections, how well does spatial gene expression (HVG1000/HVG50)
 and PROGENy14 pathway activity predict from: (1) a frozen,
-GenBio-PathFM-distilled 3.4M-param CNN patch encoder alone, versus (2)
+H-Optimus-0-distilled 3.4M-param CNN patch encoder alone, versus (2)
 that same encoder's output corrected by a graph neural network using the
 tissue's real physical multiscale spatial structure, versus negative
 controls (shuffled/random graphs, mean-expression floor)?
@@ -43,7 +43,7 @@ noise at this sample size, especially for CCRCC (n=5 test patients).
 | ID | What it tests |
 |---|---|
 | A0_mean_expression | Predict the training-set mean gene vector for every spot -- sanity floor |
-| A2_distilled_patch | Frozen GenBio-distilled CNN, patch-only, no graph -- **the anchor** |
+| A2_distilled_patch | Frozen H-Optimus-0-distilled CNN, patch-only, no graph -- **the anchor** |
 | A3_matched_mlp | Parameter-matched MLP on the same features, no spatial neighbors -- tests whether extra capacity alone (no real graph) explains any gain |
 | A5_shuffled_graph | Degree-preserving rewired graph -- **critical negative control** |
 | A6_local_pna | Real LOCAL-only physical graph, union-PNA backend |

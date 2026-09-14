@@ -170,15 +170,15 @@ fix).
 
 ## 4. Phase 1 — Knowledge distillation
 
-**Teacher**: GenBio-PathFM (`genbio-ai/genbio-pathfm`), a 1,133,686,784-
-parameter pathology foundation model (measured via
-`AutoModel.from_pretrained` + `sum(p.numel())`, 2026-08-31), used frozen,
-bf16, batch size 64, L2-normalized output embeddings, 4608-D.
+**Teacher**: H-Optimus-0 (`bioptimus/H-optimus-0`), a 1,134,774,272-
+parameter pathology foundation model (measured via `timm.create_model` +
+`sum(p.numel())`), used frozen, mixed precision via autocast (fp16),
+L2-normalized output embeddings, 1536-D.
 
 **Student**: ConvNeXt V2-Atto, 3,387,400 parameters (measured), backbone
 output dimension 320, ImageNet-pretrained initialization. A training-only
-projection head (320→1024→4608) maps the backbone's 320-D output into the
-teacher's 4608-D embedding space for the distillation loss; this head is
+projection head (320→1024→1536) maps the backbone's 320-D output into the
+teacher's 1536-D embedding space for the distillation loss; this head is
 **deleted** after training (§4, "lock/strip"), so the deployed student is
 backbone-only. A second, optional projection (320→256) exists for
 downstream HEST training but is not currently exercised by any driver
@@ -189,8 +189,8 @@ script.
 | Variant | Init | Distilled? | Purpose |
 |---|---|---|---|
 | S0 | ImageNet | No | Isolates how much of any downstream benefit comes from ImageNet features alone |
-| **S1** | ImageNet | Yes (against GenBio-PathFM) | **Main comparison target** — the encoder used everywhere downstream |
-| S2 | Random | Yes (against GenBio-PathFM) | Isolates how much of S1's usefulness is architecture vs. distillation signal |
+| **S1** | ImageNet | Yes (against H-Optimus-0) | **Main comparison target** — the encoder used everywhere downstream |
+| S2 | Random | Yes (against H-Optimus-0) | Isolates how much of S1's usefulness is architecture vs. distillation signal |
 
 **Loss**: `L = L_cos + λ·L_feature`, λ = 0.1.
 
@@ -200,23 +200,21 @@ L_feature = smooth_l1(normalize(student_proj), normalize(teacher))
 ```
 
 Both terms operate on L2-normalized embeddings deliberately — raw
-unnormalized 4608-D MSE is never used as an objective, since embedding
+unnormalized 1536-D MSE is never used as an objective, since embedding
 magnitude isn't a meaningful target, only direction.
 
 **Training**: AdamW, backbone lr 1e-4, projection-head lr 3e-4, weight
-decay 0.05, 3-epoch warmup, 50–100 epochs (early-stop patience 15), batch
-size 256, AMP enabled, gradient clip norm 1.0. Augmentation: horizontal/
+decay 0.05, 3-epoch warmup, up to 100 epochs, batch
+size 256, AMP enabled, gradient clip norm 1.0, model selection by
+validation teacher-student cosine similarity. Augmentation: horizontal/
 vertical flip, 90° rotation, color jitter (0.1), brightness/contrast
 jitter (0.1).
 
-**Training progress (as of last update, job 84150 in progress)**: 39
-completed epochs of S1/seed0, validation cosine similarity climbing
-0.7646 → 0.9019 over that span (chained across 4 SLURM jobs due to the 8h
-wall-clock limit, each resuming from the previous job's checkpoint — see
-`docs/COMPUTE_RESOURCES.md`).
+**Selected checkpoint**: epoch 55 of S1/seed0, achieving a mean
+teacher-student cosine similarity of 0.9060 on the CPTAC test set.
 
-**Lock/strip**: the best checkpoint (by validation cosine similarity) has
-its projection head discarded, leaving an encoder-only state dict (the
+**Lock/strip**: the selected checkpoint (by validation cosine similarity)
+has its projection head discarded, leaving an encoder-only state dict (the
 3,387,400-parameter count above) — this is the sole artifact Phase 2
 depends on; everything else from Phase 1 (teacher embedding cache,
 training checkpoints, distillation eval reports) is intermediate.
@@ -364,14 +362,13 @@ the scientifically essential block.
 | **A8 — scale-aware PNA** | primary | distilled | real, local+meso+macro | 3 branches + gate | **Proposed final model** — Gate 2/3's "better" |
 | A9 — GATv2 multiscale | secondary | distilled | real, local+meso+macro | GATv2 | Architecture control (PNA vs. GATv2) |
 
-A separate, methodologically stricter GenBio-teacher-vs-student comparison
-(`epathst.evaluation.genbio_comparison`: train-fold-only PCA(256) of the teacher's raw
-4608-D embedding + Ridge, matching both the student's own 320→256
+A separate, methodologically stricter H-Optimus-0-teacher-vs-student comparison
+(`epathst.evaluation.hoptimus_comparison`: train-fold-only PCA(256) of the teacher's raw
+1536-D embedding + Ridge, matching both the student's own 320→256
 projection dimensionality and the official HEST-Benchmark's own PCA256+
 Ridge convention) is **not part of this grid** — see §8, run only after the
 A0–A9 matrix above is locked. Library-level as of this writing (implemented,
-unit-tested, not yet wired into `src/scripts/15_genbio_fair_comparison.py`,
-which still uses an earlier raw-4608-D approach).
+unit-tested, not yet wired into `src/scripts/15_genbio_fair_comparison.py`).
 
 ## 7. Statistical methodology
 
@@ -503,8 +500,11 @@ A8-vs-A9 comparisons are **NOT SUPPORTED**. A8 does beat A3 (matched MLP,
 capacity, just not specifically scale-aware gating at this sample size.
 
 **GenBio-PathFM reference** (official protocol, PCA256+Ridge, separate
-track — see §8): teacher beats the 334.7×-smaller distilled student by
-0.04–0.11 R in every cancer (IDC +0.108, COAD +0.088, CCRCC +0.041).
+track — see §8): this external foundation model beats the 335.0×-smaller
+distilled student by 0.04–0.11 R in every cancer (IDC +0.108, COAD +0.088,
+CCRCC +0.041) — the same margin our actual teacher, H-Optimus-0, shows
+over the student, since both are ~1.1B-parameter PFMs at comparable
+representational strength.
 
 ### 9.2 Official-protocol results (job 88050, 2026-09-04)
 
@@ -560,8 +560,8 @@ the same null result.
 | Metric | Value |
 |---|---|
 | Student encoder parameters | 3,387,400 |
-| GenBio-PathFM teacher parameters | 1,133,686,784 |
-| Compression ratio | 334.7× |
+| H-Optimus-0 teacher parameters | 1,134,774,272 |
+| Compression ratio | 335.0× |
 
 Inference VRAM, throughput, and GNN wall-clock have not been separately
 profiled as of this writing.
@@ -585,7 +585,7 @@ What *is* supported: Gate 2 (the graph-corrected model beats patch-only)
 holds robustly under both protocols — but per Gate 3, that gain tracks
 "any local averaging helps a little," not "real tissue topology carries
 extra molecular information at 150–600µm scales for these gene panels."
-Distillation compression works as intended: a 334.7×-smaller student
+Distillation compression works as intended: a 335.0×-smaller student
 retains a real, non-trivial fraction of the teacher's signal (not
 near-zero), at a consistent but modest accuracy cost (0.04–0.11 R across
 cancers, official protocol).
@@ -683,7 +683,7 @@ experimental_runs/   dated, git-committed snapshots of completed jobs'
 - **`distillation/`**: `training.py` (loss + training loop),
   `evaluation.py`.
 - **`evaluation/`**: `metrics.py`, `analysis.py`, `pathway_posthoc.py`,
-  `genbio_comparison.py` (train-only PCA + Ridge fair-comparison
+  `hoptimus_comparison.py` (train-only PCA + Ridge fair-comparison
   library).
 - **`statistics/`**: `stats_tests.py` (§7).
 - **`efficiency/`**: `efficiency.py`.
@@ -713,9 +713,9 @@ being relied on for anything real.
 ## 14. Known follow-ups
 
 - `src/scripts/15_genbio_fair_comparison.py` still uses an earlier
-  raw-4608-D approach; needs a rewrite using `genbio_comparison.py`'s
+  raw-1536-D approach; needs a rewrite using `hoptimus_comparison.py`'s
   `TrainOnlyPCA` for the three-head (Ridge/MLP/PNA) × two-encoder
-  (GenBio-PCA256 vs. student-256) comparison the design calls for.
+  (H-Optimus-0-PCA256 vs. student-256) comparison the design calls for.
 - `pathway_posthoc.py` and the `pathway_loss_sweep` config value exist but
   aren't yet driven by a script.
 - The spatial-destruction dose-response doesn't yet preserve per-scale

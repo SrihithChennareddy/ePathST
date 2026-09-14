@@ -15,7 +15,7 @@
       "final",
       "final_results_table.csv",
       "genbio_baseline",
-      "genbio_teacher_param_count.json",
+      "h_optimus_0_teacher_param_count.json",
       "official_hest_benchmark",
       "per_cancer_results_table.csv",
       "primary_hypothesis_test.json",

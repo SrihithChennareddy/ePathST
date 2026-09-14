@@ -1,4 +1,0 @@
-{
-  "total_parameters": 1133686784,
-  "note": "Measured 2026-08-31 via transformers.AutoModel.from_pretrained('genbio-ai/genbio-pathfm', trust_remote_code=True) then sum(p.numel() for p in model.parameters()) -- an exact real count, not the docstring's rounded '1.1B' figure. CPU load, fp32 dtype for the count itself (dtype does not affect numel)."
-}

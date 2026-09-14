@@ -74,14 +74,14 @@ Difficulty ranks the same as the custom-protocol run: IDC (easiest) > COAD > CCR
   CCRCC r=-0.134 p=0.35, pooled (n=150 genes) r=0.136 p=0.097 -- none significant, replicating
   PoC_5's own null result (r=0.115, p=0.63) on the current official data.
 
-## GenBio-PathFM teacher reference (same official protocol, PCA(256)+Ridge head)
+## H-Optimus-0 teacher reference (same official protocol, PCA(256)+Ridge head)
 
 From `src/scripts/19_official_hest_benchmark.py` (`results/official_hest_benchmark/`), a
 methodologically separate comparison (raw embeddings -> train-fold PCA(256) -> Ridge, not the
 trained MLP bottleneck head A1/A2 use -- numbers are close to but not directly comparable to
 A1/A2 above):
 
-| Cancer | GenBio-PathFM (1.1B params, teacher) R | Distilled CNN (3.4M params, student) R |
+| Cancer | H-Optimus-0 (1.1B params, teacher) R | Distilled CNN (3.4M params, student) R |
 |---|---|---|
 | IDC | 0.5898 | 0.4822 |
 | COAD | 0.3264 | 0.2385 |

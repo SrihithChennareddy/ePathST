@@ -15,7 +15,7 @@
       "final",
       "final_results_table.csv",
       "genbio_baseline",
-      "genbio_teacher_param_count.json",
+      "h_optimus_0_teacher_param_count.json",
       "morans_i_diagnostic",
       "official_hest_ablation_grid",
       "official_hest_benchmark",

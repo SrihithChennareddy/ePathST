@@ -6,7 +6,7 @@ Final_Project_V1.txt` (original, the codebase's foundation) and
 written after seeing PoC_5's real results -- see `docs/POC5_RESULTS.md`).
 
 **Explicit constraint honored throughout this migration**: nothing related
-to CPTAC WSI selection/QC, patch extraction, GenBio-PathFM teacher
+to CPTAC WSI selection/QC, patch extraction, H-Optimus-0 teacher
 inference, or ConvNeXt V2-Atto distillation training was touched --
 `src/pathology_st/teacher_genbio.py`, `src/pathology_st/student_model.py`, `src/pathology_st/distill_train.py`,
 `src/pathology_st/distill_loss.py`, `src/scripts/01`-`07`, and `configs/base.yaml`'s
@@ -15,7 +15,7 @@ except where an earlier, unrelated fix (the HDF5 truncation bug) already
 touched `src/pathology_st/teacher_genbio.py` before this migration started -- see
 `docs/RUN_STATUS.md`. Verified by diffing those sections' resolved config
 values before/after (`distillation.max_epochs=100`,
-`teacher.hf_repo=genbio-ai/genbio-pathfm`, `student.backbone=
+`teacher.hf_repo=bioptimus/H-optimus-0`, `student.backbone=
 convnextv2_atto` all confirmed unchanged) and by confirming the live
 training job (84150 at migration time) kept running throughout with zero
 interruption or config drift.
@@ -78,7 +78,7 @@ incident record, kept here since it's part of this migration's own work).
 14/18's explicit run-priority. A0 (mean-expression) and A3 (parameter-
 matched MLP) are now REAL implementations in `src/scripts/10_run_patient_cv.py`
 (V1's driver silently `continue`'d past them). V1's old A8/A9 slots
-(GenBio-teacher fair comparison) are REMOVED from this grid entirely --
+(H-Optimus-0-teacher fair comparison) are REMOVED from this grid entirely --
 V2 Phase 21 replaces that comparison with a methodologically stricter,
 separate PCA-256-based analysis (see #6 below), run only after this grid
 is locked.
@@ -129,14 +129,14 @@ Gate 3 replaces V1's Section 25 test (which used A7, union multiscale) --
 V2 explicitly redefines the primary spatial-topology comparison to use A8
 now that it's the proposed final architecture.
 
-### 8. GenBio fair comparison redesigned around training-fold PCA (V2 Phase 21)
+### 8. H-Optimus-0 fair comparison redesigned around training-fold PCA (V2 Phase 21)
 New `src/pathology_st/genbio_pca.py`: `TrainOnlyPCA` (256-D, fit on train patients
 only, leakage-asserted like `pathology_st.expression.TrainOnlyStandardizer`) +
-Ridge/report helpers, replacing V1's ambiguous "feed the raw 4608-D GenBio
+Ridge/report helpers, replacing V1's ambiguous "feed the raw 1536-D H-Optimus-0
 embedding into the same head" approach. `configs/base.yaml`'s new
 `genbio_fair_comparison` block (`pca_n_components: 256, ridge_alpha: 1.0`).
 **Library-level only** -- the driver script rewrite (replacing
-`src/scripts/15_genbio_fair_comparison.py`'s raw-4608-D approach with the
+`src/scripts/15_genbio_fair_comparison.py`'s raw-1536-D approach with the
 three-head x two-encoder PCA comparison V2 Phase 21 specifies) is a
 follow-up, not yet done (see below).
 
@@ -167,10 +167,10 @@ an evaluation driver script.
 
 ## Known follow-ups (not done in this pass -- explicitly out of scope for now)
 
-- `src/scripts/15_genbio_fair_comparison.py` still uses V1's raw-4608-D
+- `src/scripts/15_genbio_fair_comparison.py` still uses V1's raw-1536-D
   approach; needs a rewrite using `src/pathology_st/genbio_pca.py`'s `TrainOnlyPCA` to
   match V2 Phase 21's three-head (Ridge/MLP/PNA) x two-encoder
-  (GenBio-PCA256 vs. student-256) comparison.
+  (H-Optimus-0-PCA256 vs. student-256) comparison.
 - `src/pathology_st/pathway_posthoc.py` and the `pathway_loss_sweep` config value exist
   but aren't yet driven by a script -- V2 Phase 19's post-lock ablation
   (run only after the architecture matrix above is frozen) is future work.

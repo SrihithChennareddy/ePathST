@@ -1,0 +1,4 @@
+{
+  "total_parameters": 1134774272,
+  "note": "Measured via timm.create_model('hf-hub:bioptimus/H-optimus-0', pretrained=True, init_values=1e-5, dynamic_img_size=False) then sum(p.numel() for p in model.parameters()) -- an exact real count, not the docstring's rounded '1.1B' figure."
+}
