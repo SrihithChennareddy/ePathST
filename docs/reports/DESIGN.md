@@ -502,12 +502,12 @@ A8-vs-A9 comparisons are **NOT SUPPORTED**. A8 does beat A3 (matched MLP,
 Δ=0.0123, p=0.0007, **SUPPORTED**) — some graph structure helps over pure
 capacity, just not specifically scale-aware gating at this sample size.
 
-**GenBio-PathFM reference** (official protocol, PCA256+Ridge, separate
-track — see §8): this external foundation model beats the 335.0×-smaller
-distilled student by 0.04–0.11 R in every cancer (IDC +0.108, COAD +0.088,
-CCRCC +0.041) — the same margin our actual teacher, H-Optimus-0, shows
-over the student, since both are ~1.1B-parameter PFMs at comparable
-representational strength.
+**H-Optimus-0 (teacher) reference** (official protocol, PCA256+Ridge,
+separate track — see §8, full per-cancer table in
+`docs/reports/HEST_FINAL_5FOLD_RESULTS.md` §7a): the frozen teacher beats
+the 335.0×-smaller distilled student by 0.04–0.11 R in every cancer (IDC
++0.108, COAD +0.088, CCRCC +0.041) — the expected accuracy cost of this
+project's ~335× compression.
 
 ### 9.2 Official-protocol results (job 88050, 2026-09-04; superseded in part — see version note)
 
@@ -516,11 +516,10 @@ Full tables: `docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md`.
 
 > **Version note (added post-paper)**: the submitted paper
 > (`Efficient_Pathology_Encoding_..._final.pdf`) reports higher official-
-> protocol numbers for A2, A6, A7, A8, and GenBio-PathFM than the job-88050
-> table below — consistently higher, in the same direction, while an
-> independent external reference (GenBio-PathFM) moves by less than 0.001,
-> which rules out a metric/scoring change and points to a later, improved
-> run of this project's own models feeding the paper instead. Exactly what
+> protocol numbers for A2, A6, A7, and A8 than the job-88050 table below —
+> consistently higher, in the same direction across every row, which points
+> to a later, improved run of this project's own models feeding the paper.
+> Exactly what
 > changed between job 88050 and that later run (a later job ID, a training
 > fix, a longer schedule) is **not documented anywhere found so far** —
 > flagged here rather than guessed at. Critically, the paper does **not**
@@ -551,7 +550,7 @@ Full tables: `docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md`.
 | **A8 — scale-aware PNA** ("ePathST") | **0.5384** | **0.3302** | **0.2375** | **0.3687** | paper Table III/V |
 | A9 — GATv2 multiscale | 0.4744 | 0.3089 | 0.2329 | 0.3261 | job 88050 (unconfirmed vs. paper run) |
 | Distilled CNN (PCA256+Ridge, 3.4M params) | 0.4822 | 0.2385 | 0.2225 | 0.3144 | job 88050 (unconfirmed vs. paper run) |
-| GenBio-PathFM (PCA256+Ridge, 1.1B params) | 0.5872 | 0.3284 | 0.2615 | 0.3924 | paper Table III (external reference; near-identical to job 88050's 0.3933) |
+| H-Optimus-0 (PCA256+Ridge, teacher, 1.1B params) | 0.5898 | 0.3264 | 0.2638 | 0.3933 | job 88050 (own teacher; see `docs/reports/HEST_FINAL_5FOLD_RESULTS.md` §7a) |
 
 A8's paper-reported gain over A2 is **+0.0249** (0.3687 vs. 0.3438); its gain
 over conventional (ungated) multiscale A7 is a further **+0.0065** (0.3687
@@ -561,16 +560,18 @@ individually match A7 or A8 — no single fixed scale is as good as combining
 scales, gated or not.
 
 **Extended comparison against published pathology foundation models**
-(paper Table III; not previously in this document — parameter counts and
-relative-size multiplier are normalized to ePathST's full 5.25M-parameter
-system, i.e. frozen CNN + GNN together, not the 3.39M-parameter encoder
-alone):
+(paper Table III, restricted to models this project actually uses or
+reports elsewhere — GenBio-PathFM is excluded here by project decision,
+even though the paper's own Table III includes it; see
+`docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md`'s Revision history for
+the same exclusion applied there. Parameter counts and relative-size
+multiplier are normalized to ePathST's full 5.25M-parameter system, i.e.
+frozen CNN + GNN together, not the 3.39M-parameter encoder alone):
 
 | Method | Params (M) | Relative size | IDC | COAD | CCRCC | Average |
 |---|---|---|---|---|---|---|
 | GigaPath | 1135 | 216.19× | 0.5515 | 0.2992 | 0.2430 | 0.3646 |
-| H-Optimus-0 (this project's own teacher) | 1134 | 216.00× | **0.5976** | 0.3086 | 0.2676 | 0.3913 |
-| GenBio-PathFM | 1133 | 215.94× | 0.5872 | 0.3284 | 0.2615 | **0.3924** |
+| **H-Optimus-0 (this project's own teacher)** | 1134 | 216.00× | **0.5976** | 0.3086 | 0.2676 | **0.3913** |
 | UNI2-h | 681 | 129.71× | 0.5898 | 0.3015 | 0.2640 | 0.3851 |
 | Virchow2 | 632 | 120.38× | 0.5971 | 0.2581 | **0.2719** | 0.3757 |
 | CONCH v1.5 | 307 | 58.48× | 0.5440 | 0.2802 | 0.2176 | 0.3473 |
@@ -694,8 +695,7 @@ extended table.
 | UNI2-h | 4,393.78 | 334.13× | 0.3851 |
 | Prov-GigaPath | 5,408.90 | 411.32× | 0.3646 |
 | CONCH v1.5 | 6,380.90 | 485.24× | 0.3473 |
-| H-Optimus-0 | 7,011.44 | 533.19× | 0.3913 |
-| GenBio-PathFM | 16,191.64 | 1,231.30× | **0.3924** |
+| **H-Optimus-0 (this project's own teacher)** | 7,011.44 | 533.19× | **0.3913** |
 
 A log-linear ordinary-least-squares fit of PCC against log10(TFLOPs)
 across the pathology-foundation-model points only (i.e. excluding
@@ -711,11 +711,15 @@ ePathST's actual average PCC (0.3687) at 13.15 TFLOPs/WSI is well above
 this trend line's prediction at that compute level (≈0.306), which the
 paper frames as ePathST establishing a new Pareto-optimal operating point:
 no evaluated model achieves both higher predictive performance *and* lower
-computational cost simultaneously. Against GenBio-PathFM specifically,
-ePathST trades 0.0237 average PCC (0.3687 vs. 0.3924, a 6% relative gap)
-for a 1,231× reduction in per-WSI compute — this specific "1231× less
-compute" framing is the headline efficiency number the paper's abstract
-leads with, alongside the "~94%" relative-performance figure (§9.2).
+computational cost simultaneously. Against its own teacher, H-Optimus-0,
+ePathST trades 0.0226 average PCC (0.3687 vs. 0.3913, a 5.8% relative gap)
+for a 533.19× reduction in per-WSI compute. The paper's abstract headline
+figures ("~94%" relative performance, "1231× less compute") are quoted
+against GenBio-PathFM specifically, the single most compute-expensive
+model in the paper's own Table IV — that comparison is not reproduced
+here since this project's tables exclude GenBio-PathFM by decision (see
+table note above); the H-Optimus-0 comparison above is the equivalent
+figure using a model this project actually trains against.
 
 Inference VRAM and GNN-specific wall-clock (isolated from the frozen
 encoder's forward pass) have still not been separately profiled as of
@@ -764,7 +768,7 @@ mechanism broken" from "is the encoder too small to give the graph
 anything informative to work with"; pooling training data across folds/
 cancers, since official folds are very small (COAD fold 0 has 1 train
 sample) and per-fold variance is high (std ~0.13–0.17). Closing the
-remaining gap to GenBio-PathFM's raw representational power would need a
+remaining gap to H-Optimus-0's raw representational power would need a
 larger/better distilled encoder, not further graph-architecture work —
 the graph correction's realistic ceiling, even "fixed," is a few points of
 R, while the encoder-capacity gap is 0.04–0.11 R and tracks the parameter
@@ -777,7 +781,7 @@ gap directly.
    per-patient predictions to disk. A stricter implementation would
    bootstrap over patients directly.
 2. **Seeds 1/2** were not run for the custom-protocol grid — seed 0 only.
-3. **The GenBio-embedding→MLP baseline (B1)** is fold0/seed0 only per
+3. **The H-Optimus-0-embedding→MLP baseline (B1)** is fold0/seed0 only per
    cancer under the custom protocol, not the full 5-fold design.
 4. **Efficiency**: only parameter counts and the derived compression ratio
    have been measured; inference VRAM, throughput, and GNN wall-clock have
@@ -908,9 +912,9 @@ being relied on for anything real.
   separately run against all 12 official folds (§3.2).
 - **Version reconciliation (§9.2)**: identify and document what actually
   changed between job 88050 and whatever run produced the paper's A2/A6/
-  A7/A8/GenBio-PathFM numbers, then rerun A0/A1/A3/A4/A5/A9 against that
-  same setup so Gates 1 and 3 can be recomputed on numbers from a single
-  consistent run instead of mixing two job generations.
+  A7/A8 numbers, then rerun A0/A1/A3/A4/A5/A9 against that same setup so
+  Gates 1 and 3 can be recomputed on numbers from a single consistent run
+  instead of mixing two job generations.
 - Phase 2's GPU-hour ledger (H200, per the paper — §12) is not yet
   compiled into `docs/reports/COMPUTE_RESOURCES.md`, which currently only covers
   Phase 1 distillation on RTX PRO 6000 Blackwell.
