@@ -1,5 +1,7 @@
 # V1 -> V2 migration (Final_Project_V1.txt -> Final_Project_V2.txt)
 
+**Created**: 2026-08-29 · **Last updated**: 2026-09-14 (presentation polish only; no content changes)
+
 Source specs: `/lustre/nvwulf/home/schennareddy/cellvit_project/
 Final_Project_V1.txt` (original, the codebase's foundation) and
 `Final_Project_V2.txt` ("ePathST — Revised Implementation Plan",

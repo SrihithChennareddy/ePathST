@@ -8,11 +8,10 @@ project's numbers, or understand exactly why a design choice was made,
 without needing to read the code first. For a quick orientation instead,
 see `README.md` (abstract + one-line-per-script pipeline list). For the
 day-to-day operational log (what ran, what broke, when), see
-`docs/RUN_STATUS.md`. Every specific results table cited below lives in a
+`docs/reports/RUN_STATUS.md`. Every specific results table cited below lives in a
 dedicated `docs/*.md` file, referenced inline.
 
-This reflects the **V2** architecture (`Final_Project_V2.txt`) — see
-`docs/V1_TO_V2_MIGRATION.md` for the V1→V2 change log.
+This reflects the **V2** architecture (`Final_Project_V2.txt`).
 
 ## Contents
 
@@ -40,7 +39,7 @@ images, it would make molecular-level tissue characterization available
 anywhere a microscope slide already exists.
 
 This project is the direct successor to a proof-of-concept, **PoC_5**
-(`STS_PoC/PoC_5`, `crcspatial` package — see `docs/POC5_RESULTS.md`), which
+(`STS_PoC/PoC_5`, `crcspatial` package — see `docs/reports/POC5_RESULTS.md`), which
 tested the same core idea on a smaller cohort (23 colorectal-cancer
 patients, MobileNetV3-Small patch encoder, physical multiscale PNA graph).
 PoC_5's decisive hypothesis — a real spatial graph beats a
@@ -82,7 +81,7 @@ were fixed before the locked final run (job 84871).
 ## 3. Data
 
 Neither dataset is committed to this repo (both are large, DICOM/TIFF/HDF5
-binary data). Full schema and provenance: `docs/INPUT_DATA.md`. Summary
+binary data). Full schema and provenance: `docs/reports/INPUT_DATA.md`. Summary
 here.
 
 ### 3.1 CPTAC (Phase 1 — distillation)
@@ -120,7 +119,7 @@ not-yet-resolved limitation: the `not_tumor_specimen` filter requires the
 substring "tumor" in CPTAC/IDC's own `specimen_label` field, and COAD has
 both a genuinely higher fraction of matched-normal-only patients (43/178)
 and a higher fraction of ambiguously-labeled bare-`"HE"` specimens that may
-or may not be real tumor sections. Full breakdown: `docs/INPUT_DATA.md` §1.
+or may not be real tumor sections. Full breakdown: `docs/reports/INPUT_DATA.md` §1.
 
 **Split**: patient-level, 80/10/10, stratified per cancer type
 (`src/epathst/data/splits.py`), computed before any patch is
@@ -132,7 +131,9 @@ reporting; only seed 0 has been trained on so far.
 
 **Patch extraction**: tissue-masked, spatially sampled 224×224px patches
 at ~0.5µm/px target resolution, 564,312 patches total across all selected
-WSIs.
+WSIs. Per-cohort breakdown (paper Table I, not previously broken out
+here): BRCA 167,825 patches (106 WSIs), COAD 80,776 patches (47 WSIs),
+CCRCC 315,711 patches (210 WSIs).
 
 ### 3.2 HEST (Phase 2 — downstream ST)
 
@@ -155,7 +156,9 @@ to agree to 4 decimal places on a real sample (0.7257 vs. 0.7258µm/px).
 
 **Scale (post metadata-audit)**: 202 real samples across all three
 cancers — IDC 120, COAD 58, CCRCC 24 — 0 excluded by mouse/cancer-bucket/
-duplicate-id filters. The custom-protocol cross-validation grid
+duplicate-id filters. Aligned spot-patch pairs (paper Table II, not
+previously broken out here): 389,621 total — IDC 129,188, COAD 186,213,
+CCRCC 74,220. The custom-protocol cross-validation grid
 (§6, job 84871) has run against a 5-fold/3-cancer subset of these; the
 official-protocol suite (§8, jobs 88050/88100) has since run against real
 samples across all 12 official folds (IDC×4, COAD×2, CCRCC×6) spanning all
@@ -418,8 +421,8 @@ patient-level GroupKFold splits, HVG1000/HVG50/PROGENy14 targets). Scripts
 19–23 answer a different, complementary question: how does this project's
 model compare on the standard, published HEST-1k leaderboard (official
 splits, official curated 50-gene marker panel per cancer, official
-pooled-spot Pearson metric)? See `docs/HEST_OFFICIAL_ABLATION_RESULTS.md`
-and `docs/HEST_OFFICIAL_HVG50_GENES.md` for the full protocol/gene-list
+pooled-spot Pearson metric)? See `docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md`
+and `docs/reports/HEST_OFFICIAL_HVG50_GENES.md` for the full protocol/gene-list
 writeup.
 
 **Protocol differences from §3–7, all deliberate**:
@@ -468,7 +471,7 @@ writeup.
 ### 9.1 Custom-protocol locked final results (job 84871, 2026-08-31)
 
 Patient-level Fisher-z R, 5-fold × 3-cancer × seed-0 (15 cells pooled, 5
-per cancer). Full tables: `docs/HEST_FINAL_5FOLD_RESULTS.md`.
+per cancer). Full tables: `docs/reports/HEST_FINAL_5FOLD_RESULTS.md`.
 
 **Macro-average (pooled 3 cancers), HVG1000**:
 
@@ -506,36 +509,99 @@ CCRCC +0.041) — the same margin our actual teacher, H-Optimus-0, shows
 over the student, since both are ~1.1B-parameter PFMs at comparable
 representational strength.
 
-### 9.2 Official-protocol results (job 88050, 2026-09-04)
+### 9.2 Official-protocol results (job 88050, 2026-09-04; superseded in part — see version note)
 
 Same trained A0–A9 models, evaluated against official splits/genes/metric.
-Full tables: `docs/HEST_OFFICIAL_ABLATION_RESULTS.md`.
+Full tables: `docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md`.
 
-**Same metric for everyone** (official pooled-spot Pearson):
+> **Version note (added post-paper)**: the submitted paper
+> (`Efficient_Pathology_Encoding_..._final.pdf`) reports higher official-
+> protocol numbers for A2, A6, A7, A8, and GenBio-PathFM than the job-88050
+> table below — consistently higher, in the same direction, while an
+> independent external reference (GenBio-PathFM) moves by less than 0.001,
+> which rules out a metric/scoring change and points to a later, improved
+> run of this project's own models feeding the paper instead. Exactly what
+> changed between job 88050 and that later run (a later job ID, a training
+> fix, a longer schedule) is **not documented anywhere found so far** —
+> flagged here rather than guessed at. Critically, the paper does **not**
+> report updated numbers for A0, A1, A3, A4, A5, or A9 — only the four rows
+> it names in Table III/V (patch-only, local-only, multiscale, scale-aware)
+> plus two new rows (meso-only, macro-only) not previously in this grid at
+> all. So the **paper-sourced rows below are current**; **A0/A1/A3/A4/A5/A9
+> are still job-88050 values** and should be treated as unconfirmed against
+> whatever produced the newer numbers until they're rerun. Practically,
+> this means **Gate 1** (needs A1) and **Gate 3** (needs A5) **cannot be
+> recomputed from the paper alone** — the gate readout below is still the
+> job-88050 one for those two gates specifically.
 
-| Model | IDC | COAD | CCRCC | Average |
-|---|---|---|---|---|
-| A1 — ImageNet patch | 0.3826 | 0.2118 | 0.0846 | 0.2051 |
-| A2 — distilled patch | 0.4506 | 0.3220 | 0.2075 | 0.3076 |
-| A3 — matched MLP | 0.4764 | 0.3383 | 0.1896 | 0.3100 |
-| A4 — random graph | 0.4826 | 0.2967 | 0.2248 | 0.3227 |
-| A5 — shuffled graph | 0.4871 | 0.2969 | 0.2248 | 0.3242 |
-| A6 — local PNA | 0.4856 | 0.2985 | 0.2244 | 0.3238 |
-| A7 — multiscale PNA | 0.4790 | 0.3055 | 0.2206 | 0.3209 |
-| **A8 — scale-aware PNA** | 0.4790 | 0.3042 | 0.2222 | 0.3215 |
-| A9 — GATv2 multiscale | 0.4744 | 0.3089 | 0.2329 | 0.3261 |
-| Distilled CNN (PCA256+Ridge, 3.4M params) | 0.4822 | 0.2385 | 0.2225 | 0.3144 |
-| GenBio-PathFM (PCA256+Ridge, 1.1B params) | 0.5898 | 0.3264 | 0.2638 | 0.3933 |
+**Same metric for everyone** (official pooled-spot Pearson averaged over genes and folds; per-cancer, then averaged — "Average" here is the equal-weighted mean across the three cancers, matching both job 88050's convention and the paper's Table III/V):
 
-**Gate readout under the official protocol**: Gate 1 holds clearly
-(pooled +0.089). Gate 2 holds but the margin is small (pooled +0.012).
-Gate 3 **fails** — A8 (0.3215) is statistically indistinguishable from A5
-(0.3242); A4–A9 (any graph, real or fake) all cluster within ~0.32–0.33,
-and A3 (no neighbor information at all) matches them too. This reproduces
-the custom-protocol Gate 3 result exactly, despite the official and custom
-protocols scoring almost entirely different genes (1-2/50 overlap) —
-what's invariant across both is the qualitative finding, not the absolute
-numbers.
+| Model | IDC | COAD | CCRCC | Average | Source |
+|---|---|---|---|---|---|
+| A0 — mean expression | — | — | — | — | not evaluated under this protocol |
+| A1 — ImageNet patch | 0.3826 | 0.2118 | 0.0846 | 0.2051 | job 88050 (unconfirmed vs. paper run) |
+| **A2 — distilled patch** ("ePathST-E" in the paper) | **0.4890** | **0.3151** | **0.2275** | **0.3438** | paper Table III/V |
+| A3 — matched MLP | 0.4764 | 0.3383 | 0.1896 | 0.3100 | job 88050 (unconfirmed vs. paper run) |
+| A4 — random graph | 0.4826 | 0.2967 | 0.2248 | 0.3227 | job 88050 (unconfirmed vs. paper run) |
+| A5 — shuffled graph | 0.4871 | 0.2969 | 0.2248 | 0.3242 | job 88050 (unconfirmed vs. paper run) |
+| A6 — local-only PNA | **0.5161** | **0.3238** | **0.2316** | **0.3572** | paper Table V |
+| *Meso-only PNA* (new — not previously in this grid) | 0.5237 | 0.3261 | 0.2328 | **0.3609** | paper Table V (strongest single isolated scale) |
+| *Macro-only PNA* (new — not previously in this grid) | 0.5194 | 0.3249 | 0.2341 | 0.3595 | paper Table V |
+| A7 — multiscale PNA (union, no gate) | **0.5272** | **0.3256** | **0.2337** | **0.3622** | paper Table V |
+| **A8 — scale-aware PNA** ("ePathST") | **0.5384** | **0.3302** | **0.2375** | **0.3687** | paper Table III/V |
+| A9 — GATv2 multiscale | 0.4744 | 0.3089 | 0.2329 | 0.3261 | job 88050 (unconfirmed vs. paper run) |
+| Distilled CNN (PCA256+Ridge, 3.4M params) | 0.4822 | 0.2385 | 0.2225 | 0.3144 | job 88050 (unconfirmed vs. paper run) |
+| GenBio-PathFM (PCA256+Ridge, 1.1B params) | 0.5872 | 0.3284 | 0.2615 | 0.3924 | paper Table III (external reference; near-identical to job 88050's 0.3933) |
+
+A8's paper-reported gain over A2 is **+0.0249** (0.3687 vs. 0.3438); its gain
+over conventional (ungated) multiscale A7 is a further **+0.0065** (0.3687
+vs. 0.3622). Meso-only (0.3609) edges out local-only (0.3572) and
+macro-only (0.3595) as the strongest *single* isolated scale, but does not
+individually match A7 or A8 — no single fixed scale is as good as combining
+scales, gated or not.
+
+**Extended comparison against published pathology foundation models**
+(paper Table III; not previously in this document — parameter counts and
+relative-size multiplier are normalized to ePathST's full 5.25M-parameter
+system, i.e. frozen CNN + GNN together, not the 3.39M-parameter encoder
+alone):
+
+| Method | Params (M) | Relative size | IDC | COAD | CCRCC | Average |
+|---|---|---|---|---|---|---|
+| GigaPath | 1135 | 216.19× | 0.5515 | 0.2992 | 0.2430 | 0.3646 |
+| H-Optimus-0 (this project's own teacher) | 1134 | 216.00× | **0.5976** | 0.3086 | 0.2676 | 0.3913 |
+| GenBio-PathFM | 1133 | 215.94× | 0.5872 | 0.3284 | 0.2615 | **0.3924** |
+| UNI2-h | 681 | 129.71× | 0.5898 | 0.3015 | 0.2640 | 0.3851 |
+| Virchow2 | 632 | 120.38× | 0.5971 | 0.2581 | **0.2719** | 0.3757 |
+| CONCH v1.5 | 307 | 58.48× | 0.5440 | 0.2802 | 0.2176 | 0.3473 |
+| Kaiko ViT-B/16 | 86 | 16.38× | 0.5352 | 0.2812 | 0.2291 | 0.3485 |
+| CTransPath | 27.5 | 5.24× | 0.4993 | 0.2382 | 0.2362 | 0.3246 |
+| ResNet50 | 25.5 | 4.86× | 0.4739 | 0.2500 | 0.2252 | 0.3164 |
+| **ePathST-E** (this project, encoder only) | 3.39 | 0.65× | 0.4890 | 0.3151 | 0.2275 | 0.3438 |
+| **ePathST** (this project, full system) | 5.25 | 1.00× | 0.5384 | **0.3302** | 0.2375 | 0.3687 |
+
+ePathST is the single best model on COAD specifically (0.3302, beating
+every listed PFM including the 1B+-parameter ones) and reaches ~94% of
+H-Optimus-0's average PCC (0.3687 / 0.3913) at 216× fewer parameters —
+this "94%" figure and the COAD-best claim are both from the paper's
+narrative and not previously stated anywhere in this document.
+
+**Gate readout under the official protocol** (Gate 2 recomputed from the
+paper's confirmed numbers; Gates 1 and 3 still reflect job 88050, per the
+version note above — re-verify both once A1/A5 are rerun): Gate 1 held
+under job 88050 (pooled +0.089) but is unconfirmed against the paper's
+improved A2. **Gate 2 holds, and more clearly than job 88050 suggested**:
+A8 − A2 = +0.0249 under the paper's numbers (vs. job 88050's +0.012) — a
+larger, cleaner margin than previously documented. Gate 3 **failed** under
+job 88050 (A8 statistically indistinguishable from A5, 0.3215 vs. 0.3242)
+and is unconfirmed against the paper's improved A8, since A5 has no
+corresponding updated value — the paper does not include a shuffled-graph
+row at all, so Gate 3 cannot currently be verified against the newer
+model. This reproduced (under job 88050) the custom-protocol Gate 3 result
+exactly, despite the official and custom protocols scoring almost entirely
+different genes (1-2/50 overlap) — what was invariant across both was the
+qualitative finding, not the absolute numbers; whether that still holds
+against the paper's improved A8 is an open question until A5 is rerun.
 
 ### 9.3 Moran's I diagnostic (job 88100, 2026-09-05)
 
@@ -555,16 +621,105 @@ test almost exactly (`r=0.1148, p=0.630`, n=20 genes, one fold) — two
 independent codebases, two independent cohorts, the same direct test,
 the same null result.
 
-### 9.4 Efficiency
+### 9.4 Qualitative evaluation: unsupervised clustering and spatial maps
+(paper §IV, not previously in this document)
+
+Two qualitative checks accompany the quantitative results above, run on
+the official HEST-1K protocol.
+
+**Leiden clustering of predicted spatial domains.** For a representative
+HEST-1K sample, Leiden clustering is applied to (a) ground-truth expression
+and (b) each model's predicted expression, and the resulting spatial
+domain maps are compared against the ground-truth clustering. Reported as
+a single cluster-agreement score per model on that sample: ePathST-E
+0.58, **ePathST 0.66**, H-Optimus-0 0.69 (full-scale teacher-class
+reference, for context — not a fair capacity comparison). The ordering
+(patch-only < scale-aware ePathST < H-Optimus-0) is consistent with the
+quantitative PCC ordering and suggests the scale-aware graph correction
+recovers spatial molecular domain structure beyond individual-spot
+accuracy, not just marginally higher per-gene correlation.
+
+**Per-gene spatial prediction maps.** Visual comparison of predicted vs.
+ground-truth expression maps for one representative gene per cancer, with
+per-sample PCC: IDC (GATA3) — ePathST 0.88 vs. H-Optimus-0 0.89 (near
+parity); COAD (CEACAM6) — **ePathST 0.79 vs. H-Optimus-0 0.39** (ePathST
+substantially ahead on this specific gene/sample); CCRCC (STK39) —
+ePathST 0.48 vs. H-Optimus-0 0.50 (near parity). These are illustrative
+single-sample/single-gene comparisons, not aggregate statistics — COAD's
+large gap here is consistent with COAD being ePathST's strongest cancer
+in the aggregate comparison table (§9.2) but should not be read as
+evidence ePathST generally beats H-Optimus-0 on COAD; the aggregate table
+is the statistically meaningful comparison.
+
+**Gene-level ablation sensitivity to spatial scale.** For five
+representative genes per cancer, PCC is compared across the Patch-Only /
+Local / Meso / Macro / Multiscale / Scale-Aware ablation variants (§9.2):
+IDC (HER2/ERBB2, TACSTD2, ESR1, SLAMF7, CD3E), COAD (TCL1A, UGT2B17,
+LCN2, BANK1, TYMS), CCRCC (CKB, LRRC41, HMOX1, IFI27, NOL3). The paper's
+headline qualitative finding here: **ERBB2 (HER2)**, a clinically
+important breast-cancer therapeutic biomarker, is already strongly
+predictable from local morphology alone and gains comparatively little
+from broader spatial context — consistent with HER2 status being a
+largely cell-intrinsic/local histological feature. **CD3E** (a T-cell
+marker) shows a much larger gain from contextual modeling, consistent with
+its dependence on the surrounding T-cell microenvironment rather than
+local tumor-cell morphology. The paper generalizes this into a "scale
+varies by target" claim across COAD/CCRCC too, and frames scale-aware
+fusion as a way to let the model use whichever scale (or combination) a
+given gene actually needs, rather than committing to one fixed
+neighborhood radius for every gene.
+
+### 9.5 Efficiency
 
 | Metric | Value |
 |---|---|
 | Student encoder parameters | 3,387,400 |
 | H-Optimus-0 teacher parameters | 1,134,774,272 |
 | Compression ratio | 335.0× |
+| Combined corpus size (CPTAC + HEST patches, paper's framing) | ~953,000 H&E patches (564,312 CPTAC distillation patches + 389,621 HEST spot-patch pairs) |
 
-Inference VRAM, throughput, and GNN wall-clock have not been separately
-profiled as of this writing.
+**Compute-normalized comparison (paper Table IV/Fig. 5, not previously in
+this document)**: TFLOPs/WSI measured for a single 224×224 H&E patch under
+an identical protocol across ePathST and every comparison PFM from §9.2's
+extended table.
+
+| Model | TFLOPs/WSI | Relative TFLOPs | Average PCC |
+|---|---|---|---|
+| ePathST-E | 13.07 | 0.99× | 0.3438 |
+| **ePathST** | **13.15** | **1.00×** (reference) | 0.3687 |
+| ResNet50 | 48.56 | 3.69× | 0.3164 |
+| CTransPath | 53.30 | 4.05× | 0.3246 |
+| Kaiko ViT-B/16 | 399.53 | 30.38× | 0.3485 |
+| Virchow2 | 4,076.58 | 310.01× | 0.3757 |
+| UNI2-h | 4,393.78 | 334.13× | 0.3851 |
+| Prov-GigaPath | 5,408.90 | 411.32× | 0.3646 |
+| CONCH v1.5 | 6,380.90 | 485.24× | 0.3473 |
+| H-Optimus-0 | 7,011.44 | 533.19× | 0.3913 |
+| GenBio-PathFM | 16,191.64 | 1,231.30× | **0.3924** |
+
+A log-linear ordinary-least-squares fit of PCC against log10(TFLOPs)
+across the pathology-foundation-model points only (i.e. excluding
+ePathST/ePathST-E) gives:
+
+```
+PCC = 0.0262 · log10(TFLOPs) + 0.2771,   R² = 0.76
+```
+
+i.e. across *existing* pathology models, predictive accuracy climbs
+log-linearly with compute — more accurate models cost predictably more.
+ePathST's actual average PCC (0.3687) at 13.15 TFLOPs/WSI is well above
+this trend line's prediction at that compute level (≈0.306), which the
+paper frames as ePathST establishing a new Pareto-optimal operating point:
+no evaluated model achieves both higher predictive performance *and* lower
+computational cost simultaneously. Against GenBio-PathFM specifically,
+ePathST trades 0.0237 average PCC (0.3687 vs. 0.3924, a 6% relative gap)
+for a 1,231× reduction in per-WSI compute — this specific "1231× less
+compute" framing is the headline efficiency number the paper's abstract
+leads with, alongside the "~94%" relative-performance figure (§9.2).
+
+Inference VRAM and GNN-specific wall-clock (isolated from the frozen
+encoder's forward pass) have still not been separately profiled as of
+this writing — TFLOPs/WSI above is the only compute metric measured.
 
 ## 10. Interpretation
 
@@ -580,6 +735,15 @@ artifact of one run or one protocol — it reproduces PoC_5's original
 finding on an independently built codebase, independent cohorts (breast/
 colon/kidney vs. PoC_5's colorectal-only), and both this project's own
 protocol and the field's standard benchmark protocol.
+
+> **Caveat added post-paper (§9.2)**: the official-protocol Gate 3 test
+> above used job 88050's A8/A5 pair. The paper's A8 improved substantially
+> over job 88050's (0.3687 vs. 0.3215) but A5 was not rerun/reported, so
+> this specific instance of Gate 3 has **not been re-verified against the
+> paper's improved model** — only the custom-protocol Gate 3 (§9.1) and
+> the Moran's I test (§9.3, itself run independently of A8/A5) currently
+> stand unqualified. The 3-way-replication framing above should be read as
+> 2.something-way pending that rerun (§14).
 
 What *is* supported: Gate 2 (the graph-corrected model beats patch-only)
 holds robustly under both protocols — but per Gate 3, that gain tracks
@@ -635,16 +799,30 @@ gap directly.
 
 ## 12. Compute resources
 
-Full ledger: `docs/COMPUTE_RESOURCES.md`. Summary as of last update
-(2026-08-29, Phase 1 distillation only — does not yet include Phase 2/
+Full ledger: `docs/reports/COMPUTE_RESOURCES.md`. Summary as of last update
+(2026-08-29, **Phase 1 distillation only** — does not yet include Phase 2/
 official-benchmark job hours): ~19.65 GPU-hours across 5 substantially-run
 jobs, entirely on a single NVIDIA RTX PRO 6000 Blackwell (98GB) per job, no
-multi-GPU jobs. Several early attempts targeted an H200 partition but never
-started (cluster-wide full allocation at submission time; the `-long`
-partition variants also proved structurally lower scheduling priority) —
-**no H200 compute was used**. Suggested Methods-section sentence: "All
-experiments were run on a single NVIDIA RTX PRO 6000 Blackwell GPU (98GB)
-per job, on a SLURM-managed institutional cluster."
+multi-GPU jobs. Several early Phase-1 attempts targeted an H200 partition
+but never started (cluster-wide full allocation at submission time; the
+`-long` partition variants also proved structurally lower scheduling
+priority) — **no H200 compute was used for Phase 1 distillation
+specifically**.
+
+**Update from the paper (not previously reconciled here)**: the paper
+states the full ePathST prediction system and all ablation models —
+i.e. Phase 2, §5 above — *were* evaluated on NVIDIA H200 GPUs. This is
+consistent with the Phase-1-only scoping above (Phase 1's RTX PRO 6000
+ledger predates and doesn't cover Phase 2), not a contradiction — but the
+"suggested Methods-section sentence" previously here was Phase-1-scoped
+only and would be **wrong if used as a whole-paper compute statement**.
+Corrected combined sentence: "Pathology representation distillation
+(Phase 1) was run on a single NVIDIA RTX PRO 6000 Blackwell GPU (98GB) per
+job; the downstream spatial gene-expression prediction system and all
+ablation models (Phase 2) were evaluated on NVIDIA H200 GPUs, on the same
+SLURM-managed institutional cluster." Phase 2's own GPU-hour ledger is not
+yet compiled in `docs/reports/COMPUTE_RESOURCES.md` as of this writing — a
+follow-up (§14).
 
 ## 13. Repository structure and reproducibility
 
@@ -728,3 +906,25 @@ being relied on for anything real.
   samples (custom protocol) has only been exercised on the 5-fold subset
   used for the locked results so far; the official-protocol suite has
   separately run against all 12 official folds (§3.2).
+- **Version reconciliation (§9.2)**: identify and document what actually
+  changed between job 88050 and whatever run produced the paper's A2/A6/
+  A7/A8/GenBio-PathFM numbers, then rerun A0/A1/A3/A4/A5/A9 against that
+  same setup so Gates 1 and 3 can be recomputed on numbers from a single
+  consistent run instead of mixing two job generations.
+- Phase 2's GPU-hour ledger (H200, per the paper — §12) is not yet
+  compiled into `docs/reports/COMPUTE_RESOURCES.md`, which currently only covers
+  Phase 1 distillation on RTX PRO 6000 Blackwell.
+- **From the paper's own future-work section** (not previously listed
+  here, kept distinct from the codebase-level items above since these are
+  research-scope extensions rather than implementation gaps): extend the
+  official-protocol evaluation to a larger gene panel (HVG1000) — note
+  this is already the custom protocol's primary target (§5.1), so this
+  specifically means bringing the *official* HEST-1K benchmark comparison
+  up to HVG1000 too, not a new capability; evaluate on additional cancer
+  types beyond IDC/COAD/CCRCC; validate cross-platform generalization
+  against independent spatial-transcriptomics datasets not drawn from
+  HEST-1K at all; incorporate cell-level morphology features (distinct
+  from and finer-grained than the current patch-level-only representation
+  in §5.2-§5.4); explore adaptive (learned, non-fixed-radius) spatial
+  neighborhoods as an alternative to the three fixed physical-distance
+  buckets in §5.3.

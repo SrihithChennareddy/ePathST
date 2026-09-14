@@ -1,5 +1,20 @@
 # HEST Phase-2 results (CNN/GNN downstream, job 84733)
 
+**Created**: 2026-08-30 (SLURM job 84733) · **Last updated**: 2026-09-14 (protocol note added; numbers unchanged)
+
+> **Protocol note**: this is an early, provisional, **single-fold**
+> custom-protocol run (own patient-level splits, HVG1000/HVG50/PROGENy14
+> targets, patient-level Fisher-z Pearson R) — superseded for the primary
+> result by the locked 5-fold run in
+> [`HEST_FINAL_5FOLD_RESULTS.md`](HEST_FINAL_5FOLD_RESULTS.md) (job 84871).
+> Kept as the historical record of the first clean end-to-end run,
+> including a real bug (A1_imagenet_patch) found and fixed afterward. The
+> published paper reports results under the separate **official HEST-1k
+> Benchmark protocol** instead (see
+> [`HEST_OFFICIAL_ABLATION_RESULTS.md`](HEST_OFFICIAL_ABLATION_RESULTS.md));
+> nothing in this document is restated against the paper's numbers, since
+> neither the protocol, the gene panel, nor the metric overlaps.
+
 Real, computed results from the first fully clean end-to-end completion
 of Steps 8-12 against the real 3-cancer HEST dataset
 (`src/scripts/10_run_patient_cv.py` / `src/scripts/12_primary_hypothesis_test.py`,

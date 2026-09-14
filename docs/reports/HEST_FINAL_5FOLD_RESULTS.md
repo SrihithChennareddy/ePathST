@@ -1,6 +1,24 @@
 # HEST Final 5-Fold Experiment -- Results
 
+**Created**: 2026-08-31 (SLURM job 84871) · **Last updated**: 2026-09-14 (protocol note added; numbers unchanged)
+
 Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x 3-cancer x seed-0 experiment (SLURM job 84871, completed 2026-08-31, 03:15:54 elapsed). Metric: patient-level Fisher-z mean Pearson R (`pathology_st.metrics.patient_macro_fisher_z`). All CIs are bootstrap 95% intervals, n_bootstrap=10000, resampled over (cancer, fold, seed) cells -- see Limitations for what that does and doesn't mean. Every number below is read directly from `results/final/tables/`, not re-derived or estimated.
+
+> **Protocol note**: this document reports the project's own **custom
+> protocol** (own patient-level GroupKFold splits, per-fold-selected
+> HVG1000/HVG50, patient-level Fisher-z-aggregated Pearson R). The
+> published paper (*Efficient Histopathology Representation Learning for
+> Spatial Gene Expression Prediction*, Chennareddy & Yurovsky, 2026)
+> reports results exclusively under the **official HEST-1k Benchmark
+> protocol** instead (official splits, official 50-gene marker panel,
+> pooled-spot Pearson) — see
+> [`HEST_OFFICIAL_ABLATION_RESULTS.md`](HEST_OFFICIAL_ABLATION_RESULTS.md)
+> for the paper-comparable numbers. The two protocols score different gene
+> panels (1-2 genes overlap out of 50 per cancer) under different metrics,
+> so the numbers in this document are **not directly comparable** to the
+> paper's tables and are not restated to match them. What does replicate
+> across both protocols is the qualitative Gate 3 finding (real vs.
+> shuffled spatial graph) — see §4 and §9 below.
 
 ## Contents
 

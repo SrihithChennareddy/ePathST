@@ -34,12 +34,12 @@ src/
 └── scripts/            numbered pipeline stages (01-23, run in order) + tools/ (utilities)
 configs/                 base.yaml: every hyperparameter, nothing hard-coded in scripts
 tests/                   unit tests for deterministic numeric code
-docs/                    topic-specific writeups (results, data provenance, migration history)
+docs/reports/          topic-specific writeups (results, data provenance, migration history)
 design/DESIGN.md         full methods supplement
 experimental_runs/       dated, git-committed snapshots of completed jobs' results
 ```
 
-See [`docs/style_references/`](docs/style_references/README.md) for the style
+See [`docs/reports/style_references/`](docs/reports/style_references/README.md) for the style
 references this repository's organization follows.
 
 ## Pipeline overview
@@ -70,7 +70,7 @@ The `src/scripts/` are numbered end-to-end and split into two phases: distilling
 17. `17_make_results_tables_and_figures.py` — final results tables and figures across HVG settings
 18. `18_final_interpretation.py` — final scientific interpretation of the results
 
-**Official HEST-1k Benchmark reproduction** (separate from the custom protocol above — see `docs/HEST_OFFICIAL_ABLATION_RESULTS.md`)
+**Official HEST-1k Benchmark reproduction** (separate from the custom protocol above — see `docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md`)
 
 19. `19_official_hest_benchmark.py` — official splits/genes/PCA256+Ridge protocol, raw teacher/student encoders only
 20. `20_build_final_results.py` — assembles the final results tables from all upstream result files
