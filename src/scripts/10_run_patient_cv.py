@@ -73,23 +73,27 @@ def train_patch_head(x_train, x_val, y_gene_train, y_path_train, y_gene_val, y_p
     best_val, patience_ctr, best_state = float("inf"), 0, None
     for epoch in range(cfg["patch_head"]["max_epochs"]):
         patch_head.train()
-        xb = torch.tensor(x_train, dtype=torch.float32, device=device)
-        gb = torch.tensor(y_gene_train, dtype=torch.float32, device=device)
-        pb = torch.tensor(y_path_train, dtype=torch.float32, device=device)
+        x_train_batch = torch.tensor(x_train, dtype=torch.float32, device=device)
+        gene_train_batch = torch.tensor(y_gene_train, dtype=torch.float32, device=device)
+        pathway_train_batch = torch.tensor(y_path_train, dtype=torch.float32, device=device)
         opt.zero_grad()
-        out = patch_head(xb)
-        loss = patch_head_loss(out, gb, pb, cfg["patch_head"]["pathway_loss_weight"])
+        out = patch_head(x_train_batch)
+        loss = patch_head_loss(
+            out, gene_train_batch, pathway_train_batch, cfg["patch_head"]["pathway_loss_weight"]
+        )
         loss["loss"].backward()
         opt.step()
 
         # validate, early-stop
         patch_head.eval()
         with torch.no_grad():
-            xv = torch.tensor(x_val, dtype=torch.float32, device=device)
-            gv = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
-            pv = torch.tensor(y_path_val, dtype=torch.float32, device=device)
-            pw = cfg["patch_head"]["pathway_loss_weight"]
-            val_loss = patch_head_loss(patch_head(xv), gv, pv, pw)["loss"].item()
+            x_val_batch = torch.tensor(x_val, dtype=torch.float32, device=device)
+            gene_val_batch = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
+            pathway_val_batch = torch.tensor(y_path_val, dtype=torch.float32, device=device)
+            pathway_weight = cfg["patch_head"]["pathway_loss_weight"]
+            val_loss = patch_head_loss(
+                patch_head(x_val_batch), gene_val_batch, pathway_val_batch, pathway_weight
+            )["loss"].item()
         if val_loss < best_val:
             best_val = val_loss
             patience_ctr = 0
@@ -279,20 +283,25 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
         best_val, patience_ctr, best_state = float("inf"), 0, None
         for epoch in range(cfg["patch_head"]["max_epochs"]):
             mlp.train()
-            xb = torch.tensor(x_train, dtype=torch.float32, device=device)
-            gb = torch.tensor(y_gene_train, dtype=torch.float32, device=device)
-            pb = torch.tensor(y_path_train, dtype=torch.float32, device=device)
+            x_train_batch = torch.tensor(x_train, dtype=torch.float32, device=device)
+            gene_train_batch = torch.tensor(y_gene_train, dtype=torch.float32, device=device)
+            pathway_train_batch = torch.tensor(y_path_train, dtype=torch.float32, device=device)
             opt.zero_grad()
-            loss = patch_head_loss(mlp(xb), gb, pb, cfg["patch_head"]["pathway_loss_weight"])
+            loss = patch_head_loss(
+                mlp(x_train_batch), gene_train_batch, pathway_train_batch,
+                cfg["patch_head"]["pathway_loss_weight"],
+            )
             loss["loss"].backward()
             opt.step()
             mlp.eval()
             with torch.no_grad():
-                xv = torch.tensor(x_val, dtype=torch.float32, device=device)
-                gv = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
-                pv = torch.tensor(y_path_val, dtype=torch.float32, device=device)
-                pw = cfg["patch_head"]["pathway_loss_weight"]
-                val_loss = patch_head_loss(mlp(xv), gv, pv, pw)["loss"].item()
+                x_val_batch = torch.tensor(x_val, dtype=torch.float32, device=device)
+                gene_val_batch = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
+                pathway_val_batch = torch.tensor(y_path_val, dtype=torch.float32, device=device)
+                pathway_weight = cfg["patch_head"]["pathway_loss_weight"]
+                val_loss = patch_head_loss(
+                    mlp(x_val_batch), gene_val_batch, pathway_val_batch, pathway_weight
+                )["loss"].item()
             if val_loss < best_val:
                 best_val = val_loss
                 patience_ctr = 0

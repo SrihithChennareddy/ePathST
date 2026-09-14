@@ -320,12 +320,16 @@ def run_smoke_test(
         head = GenBioDownstreamHead(gene_dim=1000, pathway_dim=14).to(genbio.device)
         opt = torch.optim.AdamW(head.parameters(), lr=cfg["patch_head"]["lr"])
         n = min(8, reloaded["embedding"].shape[0])
-        xb = torch.tensor(reloaded["embedding"][:n], dtype=torch.float32, device=genbio.device)
-        gb = torch.zeros(n, 1000, device=genbio.device)
-        pb = torch.zeros(n, 14, device=genbio.device)
+        x_smoke_batch = torch.tensor(
+            reloaded["embedding"][:n], dtype=torch.float32, device=genbio.device
+        )
+        gene_dummy_target = torch.zeros(n, 1000, device=genbio.device)
+        pathway_dummy_target = torch.zeros(n, 14, device=genbio.device)
         opt.zero_grad()
-        out = head(xb)
-        loss = patch_head_loss(out, gb, pb, cfg["patch_head"]["pathway_loss_weight"])
+        out = head(x_smoke_batch)
+        loss = patch_head_loss(
+            out, gene_dummy_target, pathway_dummy_target, cfg["patch_head"]["pathway_loss_weight"]
+        )
         loss["loss"].backward()
         grad_norms = [p.grad.norm().item() for p in head.parameters() if p.grad is not None]
         assert len(grad_norms) > 0 and all(g == g for g in grad_norms), (
@@ -615,21 +619,26 @@ def main():
             best_val, patience_ctr, best_state = float("inf"), 0, None
             for epoch in range(cfg["patch_head"]["max_epochs"]):
                 head.train()
-                xb = torch.tensor(x_train, dtype=torch.float32, device=device)
-                gb = torch.tensor(y_gene_train, dtype=torch.float32, device=device)
-                pb = torch.tensor(y_path_train, dtype=torch.float32, device=device)
+                x_train_batch = torch.tensor(x_train, dtype=torch.float32, device=device)
+                gene_train_batch = torch.tensor(y_gene_train, dtype=torch.float32, device=device)
+                pathway_train_batch = torch.tensor(y_path_train, dtype=torch.float32, device=device)
                 opt.zero_grad()
-                loss = patch_head_loss(head(xb), gb, pb, cfg["patch_head"]["pathway_loss_weight"])
+                loss = patch_head_loss(
+                    head(x_train_batch), gene_train_batch, pathway_train_batch,
+                    cfg["patch_head"]["pathway_loss_weight"],
+                )
                 loss["loss"].backward()
                 opt.step()
 
                 head.eval()
                 with torch.no_grad():
-                    xv = torch.tensor(x_val, dtype=torch.float32, device=device)
-                    gv = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
-                    pv = torch.tensor(y_path_val, dtype=torch.float32, device=device)
+                    x_val_batch = torch.tensor(x_val, dtype=torch.float32, device=device)
+                    gene_val_batch = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
+                    pathway_val_batch = torch.tensor(y_path_val, dtype=torch.float32, device=device)
                     pathway_weight = cfg["patch_head"]["pathway_loss_weight"]
-                    val_loss = patch_head_loss(head(xv), gv, pv, pathway_weight)["loss"].item()
+                    val_loss = patch_head_loss(
+                        head(x_val_batch), gene_val_batch, pathway_val_batch, pathway_weight
+                    )["loss"].item()
                 if val_loss < best_val:
                     best_val = val_loss
                     patience_ctr = 0
