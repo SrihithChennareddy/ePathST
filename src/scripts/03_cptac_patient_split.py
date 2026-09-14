@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Step 3: patient-level 80/10/10 CPTAC split for each seed, stratified by
+"""Patient-level 80/10/10 CPTAC split for each seed, stratified by
 cancer type, with leakage assertions against the patch manifest."""
 from __future__ import annotations
 

@@ -17,13 +17,20 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pathology_st.ablations import build_graph_for_ablation, edge_features_for_ablation, scale_aware_edge_data
+from pathology_st.ablations import (
+    build_graph_for_ablation,
+    edge_features_for_ablation,
+    scale_aware_edge_data,
+)
 from pathology_st.cv_folds import assert_run_completeness
-from pathology_st.destruction import degree_preserving_rewire, random_graph
-from pathology_st.graph_model import (GraphCorrectionModel, ResidualGraphPredictor, ScaleAwareGraphCorrectionModel,
-                              assert_zero_residual_at_init)
+from pathology_st.graph_model import (
+    GraphCorrectionModel,
+    ResidualGraphPredictor,
+    ScaleAwareGraphCorrectionModel,
+    assert_zero_residual_at_init,
+)
 from pathology_st.graph_training import make_pyg_data, train_graph_model
-from pathology_st.patch_head import build_patch_head, patch_head_loss
+from pathology_st.patch_head import build_patch_head
 from pathology_st.pna_block import compute_degree_histogram
 from pathology_st.utils import load_config, resolve_run_paths, save_json
 
@@ -54,7 +61,9 @@ def main():
     # S1: two forward passes through the frozen patch head reproduce the same predictions;
     # eval() is required since patch_head has Dropout (this caught a real missing-.eval()
     # bug in ResidualGraphPredictor).
-    patch_head = build_patch_head(cfg, x.shape[1], gene.shape[1], pathway.shape[1]).to(args.device)
+    patch_head = build_patch_head(
+        cfg, x.shape[1], gene.shape[1], pathway.shape[1]
+    ).to(args.device)
     patch_head.eval()
     xt = torch.tensor(x, dtype=torch.float32)
     with torch.no_grad():
@@ -64,15 +73,20 @@ def main():
 
     # S2: spot_id/embedding/coordinate/gene-vector alignment.
     spot_ids = [f"spot_{i}" for i in range(x.shape[0])]
-    results["S2_integrity_alignment"] = (len(spot_ids) == x.shape[0] == coords.shape[0] == gene.shape[0])
+    results["S2_integrity_alignment"] = (
+        len(spot_ids) == x.shape[0] == coords.shape[0] == gene.shape[0]
+    )
 
     # S4/S5: real, shuffled, random graphs contain only the intended nodes; degree distributions sane.
     real_edges = build_graph_for_ablation(coords, "multiscale", cfg, seed=0)
     shuffled_edges = build_graph_for_ablation(coords, "shuffled", cfg, seed=0)
     random_edges = build_graph_for_ablation(coords, "random", cfg, seed=0)
     n = x.shape[0]
-    nodes_ok = all(e["edge_index"].size == 0 or (e["edge_index"].min() >= 0 and e["edge_index"].max() < n)
-                   for e in (real_edges, shuffled_edges, random_edges))
+    nodes_ok = all(
+        e["edge_index"].size == 0
+        or (e["edge_index"].min() >= 0 and e["edge_index"].max() < n)
+        for e in (real_edges, shuffled_edges, random_edges)
+    )
     results["S4_graphs_contain_intended_nodes_only"] = bool(nodes_ok)
 
     def degree_hist(edge_index):
@@ -81,16 +95,28 @@ def main():
             deg[j] += 1
         return deg
 
-    deg_real, deg_shuffled = degree_hist(real_edges["edge_index"]), degree_hist(shuffled_edges["edge_index"])
-    results["S5_degree_distribution_preserved_by_shuffle"] = bool(np.array_equal(np.sort(deg_real), np.sort(deg_shuffled)))
+    deg_real = degree_hist(real_edges["edge_index"])
+    deg_shuffled = degree_hist(shuffled_edges["edge_index"])
+    results["S5_degree_distribution_preserved_by_shuffle"] = bool(
+        np.array_equal(np.sort(deg_real), np.sort(deg_shuffled))
+    )
 
     # S6: shuffled graph genuinely destroys spatial locality.
     real_pairs = real_edges["edge_index"]
-    real_dist = np.linalg.norm(coords[real_pairs[0]] - coords[real_pairs[1]], axis=1) if real_pairs.size else np.array([])
+    real_dist = (
+        np.linalg.norm(coords[real_pairs[0]] - coords[real_pairs[1]], axis=1)
+        if real_pairs.size
+        else np.array([])
+    )
     shuf_pairs = shuffled_edges["edge_index"]
-    shuf_dist = np.linalg.norm(coords[shuf_pairs[0]] - coords[shuf_pairs[1]], axis=1) if shuf_pairs.size else np.array([])
-    results["S6_shuffle_destroys_locality"] = bool(len(real_dist) and len(shuf_dist) and
-                                                     shuf_dist.mean() > 1.15 * real_dist.mean())
+    shuf_dist = (
+        np.linalg.norm(coords[shuf_pairs[0]] - coords[shuf_pairs[1]], axis=1)
+        if shuf_pairs.size
+        else np.array([])
+    )
+    results["S6_shuffle_destroys_locality"] = bool(
+        len(real_dist) and len(shuf_dist) and shuf_dist.mean() > 1.15 * real_dist.mean()
+    )
 
     # S3: zero-residual at init, for both the union-PNA backend and the
     # scale-aware backend -- targets PoC_5's observed failure (patch CNN
@@ -99,7 +125,9 @@ def main():
     ei = torch.tensor(real_edges["edge_index"], dtype=torch.long)
     ea = torch.tensor(edge_attr, dtype=torch.float32)
     deg = compute_degree_histogram([ei], [n])
-    gc_union = GraphCorrectionModel(x.shape[1], cfg, deg, ea.shape[1], gene.shape[1], pathway.shape[1])
+    gc_union = GraphCorrectionModel(
+        x.shape[1], cfg, deg, ea.shape[1], gene.shape[1], pathway.shape[1]
+    )
     model_union = ResidualGraphPredictor(patch_head, gc_union)
     try:
         assert_zero_residual_at_init(model_union, xt, ei, ea)
@@ -115,8 +143,9 @@ def main():
     degL = compute_degree_histogram([sa_ei_t[:, sa_scale_t == 0]], [n])
     degM = compute_degree_histogram([sa_ei_t[:, sa_scale_t == 1]], [n])
     degG = compute_degree_histogram([sa_ei_t[:, sa_scale_t == 2]], [n])
-    gc_scale_aware = ScaleAwareGraphCorrectionModel(x.shape[1], cfg, degL, degM, degG, sa_ea_t.shape[1],
-                                                     gene.shape[1], pathway.shape[1])
+    gc_scale_aware = ScaleAwareGraphCorrectionModel(
+        x.shape[1], cfg, degL, degM, degG, sa_ea_t.shape[1], gene.shape[1], pathway.shape[1]
+    )
     model_scale_aware = ResidualGraphPredictor(patch_head, gc_scale_aware)
     try:
         assert_zero_residual_at_init(model_scale_aware, xt, sa_ei_t, sa_ea_t, sa_scale_t)
@@ -129,14 +158,21 @@ def main():
     # S7: training on this tiny synthetic graph decreases loss strongly (attempt-to-overfit combined).
     data = make_pyg_data(x, real_edges["edge_index"], edge_attr, gene, pathway, "toy_patient")
     ckpt_path = paths["student_checkpoints"] / "sanity_toy.pt"
-    res = train_graph_model(patch_head, [data], [data], cfg, ckpt_path, seed=0, device=args.device, graphs_per_step=1)
+    res = train_graph_model(
+        patch_head, [data], [data], cfg, ckpt_path,
+        seed=0, device=args.device, graphs_per_step=1,
+    )
     target_var = float(np.var(gene))
-    results["S7_tiny_overfit_and_loss_decreases"] = bool(res["best_epoch"] >= 0 and res["best_val_loss"] < target_var)
+    results["S7_tiny_overfit_and_loss_decreases"] = bool(
+        res["best_epoch"] >= 0 and res["best_val_loss"] < target_var
+    )
 
     # S8: the exact same HVG ordering must be used by every head in a fold -- here just a
     # name/width consistency check; in the real pipeline this checks the fold's locked
     # `hvg["hvg1000"]` order end-to-end.
-    results["S8_target_gene_order_consistent"] = bool(len(gene_names) == gene.shape[1] == patch_head.gene_head.out_features)
+    results["S8_target_gene_order_consistent"] = bool(
+        len(gene_names) == gene.shape[1] == patch_head.gene_head.out_features
+    )
 
     # S9: the fold-completeness assertion raises on a deliberately
     # incomplete synthetic run set and passes on a complete one -- proves
@@ -151,7 +187,9 @@ def main():
     except AssertionError:
         pass
     try:
-        assert_run_completeness(expected, incomplete, context="S9 self-test (incomplete, should raise)")
+        assert_run_completeness(
+            expected, incomplete, context="S9 self-test (incomplete, should raise)"
+        )
     except AssertionError:
         s9_raises_on_incomplete = True
     results["S9_fold_completeness_guard_works"] = bool(s9_pass_on_complete and s9_raises_on_incomplete)
@@ -161,8 +199,11 @@ def main():
     for k, v in results.items():
         print(f"  {k}: {'PASS' if v else 'FAIL'}")
     if not all(results.values()):
-        print("[16_sanity_checks] FAILURES DETECTED -- do not launch the full 5-fold x 3-seed run "
-              "until every check above passes.", file=sys.stderr)
+        print(
+            "[16_sanity_checks] FAILURES DETECTED -- do not launch the full 5-fold x "
+            "3-seed run until every check above passes.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 

@@ -1,7 +1,5 @@
-"""PNA / Scale-Aware PNA / GATv2 graph-correction models, each wrapped as a
-zero-initialized RESIDUAL on top of the frozen patch-only predictor
-(y_final = y_patch + GNN(h, neighborhood)), so spatial context is added
-rather than re-derived from scratch."""
+"""PNA / Scale-Aware PNA / GATv2 graph-correction models, each wrapped as a zero-initialized RESIDUAL on top of the frozen patch-only predictor.
+y_final = y_patch + GNN(h, neighborhood), so spatial context is added rather than re-derived from scratch."""
 from __future__ import annotations
 
 import torch
@@ -12,52 +10,76 @@ from pathology_st.pna_block import MultiLayerPNA
 
 
 class GraphCorrectionModel(nn.Module):
-    """Union multiscale PNA correction (A4 random / A5 shuffled / A6 local
-    / A7 union-multiscale -- same module, different edge sets/features fed
-    in from outside)."""
+    """Union multiscale PNA correction (A4 random / A5 shuffled / A6 local / A7 union-multiscale -- same module, different edge sets/features fed in from outside)."""
 
-    def __init__(self, in_dim: int, cfg: dict, deg: torch.Tensor, edge_dim: int, gene_dim: int, pathway_dim: int):
+    def __init__(
+        self,
+        in_dim: int,
+        cfg: dict,
+        deg: torch.Tensor,
+        edge_dim: int,
+        gene_dim: int,
+        pathway_dim: int,
+    ):
         super().__init__()
-        p = cfg["pna"]
-        self.input_proj = nn.Linear(in_dim, p["hidden_dim"])
-        self.pna = MultiLayerPNA(p["hidden_dim"], p["n_layers"], p["aggregators"], p["scalers"], deg, edge_dim,
-                                  p["dropout"])
-        self.to_latent = nn.Linear(p["hidden_dim"], p["molecular_latent_dim"])
+        pna_cfg = cfg["pna"]
+        self.input_proj = nn.Linear(in_dim, pna_cfg["hidden_dim"])
+        self.pna = MultiLayerPNA(
+            pna_cfg["hidden_dim"],
+            pna_cfg["n_layers"],
+            pna_cfg["aggregators"],
+            pna_cfg["scalers"],
+            deg,
+            edge_dim,
+            pna_cfg["dropout"],
+        )
+        self.to_latent = nn.Linear(pna_cfg["hidden_dim"], pna_cfg["molecular_latent_dim"])
         self.act = nn.GELU()
-        self.gene_delta_head = nn.Linear(p["molecular_latent_dim"], gene_dim)
-        self.pathway_delta_head = nn.Linear(p["molecular_latent_dim"], pathway_dim)
-        _zero_init_delta_heads(self, p)
+        self.gene_delta_head = nn.Linear(pna_cfg["molecular_latent_dim"], gene_dim)
+        self.pathway_delta_head = nn.Linear(pna_cfg["molecular_latent_dim"], pathway_dim)
+        _zero_init_delta_heads(self, pna_cfg)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor) -> dict:
         h = self.input_proj(x)
         h = self.pna(h, edge_index, edge_attr)
         z = self.act(self.to_latent(h))
-        return {"latent": z, "gene_delta": self.gene_delta_head(z), "pathway_delta": self.pathway_delta_head(z)}
+        return {
+            "latent": z,
+            "gene_delta": self.gene_delta_head(z),
+            "pathway_delta": self.pathway_delta_head(z),
+        }
 
 
 class GATv2CorrectionModel(nn.Module):
-    """A9: identical structure to GraphCorrectionModel with GATv2 in place
-    of PNA -- the architecture-isolation control. No degree histogram
-    needed (GATv2 doesn't use PNA's degree scalers)."""
+    """A9: identical structure to GraphCorrectionModel with GATv2 in place of PNA -- the architecture-isolation control; no degree histogram needed (GATv2 doesn't use PNA's degree scalers)."""
 
     def __init__(self, in_dim: int, cfg: dict, edge_dim: int, gene_dim: int, pathway_dim: int):
         super().__init__()
-        p = cfg["pna"]
+        pna_cfg = cfg["pna"]
         g = cfg.get("gatv2", {})
-        self.input_proj = nn.Linear(in_dim, p["hidden_dim"])
-        self.gnn = MultiLayerGATv2(p["hidden_dim"], p["n_layers"], edge_dim,
-                                    heads=g.get("heads", 4), dropout=p["dropout"])
-        self.to_latent = nn.Linear(p["hidden_dim"], p["molecular_latent_dim"])
+        self.input_proj = nn.Linear(in_dim, pna_cfg["hidden_dim"])
+        self.gnn = MultiLayerGATv2(
+            pna_cfg["hidden_dim"],
+            pna_cfg["n_layers"],
+            edge_dim,
+            heads=g.get("heads", 4),
+            dropout=pna_cfg["dropout"],
+        )
+        self.to_latent = nn.Linear(pna_cfg["hidden_dim"], pna_cfg["molecular_latent_dim"])
         self.act = nn.GELU()
-        self.gene_delta_head = nn.Linear(p["molecular_latent_dim"], gene_dim)
-        self.pathway_delta_head = nn.Linear(p["molecular_latent_dim"], pathway_dim)
-        _zero_init_delta_heads(self, p)
+        self.gene_delta_head = nn.Linear(pna_cfg["molecular_latent_dim"], gene_dim)
+        self.pathway_delta_head = nn.Linear(pna_cfg["molecular_latent_dim"], pathway_dim)
+        _zero_init_delta_heads(self, pna_cfg)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor) -> dict:
         h = self.input_proj(x)
         h = self.gnn(h, edge_index, edge_attr)
         z = self.act(self.to_latent(h))
-        return {"latent": z, "gene_delta": self.gene_delta_head(z), "pathway_delta": self.pathway_delta_head(z)}
+        return {
+            "latent": z,
+            "gene_delta": self.gene_delta_head(z),
+            "pathway_delta": self.pathway_delta_head(z),
+        }
 
 
 class ScaleAwareGraphCorrectionModel(nn.Module):
@@ -84,15 +106,48 @@ class ScaleAwareGraphCorrectionModel(nn.Module):
     `edge_scale` LongTensor (0=local, 1=meso, 2=macro) tags each edge's
     branch; forward() masks by `edge_scale` to route edges to branches."""
 
-    def __init__(self, in_dim: int, cfg: dict, deg_local: torch.Tensor, deg_meso: torch.Tensor,
-                 deg_macro: torch.Tensor, edge_dim: int, gene_dim: int, pathway_dim: int):
+    def __init__(
+        self,
+        in_dim: int,
+        cfg: dict,
+        deg_local: torch.Tensor,
+        deg_meso: torch.Tensor,
+        deg_macro: torch.Tensor,
+        edge_dim: int,
+        gene_dim: int,
+        pathway_dim: int,
+    ):
         super().__init__()
-        p = cfg["pna"]
-        hd = p["hidden_dim"]
+        pna_cfg = cfg["pna"]
+        hd = pna_cfg["hidden_dim"]
         self.input_proj = nn.Linear(in_dim, hd)
-        self.pna_local = MultiLayerPNA(hd, p["n_layers"], p["aggregators"], p["scalers"], deg_local, edge_dim, p["dropout"])
-        self.pna_meso = MultiLayerPNA(hd, p["n_layers"], p["aggregators"], p["scalers"], deg_meso, edge_dim, p["dropout"])
-        self.pna_macro = MultiLayerPNA(hd, p["n_layers"], p["aggregators"], p["scalers"], deg_macro, edge_dim, p["dropout"])
+        self.pna_local = MultiLayerPNA(
+            hd,
+            pna_cfg["n_layers"],
+            pna_cfg["aggregators"],
+            pna_cfg["scalers"],
+            deg_local,
+            edge_dim,
+            pna_cfg["dropout"],
+        )
+        self.pna_meso = MultiLayerPNA(
+            hd,
+            pna_cfg["n_layers"],
+            pna_cfg["aggregators"],
+            pna_cfg["scalers"],
+            deg_meso,
+            edge_dim,
+            pna_cfg["dropout"],
+        )
+        self.pna_macro = MultiLayerPNA(
+            hd,
+            pna_cfg["n_layers"],
+            pna_cfg["aggregators"],
+            pna_cfg["scalers"],
+            deg_macro,
+            edge_dim,
+            pna_cfg["dropout"],
+        )
 
         gate_cfg = cfg.get("scale_aware_pna", {})
         gate_hidden = gate_cfg.get("gate_hidden_dim", hd)
@@ -100,16 +155,15 @@ class ScaleAwareGraphCorrectionModel(nn.Module):
             nn.Linear(hd * 4, gate_hidden), nn.GELU(), nn.Linear(gate_hidden, 3),
         )
 
-        self.to_latent = nn.Linear(hd, p["molecular_latent_dim"])
+        self.to_latent = nn.Linear(hd, pna_cfg["molecular_latent_dim"])
         self.act = nn.GELU()
-        self.gene_delta_head = nn.Linear(p["molecular_latent_dim"], gene_dim)
-        self.pathway_delta_head = nn.Linear(p["molecular_latent_dim"], pathway_dim)
-        _zero_init_delta_heads(self, p)
+        self.gene_delta_head = nn.Linear(pna_cfg["molecular_latent_dim"], gene_dim)
+        self.pathway_delta_head = nn.Linear(pna_cfg["molecular_latent_dim"], pathway_dim)
+        _zero_init_delta_heads(self, pna_cfg)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor,
                 edge_scale: torch.Tensor) -> dict:
-        """`edge_scale` is a (E,) LongTensor with values in {0, 1, 2} =
-        {local, meso, macro}, aligned to `edge_index`'s columns."""
+        """`edge_scale` is a (E,) LongTensor with values in {0, 1, 2} = {local, meso, macro}, aligned to `edge_index`'s columns."""
         h0 = self.input_proj(x)
         mask_l, mask_m, mask_g = edge_scale == 0, edge_scale == 1, edge_scale == 2
         hL = self.pna_local(h0, edge_index[:, mask_l], edge_attr[mask_l])
@@ -121,8 +175,12 @@ class ScaleAwareGraphCorrectionModel(nn.Module):
         h_spatial = (alpha[:, 0:1] * hL + alpha[:, 1:2] * hM + alpha[:, 2:3] * hG)
 
         z = self.act(self.to_latent(h_spatial))
-        return {"latent": z, "gene_delta": self.gene_delta_head(z), "pathway_delta": self.pathway_delta_head(z),
-                "scale_weights": alpha.detach()}
+        return {
+            "latent": z,
+            "gene_delta": self.gene_delta_head(z),
+            "pathway_delta": self.pathway_delta_head(z),
+            "scale_weights": alpha.detach(),
+        }
 
 
 def _zero_init_delta_heads(model: nn.Module, pna_cfg: dict) -> None:
@@ -134,29 +192,19 @@ def _zero_init_delta_heads(model: nn.Module, pna_cfg: dict) -> None:
 
 
 class ResidualGraphPredictor(nn.Module):
-    """Wraps a FROZEN patch-only MolecularBottleneckHead with any trainable
-    graph-correction backend (GraphCorrectionModel / GATv2CorrectionModel /
-    ScaleAwareGraphCorrectionModel); forward() returns final = patch + delta,
-    and the patch predictor never receives gradients -- isolating "what does
-    spatial context add" is the entire point of the residual design.
-    Backend-agnostic via *graph_args passthrough: forwards whatever was
-    passed straight to `self.graph_correction` (union/GATv2 take
-    (edge_index, edge_attr); scale-aware also takes edge_scale)."""
+    """Wraps a FROZEN patch-only MolecularBottleneckHead with any trainable graph-correction backend (GraphCorrectionModel/GATv2CorrectionModel/ScaleAwareGraphCorrectionModel); forward() returns final=patch+delta with the patch predictor receiving no gradients, isolating what spatial context adds -- backend-agnostic via *graph_args passthrough (union/GATv2 take edge_index+edge_attr; scale-aware also takes edge_scale)."""
 
     def __init__(self, patch_head, graph_correction: nn.Module):
         super().__init__()
         self.patch_head = patch_head
         for p in self.patch_head.parameters():
             p.requires_grad_(False)
-        # frozen -> always eval mode; otherwise patch_head's Dropout makes the "frozen" patch
-        # predictor non-deterministic across calls (caught by sanity check S1).
+        # frozen -> always eval mode; otherwise Dropout makes the "frozen" patch predictor non-deterministic across calls (caught by sanity check S1).
         self.patch_head.eval()
         self.graph_correction = graph_correction
 
     def train(self, mode: bool = True):
-        """Keep patch_head in eval() even when the parent's .train() is
-        called -- frozen means it must reproduce y_patch exactly and can
-        never see BatchNorm/Dropout train-mode stochasticity."""
+        """Keep patch_head in eval() even when the parent's .train() is called -- frozen means it must reproduce y_patch exactly and can never see BatchNorm/Dropout train-mode stochasticity."""
         super().train(mode)
         self.patch_head.eval()
         return self
@@ -177,27 +225,25 @@ class ResidualGraphPredictor(nn.Module):
 
 def assert_zero_residual_at_init(model: ResidualGraphPredictor, x: torch.Tensor, *graph_args,
                                   tol: float = 1e-5) -> None:
-    """Run before every graph-training call: with the graph correction
-    heads freshly zero-initialized, y_final must exactly equal y_patch.
-    Guards against the graph model silently starting out worse than
-    patch-only (PoC_5 once regressed below patch-only performance before
-    this check existed)."""
+    """Run before every graph-training call: with correction heads freshly zero-initialized, y_final must exactly equal y_patch; guards against the graph model silently starting out worse than patch-only (PoC_5 once regressed below patch-only performance before this check existed)."""
     model.eval()
     with torch.no_grad():
         out = model(x, *graph_args)
         patch_only = model.patch_head(x)
     max_abs_gene = (out["gene"] - patch_only["gene"]).abs().max().item()
     max_abs_pathway = (out["pathway"] - patch_only["pathway"]).abs().max().item()
-    assert max_abs_gene < tol, f"zero-residual check FAILED for genes: max_abs={max_abs_gene} >= tol={tol}"
-    assert max_abs_pathway < tol, f"zero-residual check FAILED for pathways: max_abs={max_abs_pathway} >= tol={tol}"
+    assert max_abs_gene < tol, (
+        f"zero-residual check FAILED for genes: max_abs={max_abs_gene} >= tol={tol}"
+    )
+    assert max_abs_pathway < tol, (
+        f"zero-residual check FAILED for pathways: max_abs={max_abs_pathway} >= tol={tol}"
+    )
     model.train()
 
 
 def graph_loss(pred: dict, gene_target: torch.Tensor, pathway_target: torch.Tensor,
                pathway_weight: float = 0.0) -> dict:
-    """Primary loss is gene-only by default (pathway_weight=0.0); pathway
-    loss weight is swept separately as an ablation once the architecture
-    is locked (see src/pathology_st/patch_head.py's matching default)."""
+    """Primary loss is gene-only by default (pathway_weight=0.0); pathway loss weight is swept separately as an ablation once the architecture is locked (see src/pathology_st/patch_head.py's matching default)."""
     from pathology_st.patch_head import patch_head_loss
     fake_pred = {"gene": pred["gene"], "pathway": pred["pathway"]}
     return patch_head_loss(fake_pred, gene_target, pathway_target, pathway_weight)

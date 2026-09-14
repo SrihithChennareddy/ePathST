@@ -14,7 +14,6 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pandas as pd
-import torch
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -36,7 +35,8 @@ def main():
     out_dir = paths["student_embeddings"] / "genbio_teacher"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    with RunEnvironment("15_genbio_fair_comparison_extract", paths["logs"] / "15_genbio_fair_comparison_env.json"):
+    env_log = paths["logs"] / "15_genbio_fair_comparison_env.json"
+    with RunEnvironment("15_genbio_fair_comparison_extract", env_log):
         teacher = GenBioPathFMTeacher(cfg, device=args.device)
         bs = cfg["teacher"]["batch_size"]
         for sample_id, group in tqdm(spot_manifest.groupby("sample_id"), desc="GenBio features on HEST"):

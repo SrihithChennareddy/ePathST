@@ -1,6 +1,5 @@
-"""Model-efficiency accounting. Reports exact programmatically-derived
-counts -- never manual estimates -- and always separates teacher-label-
-generation cost from student inference cost."""
+"""Model-efficiency accounting; reports exact programmatically-derived counts -- never manual estimates --
+and always separates teacher-label-generation cost from student inference cost."""
 from __future__ import annotations
 
 import time
@@ -19,28 +18,40 @@ def compression_ratio(teacher_params: dict, student_params: dict) -> dict:
     return {
         "teacher_total_parameters": teacher_params["total_parameters"],
         "student_total_parameters": student_params["total_parameters"],
-        "compression_ratio_x": teacher_params["total_parameters"] / max(1, student_params["total_parameters"]),
+        "compression_ratio_x": (
+            teacher_params["total_parameters"] / max(1, student_params["total_parameters"])
+        ),
     }
 
 
 def measure_flops_macs(model, input_shape: tuple, device: str = "cuda") -> dict:
-    """FLOPs/MACs per patch. Uses `fvcore` if available; falls back to
-    reporting `None` with an explanatory note if it isn't installed,
-    rather than fabricating a number."""
+    """FLOPs/MACs per patch via fvcore if available; falls back to reporting None with an explanatory note if it isn't installed, rather than fabricating a number."""
     try:
         from fvcore.nn import FlopCountAnalysis
         model.eval()
         x = torch.randn(1, *input_shape, device=device)
         flops = FlopCountAnalysis(model, x)
-        return {"macs_per_patch": float(flops.total()), "flops_per_patch": float(flops.total()) * 2, "method": "fvcore"}
+        return {
+            "macs_per_patch": float(flops.total()),
+            "flops_per_patch": float(flops.total()) * 2,
+            "method": "fvcore",
+        }
     except ImportError:
-        return {"macs_per_patch": None, "flops_per_patch": None,
-                "method": "fvcore not installed -- install to measure; not estimated"}
+        return {
+            "macs_per_patch": None,
+            "flops_per_patch": None,
+            "method": "fvcore not installed -- install to measure; not estimated",
+        }
 
 
 @torch.no_grad()
-def measure_inference_throughput(model, patches_uint8: np.ndarray, device: str, batch_size: int = 64,
-                                  n_warmup: int = 2) -> dict:
+def measure_inference_throughput(
+    model,
+    patches_uint8: np.ndarray,
+    device: str,
+    batch_size: int = 64,
+    n_warmup: int = 2,
+) -> dict:
     """CNN feature-extraction time and patches/sec."""
     model.eval()
     n = len(patches_uint8)
@@ -63,7 +74,11 @@ def measure_inference_throughput(model, patches_uint8: np.ndarray, device: str, 
     if device.startswith("cuda"):
         torch.cuda.synchronize()
     elapsed = time.time() - t0
-    return {"n_patches": n, "elapsed_seconds": elapsed, "patches_per_second": n / max(elapsed, 1e-9)}
+    return {
+        "n_patches": n,
+        "elapsed_seconds": elapsed,
+        "patches_per_second": n / max(elapsed, 1e-9),
+    }
 
 
 def _prep_batch(batch_uint8: np.ndarray, device: str):

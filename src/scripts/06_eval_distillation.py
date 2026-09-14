@@ -1,7 +1,6 @@
 #!/usr/bin/env python
-"""Step 8: evaluate S0/S1/(S2) on unseen CPTAC test patients -- cosine
-similarity distribution, retrieval overlap@K, linear-probe sanity, and
-UMAP visualization -- overall and per cancer type, with bootstrap CIs."""
+"""Evaluates S0/S1/(S2) on unseen CPTAC test patients: cosine-similarity distribution, retrieval
+overlap@K, linear-probe sanity, UMAP -- overall and per cancer type, with bootstrap CIs."""
 from __future__ import annotations
 
 import argparse
@@ -21,7 +20,9 @@ from pathology_st.utils import load_config, resolve_run_paths, save_json
 
 @torch.no_grad()
 def project_all(model, dataset, device, batch_size=256):
-    loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    loader = torch.utils.data.DataLoader(
+        dataset, batch_size=batch_size, shuffle=False, num_workers=4
+    )
     model.eval()
     projs, teachers, pids = [], [], []
     for x, t, pid in loader:
@@ -48,8 +49,10 @@ def main():
     for seed in cfg["seeds"]:
         # build held-out test set for this seed
         split_df = pd.read_csv(paths["manifests"] / f"cptac_split_seed{seed}.csv")
-        merged = patch_manifest.merge(split_df[["patient_id", "split", "cancer_type"]], on="patient_id",
-                                       suffixes=("", "_split"))
+        merged = patch_manifest.merge(
+            split_df[["patient_id", "split", "cancer_type"]], on="patient_id",
+            suffixes=("", "_split"),
+        )
         test_pm = merged[merged["split"] == "test"]
         test_ds = CPTACDistillDataset(test_pm, teacher_h5, shard_dir, train=False, cfg=cfg)
 

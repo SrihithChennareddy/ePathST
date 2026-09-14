@@ -1,9 +1,6 @@
 #!/usr/bin/env python
-"""Step 4: run the frozen GenBio-PathFM teacher ONCE over every selected
-CPTAC patch, cache FP16 embeddings to the persistent teacher_embeddings
-store, and verify the cache -- resumable and GPU-shardable via
---shard-index/--num-shards, with --merge-shards folding shards back
-together afterward."""
+"""Runs the frozen GenBio-PathFM teacher once per CPTAC patch, caching FP16 embeddings; resumable and
+GPU-shardable via --shard-index/--num-shards, folded back with --merge-shards."""
 from __future__ import annotations
 
 import argparse
@@ -28,9 +25,7 @@ def _already_cached_patch_ids(path: Path) -> set[str]:
 
 
 def merge_shards(canonical_path: Path, shard_paths: list[Path]) -> None:
-    """Folds every shard file's (patch_id, embedding) pairs into the
-    canonical cache, skipping any patch_id already present there (so
-    merge_shards is itself idempotent/safe to rerun)."""
+    # skips patch_ids already in the canonical cache, so this is idempotent/safe to rerun
     have = _already_cached_patch_ids(canonical_path)
     for sp in shard_paths:
         if not sp.exists():
@@ -49,16 +44,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/base.yaml")
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--shard-index", type=int, default=0, help="0-based shard index for multi-GPU sharding")
-    ap.add_argument("--num-shards", type=int, default=1, help="total number of parallel shards (e.g. 4 for H200x4)")
+    ap.add_argument("--shard-index", type=int, default=0,
+                     help="0-based shard index for multi-GPU sharding")
+    ap.add_argument("--num-shards", type=int, default=1,
+                     help="total number of parallel shards (e.g. 4 for H200x4)")
     ap.add_argument("--merge-shards", action="store_true",
                      help="skip embedding; just merge every shard file into the canonical cache and verify")
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
 
-    # the teacher must never be re-run per distillation epoch -- this script (run
-    # once, cached here) is what makes that possible
+    # the teacher must never be re-run per distillation epoch -- this run-once cache is what makes that possible
     canonical_path = paths["teacher_embeddings"] / "cptac_teacher_embeddings.h5"
 
     # merge-only mode: fold shards into canonical cache, verify, exit
@@ -79,19 +75,18 @@ def main():
     patch_manifest = pd.read_csv(paths["manifests"] / "cptac_patch_manifest.csv")
     shard_dir = paths["work_dir"] / "cptac_patches"
 
-    # each shard writes its own temp file (no concurrent writers to the canonical
-    # cache); --merge-shards folds every shard into the canonical cache afterward
+    # each shard writes its own temp file (no concurrent writers to the canonical cache)
     out_path = (paths["teacher_embeddings"] / f"_shard{args.shard_index}_of_{args.num_shards}.h5"
                 if args.num_shards > 1 else canonical_path)
 
-    # Resumability: skip patch_ids already in the CANONICAL cache (a previous
-    # merged run) or already in THIS shard's own partial output (a killed,
-    # restarted shard) -- either way, the teacher never re-embeds a patch.
+    # skip patch_ids already in the canonical cache OR this shard's own partial output -- either way, never re-embed
     already_done = _already_cached_patch_ids(canonical_path) | _already_cached_patch_ids(out_path)
 
     wsi_ids = sorted(patch_manifest["wsi_id"].unique())
     my_wsi_ids = set(wsi_ids[args.shard_index::args.num_shards])
-    todo = patch_manifest[patch_manifest["wsi_id"].isin(my_wsi_ids) & ~patch_manifest["patch_id"].isin(already_done)]
+    todo = patch_manifest[
+        patch_manifest["wsi_id"].isin(my_wsi_ids) & ~patch_manifest["patch_id"].isin(already_done)
+    ]
     print(f"[04_run_teacher_genbio] shard {args.shard_index}/{args.num_shards}: "
           f"{len(my_wsi_ids)} WSIs assigned, {len(todo)} patches left to embed "
           f"({len(already_done)} already cached)")

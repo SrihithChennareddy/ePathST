@@ -1,8 +1,6 @@
 #!/usr/bin/env python
-"""Steps 10-12: audit HEST metadata for IDC/COAD/CCRCC, run mandatory
-H&E<->ST alignment QC on a random spot sample per sample, and extract
-ST-spot-centered 224x224 patches. Writes manifests/hest_samples.csv and
-one HDF5 patch shard per sample under runs/.../hest_patches/."""
+"""Audits HEST metadata for IDC/COAD/CCRCC, runs mandatory H&E<->ST alignment QC, and extracts ST-
+spot-centered patches into manifests/hest_samples.csv + per-sample HDF5 shards."""
 from __future__ import annotations
 
 import argparse
@@ -20,35 +18,20 @@ from pathology_st.hest_prep import (HEST_SAMPLE_COLUMNS, alignment_qc_sample, au
 from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, save_json
 from pathology_st.wsi_patches import open_slide, write_patch_shard
 
-# Per-cancer HEST layout (configs/base.yaml `paths.hest_by_cancer`; breast is used
-# in place at the YurovskyGroup project space, colon/kidney came from HuggingFace
-# MahmoodLab/hest -- see docs/INPUT_DATA.md):
-#   metadata_csv  HEST-1k per-organ metadata (id, organ, disease_state, oncotree_code, ...)
-#   wsi_dir/{id}.tif   pyramidal TIFF, openslide-readable
-#   st_dir/{id}.h5ad   Visium AnnData: obsm['spatial'] = (x_px, y_px), already filtered to
-#     in_tissue==1, X = raw counts, uns['spatial']['ST']['scalefactors']['spot_diameter_fullres']
-# No explicit patient_id column -- each `id` is one section from one patient, so `id`
-# doubles as `patient_id`.
-#
-# Oncotree -> cancer-bucket mapping: COAD/COADREAD/READ collapse to "COAD". SCCRCC
-# (clear-cell RCC) maps to "CCRCC"; PRCC (papillary RCC) and ILC (invasive lobular,
-# distinct from this project's IDC target) are left unmapped and excluded.
+# HEST layout is documented in docs/INPUT_DATA.md; note `id` doubles as `patient_id` (no separate column), and PRCC/ILC oncotree codes are intentionally excluded (unmapped, not a bug).
 ONCOTREE_TO_CANCER = {"IDC": "IDC", "COAD": "COAD", "COADREAD": "COAD", "READ": "COAD",
                        "CCRCC": "CCRCC", "SCCRCC": "CCRCC"}
 
 
 def load_hest_raw_metadata(cfg: dict) -> pd.DataFrame:
-    """Reads each cancer's HEST metadata CSV + WSI/ST directories from
-    `cfg["paths"]["hest_by_cancer"]`, normalized to
-    pathology_st.hest_prep.HEST_SAMPLE_COLUMNS; missing/not-yet-downloaded
-    cancers are skipped and reported, not treated as an error."""
+    # missing/not-yet-downloaded cancers are skipped and reported here, not treated as an error
     sources = cfg["paths"].get("hest_by_cancer", {})
     rows = []
     for cancer in cfg["cancers"]["hest"]:
         src = sources.get(cancer)
         if src is None or not Path(src["metadata_csv"]).exists():
-            print(f"[08_prepare_hest_metadata] no HEST metadata source configured/found for {cancer} -- "
-                  f"skipping (not yet available)", file=sys.stderr)
+            print(f"[08_prepare_hest_metadata] no HEST metadata source configured/found for "
+                  f"{cancer} -- skipping (not yet available)", file=sys.stderr)
             continue
         wsi_dir, st_dir = Path(src["wsi_dir"]), Path(src["st_dir"])
         meta = pd.read_csv(src["metadata_csv"])
@@ -64,20 +47,17 @@ def load_hest_raw_metadata(cfg: dict) -> pd.DataFrame:
             if not (he_path.exists() and expr_path.exists()):
                 continue
             rows.append({
-                "sample_id": sample_id, "patient_id": sample_id, "study": src.get("study", cancer.lower()),
-                "cancer": mapped_cancer, "organ": str(r.get("organ", cancer)), "species": str(r.get("species", "human")),
-                "st_technology": r.get("st_technology"), "he_path": str(he_path), "expression_path": str(expr_path),
-                "mpp": None,
+                "sample_id": sample_id, "patient_id": sample_id,
+                "study": src.get("study", cancer.lower()), "cancer": mapped_cancer,
+                "organ": str(r.get("organ", cancer)), "species": str(r.get("species", "human")),
+                "st_technology": r.get("st_technology"), "he_path": str(he_path),
+                "expression_path": str(expr_path), "mpp": None,
             })
     return pd.DataFrame(rows, columns=HEST_SAMPLE_COLUMNS)
 
 
 def _process_one_sample(sample: dict, cfg: dict, patch_shard_dir: str, n_threads: int, seed: int = 0) -> dict:
-    """Runs in a worker process: alignment QC + patch extraction + shard
-    write for exactly ONE HEST sample, self-contained (opens its own
-    WSI/expression handles) and writing only its own `{sample_id}.h5`
-    shard -- returns manifest rows only, since the patch array is already
-    on disk and doesn't need to be pickled back to the parent."""
+    # writes its own {sample_id}.h5 shard and returns only manifest rows -- the patch array stays on disk, not pickled back
     import anndata as ad
 
     reader = open_slide(sample["he_path"])
@@ -91,15 +71,21 @@ def _process_one_sample(sample: dict, cfg: dict, patch_shard_dir: str, n_threads
     if qc["likely_misaligned"]:
         return {"sample_id": sample["sample_id"], "qc": qc, "misaligned": True, "manifest_rows": []}
 
-    patches = extract_hest_patches_for_sample(reader, spot_ids, coords_px, mpp, cfg, n_threads=n_threads)
-    write_patch_shard(Path(patch_shard_dir) / f"{sample['sample_id']}.h5", spot_ids, patches,
-                       {"x_um": coords_px[:, 0] * mpp, "y_um": coords_px[:, 1] * mpp})
+    patches = extract_hest_patches_for_sample(
+        reader, spot_ids, coords_px, mpp, cfg, n_threads=n_threads
+    )
+    write_patch_shard(
+        Path(patch_shard_dir) / f"{sample['sample_id']}.h5", spot_ids, patches,
+        {"x_um": coords_px[:, 0] * mpp, "y_um": coords_px[:, 1] * mpp},
+    )
 
-    manifest_rows = [{"sample_id": sample["sample_id"], "patient_id": sample["patient_id"],
-                       "cancer": sample["cancer"], "spot_id": sid,
-                       "spot_uid": f"{sample['sample_id']}::{sid}",
-                       "x_um": coords_px[i, 0] * mpp, "y_um": coords_px[i, 1] * mpp}
-                      for i, sid in enumerate(spot_ids)]
+    manifest_rows = [
+        {"sample_id": sample["sample_id"], "patient_id": sample["patient_id"],
+         "cancer": sample["cancer"], "spot_id": sid,
+         "spot_uid": f"{sample['sample_id']}::{sid}",
+         "x_um": coords_px[i, 0] * mpp, "y_um": coords_px[i, 1] * mpp}
+        for i, sid in enumerate(spot_ids)
+    ]
     return {"sample_id": sample["sample_id"], "qc": qc, "misaligned": False, "manifest_rows": manifest_rows}
 
 
@@ -118,11 +104,14 @@ def main():
     paths = resolve_run_paths(cfg)
     sources = cfg["paths"].get("hest_by_cancer", {})
 
-    missing = [c for c in cfg["cancers"]["hest"] if not Path(sources.get(c, {}).get("wsi_dir", "")).exists()]
+    missing = [
+        c for c in cfg["cancers"]["hest"]
+        if not Path(sources.get(c, {}).get("wsi_dir", "")).exists()
+    ]
     if len(missing) == len(cfg["cancers"]["hest"]):
-        print(f"[08_prepare_hest_metadata] no configured hest_by_cancer WSI directory exists yet for any of "
-              f"{cfg['cancers']['hest']} -- expected while scratch download is in progress, rerun once data lands.",
-              file=sys.stderr)
+        print(f"[08_prepare_hest_metadata] no configured hest_by_cancer WSI directory exists "
+              f"yet for any of {cfg['cancers']['hest']} -- expected while scratch download is "
+              f"in progress, rerun once data lands.", file=sys.stderr)
         sys.exit(2)
     if missing:
         print(f"[08_prepare_hest_metadata] WSI directory not found for {missing} -- will be skipped, "
@@ -155,11 +144,7 @@ def main():
             included_samples.to_csv(samples_path, index=False)
             pd.DataFrame(spot_manifest_rows).to_csv(manifest_path, index=False)
 
-        # `spot_id` alone is only unique within one sample's own shard/feature-cache file -- HEST
-        # spot ids are Visium array-grid coordinates (e.g. "010x016"), not global barcodes, and
-        # collide heavily across samples. Anything that pools multiple samples' spots (e.g. script
-        # 10's per-fold tables) must join on `spot_uid` (built the same way in `_process_one_sample`
-        # above), never bare `spot_id`, or it silently misattributes data across patients.
+        # spot_id alone collides across samples (HEST ids are grid coords, not global barcodes) -- anything pooling samples must join on spot_uid (built above), never bare spot_id, or it misattributes patients
         # alignment QC + patch extraction, in parallel
         pending = [row.to_dict() for _, row in clean.iterrows() if row["sample_id"] not in done_samples]
         n_since_checkpoint = 0

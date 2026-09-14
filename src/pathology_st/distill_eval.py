@@ -1,6 +1,5 @@
-"""Evaluates whether distillation worked, on completely unseen CPTAC test
-patients. All metrics computed overall and per cancer type (BRCA/COAD/
-CCRCC), with bootstrap confidence intervals."""
+"""Evaluates whether distillation worked, on completely unseen CPTAC test patients; all
+metrics computed overall and per cancer type (BRCA/COAD/CCRCC), with bootstrap confidence intervals."""
 from __future__ import annotations
 
 import numpy as np
@@ -16,18 +15,23 @@ def bootstrap_ci_1d(values: np.ndarray, n_iter: int = 10000, seed: int = 0, ci=(
     rng = np.random.RandomState(seed)
     n = len(values)
     boots = np.array([values[rng.randint(0, n, size=n)].mean() for _ in range(n_iter)])
-    return {"mean": float(values.mean()), "median": float(np.median(values)),
-            "ci_low": float(np.percentile(boots, ci[0])), "ci_high": float(np.percentile(boots, ci[1])),
-            "n": n}
+    return {
+        "mean": float(values.mean()),
+        "median": float(np.median(values)),
+        "ci_low": float(np.percentile(boots, ci[0])),
+        "ci_high": float(np.percentile(boots, ci[1])),
+        "n": n,
+    }
 
 
-def retrieval_overlap_at_k(student_proj: np.ndarray, teacher_emb: np.ndarray, ks=(1, 5, 10),
-                            max_query: int = 2000, seed: int = 0) -> dict:
-    """For each test patch, compares teacher-space nearest neighbors to
-    student-space nearest neighbors and reports overlap@K. Uses a random
-    subsample of queries (max_query) against the full test set as the
-    search pool -- exact brute-force cosine kNN, capped for tractability
-    on large test sets."""
+def retrieval_overlap_at_k(
+    student_proj: np.ndarray,
+    teacher_emb: np.ndarray,
+    ks=(1, 5, 10),
+    max_query: int = 2000,
+    seed: int = 0,
+) -> dict:
+    """For each test patch, compares teacher/student-space nearest neighbors and reports overlap@K, using a random subsample (max_query) against the full test set as the search pool -- exact brute-force cosine kNN, capped for tractability."""
     from sklearn.neighbors import NearestNeighbors
 
     s = student_proj / np.clip(np.linalg.norm(student_proj, axis=1, keepdims=True), 1e-8, None)
@@ -55,15 +59,17 @@ def retrieval_overlap_at_k(student_proj: np.ndarray, teacher_emb: np.ndarray, ks
 
 
 def linear_probe_sanity(student_proj: np.ndarray, labels: np.ndarray, seed: int = 0) -> dict:
-    """Linear-probe sanity test -- e.g. cancer-type classification from the
-    student's projected embedding, 5-fold CV accuracy. A sanity signal
-    only, not primary evidence."""
+    """Linear-probe sanity test (e.g. cancer-type classification from the student's projected embedding, 5-fold CV accuracy) -- a sanity signal only, not primary evidence."""
     from sklearn.linear_model import LogisticRegression
     from sklearn.model_selection import cross_val_score
 
     clf = LogisticRegression(max_iter=2000, multi_class="auto")
     scores = cross_val_score(clf, student_proj, labels, cv=5, scoring="accuracy")
-    return {"mean_accuracy": float(scores.mean()), "std_accuracy": float(scores.std()), "fold_scores": scores.tolist()}
+    return {
+        "mean_accuracy": float(scores.mean()),
+        "std_accuracy": float(scores.std()),
+        "fold_scores": scores.tolist(),
+    }
 
 
 def umap_embedding(features: np.ndarray, seed: int = 0):
@@ -73,8 +79,9 @@ def umap_embedding(features: np.ndarray, seed: int = 0):
     return reducer.fit_transform(features)
 
 
-def evaluate_distillation(student_proj: np.ndarray, teacher_emb: np.ndarray, cancer_types: np.ndarray,
-                           cfg: dict) -> dict:
+def evaluate_distillation(
+    student_proj: np.ndarray, teacher_emb: np.ndarray, cancer_types: np.ndarray, cfg: dict
+) -> dict:
     """Runs the full distillation-eval battery overall + per cancer type."""
     out = {}
     groups = {"overall": np.ones(len(cancer_types), dtype=bool)}

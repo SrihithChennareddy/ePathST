@@ -15,10 +15,7 @@ import numpy as np
 
 
 def load_config(path: str | Path) -> dict:
-    """Prefers a sibling .json (PyYAML is not guaranteed present on every
-    cluster module) and falls back to real YAML parsing otherwise. Resolves
-    ``${experiment_name}``-style templates against the config's own
-    top-level scalar values (used for paths.work_dir)."""
+    """Prefers a sibling .json over YAML (PyYAML isn't guaranteed on every cluster module); resolves ``${...}`` templates against the config's own top-level scalars."""
     path = Path(path)
     json_sibling = path.with_suffix(".json")
     if json_sibling.exists():
@@ -43,14 +40,7 @@ def _resolve_templates(node, root: dict):
 
 
 def resolve_run_paths(cfg: dict) -> dict[str, Path]:
-    """Turns cfg['paths'] into absolute Path objects under work_dir and
-    creates every run subdirectory (configs/logs/manifests/qc/
-    teacher_embeddings/student_checkpoints/student_embeddings/graphs/
-    predictions/results/figures). `teacher_embeddings` and
-    `student_checkpoints` are the two expensive, reusable artifacts, so if
-    cfg['paths'] sets `persist_dir` those two are created there instead of
-    under the (possibly ephemeral/scratch) work_dir, to survive independently
-    of any one run and be reusable by later runs."""
+    """Creates every run subdirectory under work_dir, except `teacher_embeddings`/`student_checkpoints`, which go under `persist_dir` when set, since those two are expensive artifacts meant to survive across runs."""
     work_dir = Path(cfg["paths"]["work_dir"])
     persist_dir = cfg["paths"].get("persist_dir")
     persist_dir = Path(persist_dir) if persist_dir else None
@@ -111,10 +101,7 @@ def ensure_dir(path: str | Path) -> Path:
 
 
 class RunEnvironment:
-    """Reproducibility record. Use as a context manager around any
-    expensive stage; writes a JSON record with wall-clock seconds, peak
-    VRAM (if CUDA available), package versions, CUDA version, GPU model,
-    and the current git commit (omitted, not failed, if not a git repo)."""
+    """Context manager writing a reproducibility record (wall-clock, peak VRAM, package/CUDA versions, GPU model, git commit -- blank outside a git repo) after an expensive stage."""
 
     def __init__(self, stage_name: str, out_path: str | Path):
         self.stage_name = stage_name
@@ -183,8 +170,7 @@ def _gpu_record() -> dict:
 
 
 def count_parameters(model) -> dict:
-    """Exact, programmatically-counted parameter counts -- never estimate
-    manually."""
+    """Exact, programmatically-counted parameter counts -- never estimate manually."""
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
     return {"trainable_parameters": int(trainable), "total_parameters": int(total)}

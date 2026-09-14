@@ -1,6 +1,5 @@
 """Physical multiscale graph construction: one graph per tissue section, with
-ST-spot nodes (GenBio-distilled embedding as the only feature) connected by
-physical-distance-bucketed edges (local/meso/macro, each capped per scale)."""
+GenBio-embedding-only ST-spot nodes joined by distance-bucketed edges (local/meso/macro, capped per scale)."""
 from __future__ import annotations
 
 import numpy as np
@@ -9,12 +8,16 @@ from scipy.spatial import cKDTree
 SCALE_NAMES = ("local", "meso", "macro")
 
 
-def build_multiscale_edges(coords_um: np.ndarray, local_radius_um: float, meso_radius_um: float,
-                            macro_radius_um: float, max_local: int, max_meso: int, max_macro: int) -> dict:
-    """coords_um: (N, 2) physical micrometer coordinates. Returns dict with
-    'edge_index' (2, E) int64 [src, dst], 'distance_um' (E,), 'scale' (E,)
-    string array in SCALE_NAMES. Edges are directed both ways so message
-    passing is symmetric."""
+def build_multiscale_edges(
+    coords_um: np.ndarray,
+    local_radius_um: float,
+    meso_radius_um: float,
+    macro_radius_um: float,
+    max_local: int,
+    max_meso: int,
+    max_macro: int,
+) -> dict:
+    """coords_um: (N,2) um coords; returns edge_index/distance_um/scale dict, edges listed both directions for symmetric message passing."""
     n = coords_um.shape[0]
     # coords_um is used only to compute edge distance/bucket -- never used as a node feature
     # find all pairs within the widest (macro) radius
@@ -43,7 +46,10 @@ def build_multiscale_edges(coords_um: np.ndarray, local_radius_um: float, meso_r
                 dist_list += [dij, dij]
                 scale_list += [scale_name, scale_name]
 
-    edge_index = np.array([src_list, dst_list], dtype=np.int64) if src_list else np.zeros((2, 0), dtype=np.int64)
+    if src_list:
+        edge_index = np.array([src_list, dst_list], dtype=np.int64)
+    else:
+        edge_index = np.zeros((2, 0), dtype=np.int64)
     return {
         "edge_index": edge_index,
         "distance_um": np.array(dist_list, dtype=np.float32),
@@ -51,7 +57,9 @@ def build_multiscale_edges(coords_um: np.ndarray, local_radius_um: float, meso_r
     }
 
 
-def _cap_degree(pairs: np.ndarray, dists: np.ndarray, n_nodes: int, cap: int) -> list[tuple[tuple[int, int], float]]:
+def _cap_degree(
+    pairs: np.ndarray, dists: np.ndarray, n_nodes: int, cap: int
+) -> list[tuple[tuple[int, int], float]]:
     order = np.argsort(dists)
     degree = np.zeros(n_nodes, dtype=np.int32)
     kept, seen = [], set()
@@ -69,10 +77,10 @@ def _cap_degree(pairs: np.ndarray, dists: np.ndarray, n_nodes: int, cap: int) ->
     return kept
 
 
-def _rbf_basis(distance_um: np.ndarray, macro_radius_um: float, n_rbf: int, gamma: float) -> tuple[np.ndarray, np.ndarray]:
-    """Shared core: d_bar = d/macro_radius, n_rbf RBFs
-    phi_m(d)=exp(-gamma*(d-mu_m)^2) with mu_m evenly spaced in [0,1].
-    Returns (d_bar, rbf) so callers can choose what else to concatenate."""
+def _rbf_basis(
+    distance_um: np.ndarray, macro_radius_um: float, n_rbf: int, gamma: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """Shared RBF core: d_bar=d/macro_radius, phi_m=exp(-gamma*(d_bar-mu_m)^2), mu_m evenly spaced in [0,1]; returns (d_bar, rbf)."""
     d_norm = np.clip(distance_um / macro_radius_um, 0.0, 1.0)
     mu = np.linspace(0.0, 1.0, n_rbf)
     rbf = np.exp(-gamma * (d_norm[:, None] - mu[None, :]) ** 2).astype(np.float32)
@@ -81,12 +89,7 @@ def _rbf_basis(distance_um: np.ndarray, macro_radius_um: float, n_rbf: int, gamm
 
 def union_edge_features(distance_um: np.ndarray, scale: np.ndarray, macro_radius_um: float,
                          n_rbf: int = 16, gamma: float = 10.0) -> np.ndarray:
-    """Edge feature for the UNION multiscale graph, where one PNA layer
-    sees edges from all three scales at once: 1 normalized distance + 16
-    RBF + 3-D one-hot scale code = 20-D. The explicit distance scalar
-    matters here because RBFs alone under-determine distance near bucket
-    boundaries. Used by A7 (union multiscale) and the random/shuffled/
-    local-only ablations."""
+    """Union-graph edge feature (20-D: distance + 16 RBF + 3-D scale one-hot); the explicit distance matters since RBFs alone under-determine distance near bucket boundaries (used by A7 + random/shuffled/local-only ablations)."""
     d_norm, rbf = _rbf_basis(distance_um, macro_radius_um, n_rbf, gamma)
     onehot = np.zeros((len(distance_um), len(SCALE_NAMES)), dtype=np.float32)
     for s_idx, s_name in enumerate(SCALE_NAMES):
@@ -96,38 +99,31 @@ def union_edge_features(distance_um: np.ndarray, scale: np.ndarray, macro_radius
 
 def per_scale_edge_features(distance_um: np.ndarray, macro_radius_um: float,
                              n_rbf: int = 16, gamma: float = 10.0) -> np.ndarray:
-    """Edge feature for the scale-aware model: each of the three PNA
-    branches only ever sees edges of its own scale, so branch identity
-    already encodes scale and the one-hot is redundant. 1 normalized
-    distance + 16 RBF = 17-D."""
+    """Scale-aware edge feature (17-D: distance + 16 RBF, no scale one-hot -- branch identity already encodes scale)."""
     d_norm, rbf = _rbf_basis(distance_um, macro_radius_um, n_rbf, gamma)
     return np.concatenate([d_norm[:, None], rbf], axis=1)
 
 
-# Back-compat alias for the old name (an earlier version of this function
-# was 19-D, omitting the explicit distance scalar); kept importable so
-# nothing calling it directly breaks. New code should call
-# `union_edge_features` explicitly.
+# Back-compat alias (old 19-D version omitted the distance scalar); new code should call union_edge_features directly.
 def rbf_edge_features(distance_um: np.ndarray, scale: np.ndarray, macro_radius_um: float,
                        n_rbf: int = 16, gamma: float = 10.0) -> np.ndarray:
     return union_edge_features(distance_um, scale, macro_radius_um, n_rbf, gamma)
 
 
 def build_local_only_edges(coords_um: np.ndarray, local_radius_um: float, max_local: int) -> dict:
-    """A6/local-only ablation: identical to build_multiscale_edges but with
-    meso/macro radii collapsed to local_radius_um, so only local edges
-    exist."""
+    """A6 local-only ablation: same as build_multiscale_edges but meso/macro radii collapsed to local_radius_um."""
     return build_multiscale_edges(coords_um, local_radius_um, local_radius_um, local_radius_um,
                                    max_local, max_local, max_local)
 
 
 def split_edges_by_scale(edges: dict) -> dict[str, dict]:
-    """Splits one `build_multiscale_edges` output into three per-scale
-    edge dicts (local/meso/macro), sharing the same node index space, for
-    the scale-aware model's three independent PNA branches."""
+    """Splits one build_multiscale_edges output into three per-scale edge dicts (local/meso/macro) sharing the same node index space."""
     out = {}
     for s in SCALE_NAMES:
         mask = edges["scale"] == s
-        out[s] = {"edge_index": edges["edge_index"][:, mask], "distance_um": edges["distance_um"][mask],
-                   "scale": edges["scale"][mask]}
+        out[s] = {
+            "edge_index": edges["edge_index"][:, mask],
+            "distance_um": edges["distance_um"][mask],
+            "scale": edges["scale"][mask],
+        }
     return out

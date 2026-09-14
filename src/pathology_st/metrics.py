@@ -1,7 +1,5 @@
-"""Evaluation metrics: patient-level Fisher-z aggregated Pearson (the
-primary metric -- patients, not spots, are the independent statistical
-unit), plus Spearman, MSE/MAE, threshold fractions, and Moran's I for
-spatial fidelity."""
+"""Evaluation metrics: patient-level Fisher-z aggregated Pearson (the primary metric -- patients, not
+spots, are the independent statistical unit), plus Spearman, MSE/MAE, threshold fractions, Moran's I."""
 from __future__ import annotations
 
 import numpy as np
@@ -16,8 +14,13 @@ def _safe_pearson(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(np.corrcoef(y_true[valid], y_pred[valid])[0, 1])
 
 
-def per_patient_per_column_pearson(y_true: np.ndarray, y_pred: np.ndarray, patient_ids: np.ndarray,
-                                    col_names: list[str], min_regions: int) -> pd.DataFrame:
+def per_patient_per_column_pearson(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    patient_ids: np.ndarray,
+    col_names: list[str],
+    min_regions: int,
+) -> pd.DataFrame:
     rows = []
     for pid in sorted(set(patient_ids)):
         mask = patient_ids == pid
@@ -28,13 +31,19 @@ def per_patient_per_column_pearson(y_true: np.ndarray, y_pred: np.ndarray, patie
             r = _safe_pearson(yt[:, j], yp[:, j])
             mse = float(np.nanmean((yt[:, j] - yp[:, j]) ** 2))
             mae = float(np.nanmean(np.abs(yt[:, j] - yp[:, j])))
-            rows.append({"patient_id": pid, "column": col, "r": r, "mse": mse, "mae": mae, "n": int(mask.sum())})
+            rows.append({
+                "patient_id": pid,
+                "column": col,
+                "r": r,
+                "mse": mse,
+                "mae": mae,
+                "n": int(mask.sum()),
+            })
     return pd.DataFrame(rows)
 
 
 def patient_macro_fisher_z(per_patient_per_col: pd.DataFrame) -> pd.DataFrame:
-    """R_p = tanh(mean_g(atanh(r_pg))) -- the fundamental independent
-    observations for every downstream statistical test."""
+    """R_p = tanh(mean_g(atanh(r_pg))) -- the fundamental independent observations for every downstream statistical test."""
     df = per_patient_per_col.dropna(subset=["r"]).copy()
     df["r_clipped"] = df["r"].clip(-0.999999, 0.999999)
     df["z"] = np.arctanh(df["r_clipped"])
@@ -44,8 +53,7 @@ def patient_macro_fisher_z(per_patient_per_col: pd.DataFrame) -> pd.DataFrame:
 
 
 def target_summary(per_patient_per_col: pd.DataFrame, thresholds=(0.0, 0.2, 0.3)) -> dict:
-    """Fisher-z mean + median patient-level correlation, plus %{gene: r >
-    threshold} on the per-gene pooled-across-patients mean r."""
+    """Fisher-z mean + median patient-level correlation, plus %{gene: r > threshold} on the per-gene pooled-across-patients mean r."""
     per_col = per_patient_per_col.dropna(subset=["r"]).groupby("column")["r"].mean()
     macro = patient_macro_fisher_z(per_patient_per_col)
     out = {
@@ -59,8 +67,13 @@ def target_summary(per_patient_per_col: pd.DataFrame, thresholds=(0.0, 0.2, 0.3)
     return out
 
 
-def spearman_per_column(y_true: np.ndarray, y_pred: np.ndarray, patient_ids: np.ndarray, col_names: list[str],
-                         min_regions: int) -> pd.DataFrame:
+def spearman_per_column(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    patient_ids: np.ndarray,
+    col_names: list[str],
+    min_regions: int,
+) -> pd.DataFrame:
     rows = []
     for pid in sorted(set(patient_ids)):
         mask = patient_ids == pid
@@ -105,10 +118,15 @@ def morans_i(values: np.ndarray, coords_um: np.ndarray, k: int = 6) -> float:
     return float((n / w_sum) * (num / denom))
 
 
-def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray, patient_ids: np.ndarray, cancer_types: np.ndarray,
-                          col_names: list[str], cfg: dict) -> dict:
-    """Overall + per-cancer patient-level Pearson/Spearman/MSE/MAE summary
-    for one target block (HVG50, HVG1000, or pathways)."""
+def evaluate_predictions(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    patient_ids: np.ndarray,
+    cancer_types: np.ndarray,
+    col_names: list[str],
+    cfg: dict,
+) -> dict:
+    """Overall + per-cancer patient-level Pearson/Spearman/MSE/MAE summary for one target block (HVG50, HVG1000, or pathways)."""
     min_regions = cfg["evaluation"]["min_regions_per_patient"]
     thresholds = tuple(cfg["evaluation"]["gene_r_thresholds"])
     out = {}
@@ -120,8 +138,12 @@ def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray, patient_ids: np
     for name, mask in groups.items():
         if mask.sum() == 0:
             continue
-        pp = per_patient_per_column_pearson(y_true[mask], y_pred[mask], patient_ids[mask], col_names, min_regions)
-        sp = spearman_per_column(y_true[mask], y_pred[mask], patient_ids[mask], col_names, min_regions)
+        pp = per_patient_per_column_pearson(
+            y_true[mask], y_pred[mask], patient_ids[mask], col_names, min_regions
+        )
+        sp = spearman_per_column(
+            y_true[mask], y_pred[mask], patient_ids[mask], col_names, min_regions
+        )
         summ = target_summary(pp, thresholds)
         summ["mean_spearman"] = float(sp["spearman"].mean()) if len(sp) else np.nan
         summ["mean_mse"] = float(pp["mse"].mean()) if len(pp) else np.nan

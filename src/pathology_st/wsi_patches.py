@@ -1,10 +1,5 @@
-"""WSI I/O (openslide for .svs/.ndpi/... and wsidicom for the DICOM
-whole-slide-image series CPTAC ships via the Imaging Data Commons) plus
-tissue-masked patch extraction, reused for both CPTAC tissue sampling and
-HEST ST-spot-centered patches. Never resizes whole WSIs -- always reads
-the pyramid level nearest the target mpp and extracts fixed-physical-size
-regions.
-"""
+"""WSI I/O (openslide for .svs/.ndpi, wsidicom for CPTAC's IDC-hosted DICOM series) plus tissue-masked patch extraction.
+Never resizes whole WSIs -- always reads the pyramid level nearest the target mpp and extracts fixed-physical-size regions."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,24 +13,14 @@ from pathology_st.cptac_select import tissue_mask_from_thumbnail
 def _clamp_region(
     x0: int, y0: int, size: int, level_width: int, level_height: int,
 ) -> tuple[int, int]:
-    """Shifts (x0, y0) so the `size`x`size` box stays fully within
-    [0, level_width) x [0, level_height). Patches sampled near a tissue
-    edge routinely land within half a patch-width of the slide boundary;
-    reading past it either crashes (wsidicom) or returns black padding
-    (openslide) instead of real tissue. Clamping trades a small, harmless
-    shift in the patch's exact center for real tissue content -- and for
-    not aborting the whole WSI's extraction over one edge coordinate."""
+    """Shifts (x0, y0) to keep the box inside [0, level_width) x [0, level_height); trades a small shift in patch center for real tissue instead of a crash/black-padding at the slide edge."""
     x0 = max(0, min(x0, max(0, level_width - size)))
     y0 = max(0, min(y0, max(0, level_height - size)))
     return x0, y0
 
 
 def open_slide(path: str):
-    """Factory: a directory (or a path with sibling .dcm files) is a DICOM
-    whole-slide-image series -- CPTAC/IDC ships one series as multiple SOP
-    instances (VOLUME pyramid levels, LABEL, OVERVIEW, THUMBNAIL)
-    addressed by directory, never a single filename. Anything else is
-    opened via openslide."""
+    """Factory: a directory (or sibling .dcm files) is a DICOM series -- CPTAC/IDC ships one series as multiple SOP instances addressed by directory, never a filename; anything else opens via openslide."""
     p = Path(path)
     if p.is_dir() or (p.exists() and any(p.parent.glob("*.dcm"))):
         return WsiDicomReader(str(p if p.is_dir() else p.parent))
@@ -43,13 +28,7 @@ def open_slide(path: str):
 
 
 class WsiDicomReader:
-    """Duck-typed wrapper around wsidicom.WsiDicom, matching the interface
-    expected by pathology_st.cptac_select.compute_wsi_qc and the patch extractors
-    below. `path` is a DIRECTORY containing every .dcm instance of one
-    series (wsidicom auto-discovers and assembles the pyramid).
-    wsidicom.read_region's `location` is level-0 pixel coordinates (same
-    convention as openslide.OpenSlide.read_region), so the rest of this
-    module's arithmetic (written against OpenSlideReader) is unchanged."""
+    """Duck-typed wrapper around wsidicom.WsiDicom matching OpenSlideReader's interface; `path` is a directory of one series' .dcm instances, and read_region's coordinates are level-0 pixels like openslide's, so this module's arithmetic is unchanged."""
 
     def __init__(self, path: str):
         from wsidicom import WsiDicom
@@ -69,9 +48,7 @@ class WsiDicomReader:
         return np.asarray(thumb.convert("RGB"))
 
     def level_for_mpp(self, target_mpp: float) -> int:
-        """Returns the pyramid INDEX (0 = highest resolution) into
-        self._levels closest to target_mpp -- this is the `level` argument
-        wsidicom.read_region expects, not the DICOM-native level number."""
+        """Returns the pyramid index (0 = highest-res) into self._levels closest to target_mpp -- the `level` arg read_region expects, not the DICOM-native level number."""
         if self.mpp is None:
             return 0
         best_idx, best_diff = 0, float("inf")
@@ -125,10 +102,7 @@ class WsiDicomReader:
 
 
 class OpenSlideReader:
-    """Thin duck-typed wrapper around openslide.OpenSlide matching the
-    interface expected by pathology_st.cptac_select.compute_wsi_qc and the patch
-    extractors below. cuCIM is a drop-in alternative when GPU-accelerated
-    slide reading is available; swap the backend here if so."""
+    """Thin duck-typed wrapper around openslide.OpenSlide matching the same interface; cuCIM is a drop-in, GPU-accelerated alternative backend if needed."""
 
     def __init__(self, path: str):
         import openslide
@@ -174,8 +148,7 @@ class OpenSlideReader:
         return best_level
 
     def read_region_20x(self, x_thumb: int, y_thumb: int, size_px: int) -> np.ndarray:
-        """x_thumb/y_thumb are level-0 pixel coords already; reads a
-        `size_px` square at the pyramid level nearest 0.5 um/px."""
+        """x_thumb/y_thumb are level-0 pixel coords already; reads a `size_px` square at the pyramid level nearest 0.5 um/px."""
         lvl = self.level_for_mpp(0.5)
         region = self.slide.read_region((int(x_thumb), int(y_thumb)), lvl, (size_px, size_px))
         return np.asarray(region.convert("RGB"))
@@ -183,9 +156,7 @@ class OpenSlideReader:
     def sample_tissue_tile_coords(
         self, tissue_mask: np.ndarray, n_tiles: int, tile_px: int,
     ) -> list[tuple[int, int]]:
-        """Uniformly samples up to n_tiles level-0 coordinates from tissue
-        pixels in the thumbnail mask, spread across the tissue area rather
-        than clustered."""
+        """Uniformly samples up to n_tiles level-0 coordinates from tissue pixels in the thumbnail mask, spread across the tissue rather than clustered."""
         ys, xs = np.where(tissue_mask)
         if len(xs) == 0:
             return []
@@ -203,10 +174,7 @@ class OpenSlideReader:
 
     def read_region_at_mpp(self, center_x_px: float, center_y_px: float, physical_size_um: float,
                             out_px: int, source_mpp: float | None = None) -> np.ndarray:
-        """Reads a `physical_size_um`-wide square centered at
-        (center_x_px, center_y_px) in level-0 pixel coordinates, at the
-        level nearest 0.5 um/px, then resizes to out_px x out_px. Used for
-        both CPTAC tissue sampling and ST-spot-centered HEST patches."""
+        """Reads a `physical_size_um`-wide square centered at (center_x_px, center_y_px) at the level nearest 0.5 um/px, then resizes to out_px x out_px; used for both CPTAC and HEST patches."""
         from PIL import Image
         mpp = source_mpp or self.mpp or 0.25
         native_span = physical_size_um / mpp
@@ -223,11 +191,7 @@ class OpenSlideReader:
 def sample_patch_grid(
     reader: OpenSlideReader, tissue_mask_thumb: np.ndarray, cfg: dict, rng_seed: int,
 ) -> list[tuple[int, int]]:
-    """Spatial-coverage sampling: lays a regular grid at the target patch
-    spacing across the WSI, keeps only grid points overlapping the
-    thumbnail tissue mask above the tissue-fraction threshold, then
-    subsamples down to the target patch-count range -- spreading patches
-    across the tissue rather than clustering many adjacent redundant ones."""
+    """Lays a regular grid across the WSI, keeps points over tissue above threshold, then subsamples to the target count -- spreading patches instead of clustering adjacent redundant ones."""
     patching = cfg["patching"]
     patch_px, target_mpp = patching["patch_px"], patching["target_mpp"]
     w0, h0 = reader.dimensions
@@ -265,9 +229,7 @@ def patch_tissue_fraction(patch_rgb: np.ndarray) -> float:
 def write_patch_shard(
     out_path: str | Path, patch_ids: list[str], patches: np.ndarray, meta: dict,
 ) -> None:
-    """One HDF5 shard per WSI, with per-image chunking so single-row
-    training reads stay cheap -- coordinate-based on-demand reading is
-    preferred over millions of individual PNG files."""
+    """One HDF5 shard per WSI, per-image chunked so single-row reads stay cheap -- avoids millions of individual PNG files."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(out_path, "w") as f:

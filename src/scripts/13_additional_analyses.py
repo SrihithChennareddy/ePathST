@@ -28,10 +28,18 @@ def main():
     by_cancer = {}
     for cancer, sub in df.groupby("cancer"):
         by_cancer[cancer] = {
-            "A2_distilled_patch": sub[sub["ablation"] == "A2_distilled_patch"]["fisher_z_mean_patient_R"].mean(),
-            "A5_shuffled_graph": sub[sub["ablation"] == "A5_shuffled_graph"]["fisher_z_mean_patient_R"].mean(),
-            "A6_local_pna": sub[sub["ablation"] == "A6_local_pna"]["fisher_z_mean_patient_R"].mean(),
-            "A7_multiscale_pna": sub[sub["ablation"] == "A7_multiscale_pna"]["fisher_z_mean_patient_R"].mean(),
+            "A2_distilled_patch": sub[sub["ablation"] == "A2_distilled_patch"][
+                "fisher_z_mean_patient_R"
+            ].mean(),
+            "A5_shuffled_graph": sub[sub["ablation"] == "A5_shuffled_graph"][
+                "fisher_z_mean_patient_R"
+            ].mean(),
+            "A6_local_pna": sub[sub["ablation"] == "A6_local_pna"][
+                "fisher_z_mean_patient_R"
+            ].mean(),
+            "A7_multiscale_pna": sub[sub["ablation"] == "A7_multiscale_pna"][
+                "fisher_z_mean_patient_R"
+            ].mean(),
         }
     consistency_df = per_cancer_consistency(by_cancer)
     consistency_df.to_csv(paths["results"] / "per_cancer_consistency.csv", index=False)
@@ -41,11 +49,18 @@ def main():
     local_mean = df[df["ablation"] == "A6_local_pna"]["fisher_z_mean_patient_R"].mean()
     multi_mean = df[df["ablation"] == "A7_multiscale_pna"]["fisher_z_mean_patient_R"].mean()
     summary = {
-        "multiscale_minus_local": float(multi_mean - local_mean) if pd.notna(local_mean) and pd.notna(multi_mean) else None,
-        "note": ("Moran's I vs delta_r correlation and per-pathway delta ranking need the full "
-                 "per-gene/per-pathway per-patient r tables from pathology_st.metrics.per_patient_per_column_pearson "
-                 "during script 10's run -- not yet wired to pathology_st.analysis.ground_truth_morans_i_per_gene / "
-                 "spatial_benefit_vs_autocorrelation / per_pathway_delta."),
+        "multiscale_minus_local": (
+            float(multi_mean - local_mean)
+            if pd.notna(local_mean) and pd.notna(multi_mean)
+            else None
+        ),
+        "note": (
+            "Moran's I vs delta_r correlation and per-pathway delta ranking need the full "
+            "per-gene/per-pathway per-patient r tables from "
+            "pathology_st.metrics.per_patient_per_column_pearson during script 10's run -- "
+            "not yet wired to pathology_st.analysis.ground_truth_morans_i_per_gene / "
+            "spatial_benefit_vs_autocorrelation / per_pathway_delta."
+        ),
     }
     save_json(summary, paths["results"] / "additional_analyses_summary.json")
     print(f"[13_additional_analyses] {summary}")

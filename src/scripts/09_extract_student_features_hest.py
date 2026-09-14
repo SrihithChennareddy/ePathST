@@ -1,8 +1,6 @@
 #!/usr/bin/env python
-"""Step 13: run the frozen, locked GenBio-distilled ConvNeXt V2-Atto (per
-seed) and the off-the-shelf ImageNet-pretrained encoder (A1 baseline) on
-every HEST patch, caching 320-D node features with full
-spot_id<->patch<->coordinate<->embedding integrity checks."""
+"""Runs the locked GenBio-distilled ConvNeXt V2-Atto and the ImageNet baseline (A1) on every HEST
+patch, caching 320-D node features with full spot_id<->patch<->embedding integrity checks."""
 from __future__ import annotations
 
 import argparse
@@ -31,7 +29,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/base.yaml")
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--seed", type=int, default=0, help="which locked-encoder seed to use as the primary distilled features")
+    ap.add_argument("--seed", type=int, default=0,
+                     help="which locked-encoder seed to use as the primary distilled features")
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
@@ -52,7 +51,8 @@ def main():
         "imagenet": "timm:convnextv2_atto:imagenet-pretrained",
     }
 
-    with RunEnvironment("09_extract_student_features_hest", paths["logs"] / "09_extract_student_features_hest_env.json"):
+    stage = "09_extract_student_features_hest"
+    with RunEnvironment(stage, paths["logs"] / f"{stage}_env.json"):
         for feat_name, encoder in encoders.items():
             out_dir = paths["student_embeddings"] / feat_name
             out_dir.mkdir(parents=True, exist_ok=True)
@@ -68,8 +68,10 @@ def main():
                 # run inference, cache features
                 feats = extract_student_features(encoder, shard_patches, args.device)
                 coords = group[["x_um", "y_um"]].values
-                cache_features(out_path, shard_pids.tolist(), feats, coords, encoder_name=feat_name,
-                                checkpoint_source=checkpoint_sources[feat_name], sample_id=sample_id)
+                cache_features(
+                    out_path, shard_pids.tolist(), feats, coords, encoder_name=feat_name,
+                    checkpoint_source=checkpoint_sources[feat_name], sample_id=sample_id,
+                )
 
                 # verify alignment against expression index
                 expr_idx = load_expression_index(sample_id, Path(cfg["paths"]["hest_root"]), hest_samples)

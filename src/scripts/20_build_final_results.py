@@ -18,13 +18,16 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pathology_st.ablations import ABLATION_GRID
 from pathology_st.stats_tests import patient_bootstrap_ci
-from pathology_st.utils import load_config, resolve_run_paths, save_json
+from pathology_st.utils import load_config, resolve_run_paths
 
 MODEL_DESC = {a.name: a.description for a in ABLATION_GRID}
 MODEL_PRIORITY = {a.name: a.priority for a in ABLATION_GRID}
 MODEL_ORDER = [a.name for a in ABLATION_GRID]
-TARGETS = [("hvg1000", "hvg1000_fisher_z_mean_patient_R"), ("hvg50", "hvg50_fisher_z_mean_patient_R"),
-           ("pathway", "pathway_fisher_z_mean_patient_R")]
+TARGETS = [
+    ("hvg1000", "hvg1000_fisher_z_mean_patient_R"),
+    ("hvg50", "hvg50_fisher_z_mean_patient_R"),
+    ("pathway", "pathway_fisher_z_mean_patient_R"),
+]
 
 
 def bootstrap_row(vals: np.ndarray, n_boot: int) -> dict:
@@ -53,11 +56,15 @@ def main():
     macro_rows = []
     for model in MODEL_ORDER:
         sub = df[df["ablation"] == model]
-        row = {"model": model, "priority": MODEL_PRIORITY[model], "description": MODEL_DESC[model]}
+        row = {
+            "model": model, "priority": MODEL_PRIORITY[model], "description": MODEL_DESC[model],
+        }
         for tgt, col in TARGETS:
             b = bootstrap_row(sub[col].values, n_boot)
-            row.update({f"{tgt}_R_mean": b["mean"], f"{tgt}_R_ci_low": b["ci_low"],
-                        f"{tgt}_R_ci_high": b["ci_high"], f"{tgt}_n_cells": b["n"]})
+            row.update({
+                f"{tgt}_R_mean": b["mean"], f"{tgt}_R_ci_low": b["ci_low"],
+                f"{tgt}_R_ci_high": b["ci_high"], f"{tgt}_n_cells": b["n"],
+            })
         macro_rows.append(row)
     macro_df = pd.DataFrame(macro_rows)
     macro_df.to_csv(out_dir / "tables" / "model_comparison_macro.csv", index=False)
@@ -70,37 +77,47 @@ def main():
             row = {"cancer": cancer, "model": model}
             for tgt, col in TARGETS:
                 b = bootstrap_row(sub[col].values, n_boot)
-                row.update({f"{tgt}_R_mean": b["mean"], f"{tgt}_R_ci_low": b["ci_low"],
-                            f"{tgt}_R_ci_high": b["ci_high"], f"{tgt}_n_folds": b["n"]})
+                row.update({
+                    f"{tgt}_R_mean": b["mean"], f"{tgt}_R_ci_low": b["ci_low"],
+                    f"{tgt}_R_ci_high": b["ci_high"], f"{tgt}_n_folds": b["n"],
+                })
             per_cancer_rows.append(row)
     per_cancer_df = pd.DataFrame(per_cancer_rows)
     per_cancer_df.to_csv(out_dir / "tables" / "model_comparison_per_cancer.csv", index=False)
 
     # -- C) gate summary (from script 12's primary_hypothesis_test.json) --
     primary = json.loads((results / "primary_hypothesis_test.json").read_text())
-    gate_labels = {"gate1_distillation": "Gate 1: Distillation (A2 > A1)",
-                   "gate2_spatial_context": "Gate 2: Spatial context (A8 > A2)",
-                   "gate3_true_topology": "Gate 3: True topology (A8 > A5, decisive negative control)"}
+    gate_labels = {
+        "gate1_distillation": "Gate 1: Distillation (A2 > A1)",
+        "gate2_spatial_context": "Gate 2: Spatial context (A8 > A2)",
+        "gate3_true_topology": "Gate 3: True topology (A8 > A5, decisive negative control)",
+    }
     gate_rows = []
     for gate_key, spec in cfg["primary_gates"].items():
         g = primary["pooled"][gate_key]
-        gate_rows.append({"gate": gate_key, "label": gate_labels[gate_key], "scope": "pooled (3 cancers)",
-                           "better": spec["better"], "worse": spec["worse"],
-                           "mean_delta_R": g["bootstrap"]["mean_delta"], "ci_low": g["bootstrap"]["ci_low"],
-                           "ci_high": g["bootstrap"]["ci_high"], "cohens_d": g["bootstrap"]["effect_size_cohens_d"],
-                           "p_value_one_sided": g["sign_flip_test"]["p_value_one_sided"],
-                           "n_units": len(g["units"]),
-                           "verdict": "SUPPORTED" if g["supported_ci_above_zero"] else "NOT SUPPORTED"})
+        gate_rows.append({
+            "gate": gate_key, "label": gate_labels[gate_key], "scope": "pooled (3 cancers)",
+            "better": spec["better"], "worse": spec["worse"],
+            "mean_delta_R": g["bootstrap"]["mean_delta"], "ci_low": g["bootstrap"]["ci_low"],
+            "ci_high": g["bootstrap"]["ci_high"],
+            "cohens_d": g["bootstrap"]["effect_size_cohens_d"],
+            "p_value_one_sided": g["sign_flip_test"]["p_value_one_sided"],
+            "n_units": len(g["units"]),
+            "verdict": "SUPPORTED" if g["supported_ci_above_zero"] else "NOT SUPPORTED",
+        })
         for cancer in cancers:
             gc = primary["per_cancer"][cancer][gate_key]
-            gate_rows.append({"gate": gate_key, "label": gate_labels[gate_key], "scope": cancer,
-                               "better": spec["better"], "worse": spec["worse"],
-                               "mean_delta_R": gc["bootstrap"]["mean_delta"], "ci_low": gc["bootstrap"]["ci_low"],
-                               "ci_high": gc["bootstrap"]["ci_high"],
-                               "cohens_d": gc["bootstrap"]["effect_size_cohens_d"],
-                               "p_value_one_sided": gc["sign_flip_test"]["p_value_one_sided"],
-                               "n_units": len(gc["units"]),
-                               "verdict": "SUPPORTED" if gc["supported_ci_above_zero"] else "NOT SUPPORTED"})
+            gate_rows.append({
+                "gate": gate_key, "label": gate_labels[gate_key], "scope": cancer,
+                "better": spec["better"], "worse": spec["worse"],
+                "mean_delta_R": gc["bootstrap"]["mean_delta"],
+                "ci_low": gc["bootstrap"]["ci_low"],
+                "ci_high": gc["bootstrap"]["ci_high"],
+                "cohens_d": gc["bootstrap"]["effect_size_cohens_d"],
+                "p_value_one_sided": gc["sign_flip_test"]["p_value_one_sided"],
+                "n_units": len(gc["units"]),
+                "verdict": "SUPPORTED" if gc["supported_ci_above_zero"] else "NOT SUPPORTED",
+            })
     gate_df = pd.DataFrame(gate_rows)
     gate_df.to_csv(out_dir / "tables" / "gate_summary.csv", index=False)
 
@@ -108,23 +125,32 @@ def main():
     secondary = json.loads((results / "secondary_hypothesis_tests.json").read_text())
     sec_rows = []
     for name, g in secondary.items():
-        sec_rows.append({"comparison": name, "better": g.get("better"), "worse": g.get("worse"),
-                          "mean_delta_R": g.get("bootstrap", {}).get("mean_delta"),
-                          "ci_low": g.get("bootstrap", {}).get("ci_low"),
-                          "ci_high": g.get("bootstrap", {}).get("ci_high"),
-                          "p_value_one_sided": g.get("sign_flip_test", {}).get("p_value_one_sided"),
-                          "n_units": len(g.get("units", [])),
-                          "verdict": "SUPPORTED" if g.get("supported_ci_above_zero") else "NOT SUPPORTED"})
+        sec_rows.append({
+            "comparison": name, "better": g.get("better"), "worse": g.get("worse"),
+            "mean_delta_R": g.get("bootstrap", {}).get("mean_delta"),
+            "ci_low": g.get("bootstrap", {}).get("ci_low"),
+            "ci_high": g.get("bootstrap", {}).get("ci_high"),
+            "p_value_one_sided": g.get("sign_flip_test", {}).get("p_value_one_sided"),
+            "n_units": len(g.get("units", [])),
+            "verdict": "SUPPORTED" if g.get("supported_ci_above_zero") else "NOT SUPPORTED",
+        })
     pd.DataFrame(sec_rows).to_csv(out_dir / "tables" / "secondary_comparisons.csv", index=False)
 
     # -- E) pathway/PROGENy-only view --
-    pathway_rows = [{"scope": "macro", "model": r["model"], "R_mean": r["pathway_R_mean"],
-                      "ci_low": r["pathway_R_ci_low"], "ci_high": r["pathway_R_ci_high"], "n": r["pathway_n_cells"]}
-                     for r in macro_rows]
+    pathway_rows = [
+        {
+            "scope": "macro", "model": r["model"], "R_mean": r["pathway_R_mean"],
+            "ci_low": r["pathway_R_ci_low"], "ci_high": r["pathway_R_ci_high"],
+            "n": r["pathway_n_cells"],
+        }
+        for r in macro_rows
+    ]
     for r in per_cancer_rows:
-        pathway_rows.append({"scope": r["cancer"], "model": r["model"], "R_mean": r["pathway_R_mean"],
-                              "ci_low": r["pathway_R_ci_low"], "ci_high": r["pathway_R_ci_high"],
-                              "n": r["pathway_n_folds"]})
+        pathway_rows.append({
+            "scope": r["cancer"], "model": r["model"], "R_mean": r["pathway_R_mean"],
+            "ci_low": r["pathway_R_ci_low"], "ci_high": r["pathway_R_ci_high"],
+            "n": r["pathway_n_folds"],
+        })
     pd.DataFrame(pathway_rows).to_csv(out_dir / "tables" / "pathway_progeny_results.csv", index=False)
 
     # -- F) official HEST-Benchmark (separate protocol, copied verbatim, never mixed with A-G) --
@@ -139,8 +165,11 @@ def main():
     genbio_src = results / "genbio_baseline" / "genbio_summary.csv"
     genbio_df = pd.read_csv(genbio_src) if genbio_src.exists() else pd.DataFrame()
     if len(genbio_df):
-        genbio_df.insert(1, "status", "PARTIAL: fold0/seed0 only, not full 5-fold CV -- do not compare directly "
-                                        "to the 5-fold macro table above without accounting for this")
+        genbio_status = (
+            "PARTIAL: fold0/seed0 only, not full 5-fold CV -- do not compare directly "
+            "to the 5-fold macro table above without accounting for this"
+        )
+        genbio_df.insert(1, "status", genbio_status)
         genbio_df.to_csv(out_dir / "tables" / "genbio_embedding_mlp_baseline_B1.csv", index=False)
 
     # -- H) efficiency (real measured items only; everything else explicitly NOT MEASURED) --
@@ -152,20 +181,40 @@ def main():
     tp = results / "genbio_teacher_param_count.json"
     if tp.exists():
         teacher_params = json.loads(tp.read_text())["total_parameters"]
+    compression_ratio_value = (
+        (teacher_params / student_params) if (teacher_params and student_params) else None
+    )
     eff_rows = [
-        {"metric": "student_encoder_total_parameters", "value": student_params, "status": "MEASURED",
-         "source": "scripts (ConvNeXt V2-Atto student), student_encoder_param_count_seed0.json"},
-        {"metric": "genbio_pathfm_teacher_total_parameters", "value": teacher_params, "status": "MEASURED",
-         "source": "AutoModel.from_pretrained('genbio-ai/genbio-pathfm'), sum(p.numel()), 2026-08-31"},
-        {"metric": "compression_ratio_teacher_over_student", "value":
-            (teacher_params / student_params) if (teacher_params and student_params) else None, "status": "MEASURED",
-         "source": "derived from the two rows above"},
-        {"metric": "gpu_peak_vram_inference", "value": None, "status": "NOT MEASURED",
-         "source": "no inference-time VRAM profiling run this session"},
-        {"metric": "patches_per_second_throughput", "value": None, "status": "NOT MEASURED",
-         "source": "no throughput benchmark run this session"},
-        {"metric": "A8_gnn_inference_wallclock_per_patient", "value": None, "status": "NOT MEASURED",
-         "source": "no dedicated timing harness run this session"},
+        {
+            "metric": "student_encoder_total_parameters", "value": student_params,
+            "status": "MEASURED",
+            "source": "scripts (ConvNeXt V2-Atto student), student_encoder_param_count_seed0.json",
+        },
+        {
+            "metric": "genbio_pathfm_teacher_total_parameters", "value": teacher_params,
+            "status": "MEASURED",
+            "source": (
+                "AutoModel.from_pretrained('genbio-ai/genbio-pathfm'), sum(p.numel()), "
+                "2026-08-31"
+            ),
+        },
+        {
+            "metric": "compression_ratio_teacher_over_student", "value": compression_ratio_value,
+            "status": "MEASURED", "source": "derived from the two rows above",
+        },
+        {
+            "metric": "gpu_peak_vram_inference", "value": None, "status": "NOT MEASURED",
+            "source": "no inference-time VRAM profiling run this session",
+        },
+        {
+            "metric": "patches_per_second_throughput", "value": None, "status": "NOT MEASURED",
+            "source": "no throughput benchmark run this session",
+        },
+        {
+            "metric": "A8_gnn_inference_wallclock_per_patient", "value": None,
+            "status": "NOT MEASURED",
+            "source": "no dedicated timing harness run this session",
+        },
     ]
     pd.DataFrame(eff_rows).to_csv(out_dir / "tables" / "efficiency.csv", index=False)
 
@@ -175,9 +224,13 @@ def main():
     for cancer, info in cv_folds["per_cancer"].items():
         for f in info["folds"]:
             for pid in f["train_patients"]:
-                fold_rows.append({"cancer": cancer, "fold": f["fold"], "split": "train", "patient_id": pid})
+                fold_rows.append({
+                    "cancer": cancer, "fold": f["fold"], "split": "train", "patient_id": pid,
+                })
             for pid in f["test_patients"]:
-                fold_rows.append({"cancer": cancer, "fold": f["fold"], "split": "test", "patient_id": pid})
+                fold_rows.append({
+                    "cancer": cancer, "fold": f["fold"], "split": "test", "patient_id": pid,
+                })
     pd.DataFrame(fold_rows).to_csv(out_dir / "folds" / "cv_folds_used.csv", index=False)
 
     # -- J) FINAL_RESULTS.md --
@@ -185,21 +238,39 @@ def main():
         return "N/A" if v is None or (isinstance(v, float) and np.isnan(v)) else f"{v:.{d}f}"
 
     def gate_line(gate_key):
-        g = [r for r in gate_rows if r["gate"] == gate_key and r["scope"] == "pooled (3 cancers)"][0]
-        per_c = [f"{r['scope']}: {r['verdict']} (delta={fmt(r['mean_delta_R'])})"
-                 for r in gate_rows if r["gate"] == gate_key and r["scope"] != "pooled (3 cancers)"]
-        return (f"**{g['label']}** -- pooled: **{g['verdict']}**, "
-                f"delta_R={fmt(g['mean_delta_R'])} 95% CI=[{fmt(g['ci_low'])}, {fmt(g['ci_high'])}], "
-                f"Cohen's d={fmt(g['cohens_d'])}, p={fmt(g['p_value_one_sided'], 4)} "
-                f"(n={g['n_units']} cancer-fold-seed cells). Per-cancer: {'; '.join(per_c)}.")
+        g = [
+            r for r in gate_rows if r["gate"] == gate_key and r["scope"] == "pooled (3 cancers)"
+        ][0]
+        per_c = [
+            f"{r['scope']}: {r['verdict']} (delta={fmt(r['mean_delta_R'])})"
+            for r in gate_rows
+            if r["gate"] == gate_key and r["scope"] != "pooled (3 cancers)"
+        ]
+        return (
+            f"**{g['label']}** -- pooled: **{g['verdict']}**, "
+            f"delta_R={fmt(g['mean_delta_R'])} "
+            f"95% CI=[{fmt(g['ci_low'])}, {fmt(g['ci_high'])}], "
+            f"Cohen's d={fmt(g['cohens_d'])}, "
+            f"p={fmt(g['p_value_one_sided'], 4)} "
+            f"(n={g['n_units']} cancer-fold-seed cells). Per-cancer: {'; '.join(per_c)}."
+        )
 
-    macro_table_md = macro_df[["model", "priority", "hvg1000_R_mean", "hvg1000_R_ci_low", "hvg1000_R_ci_high",
-                                "hvg50_R_mean", "pathway_R_mean"]].round(4).to_markdown(index=False)
-    gate_table_md = gate_df[gate_df["scope"] == "pooled (3 cancers)"][
-        ["label", "mean_delta_R", "ci_low", "ci_high", "p_value_one_sided", "verdict"]].round(4).to_markdown(index=False)
-    official_table_md = official_df.round(4).to_markdown(index=False) if len(official_df) else "(not available)"
-    genbio_table_md = genbio_df[["cancer", "status", "HVG50_r", "HVG1000_r", "PROGENy14_r"]].round(4).to_markdown(
-        index=False) if len(genbio_df) else "(not available)"
+    macro_cols = [
+        "model", "priority", "hvg1000_R_mean", "hvg1000_R_ci_low", "hvg1000_R_ci_high",
+        "hvg50_R_mean", "pathway_R_mean",
+    ]
+    macro_table_md = macro_df[macro_cols].round(4).to_markdown(index=False)
+    gate_cols = ["label", "mean_delta_R", "ci_low", "ci_high", "p_value_one_sided", "verdict"]
+    pooled_gates = gate_df[gate_df["scope"] == "pooled (3 cancers)"]
+    gate_table_md = pooled_gates[gate_cols].round(4).to_markdown(index=False)
+    official_table_md = (
+        official_df.round(4).to_markdown(index=False) if len(official_df) else "(not available)"
+    )
+    genbio_cols = ["cancer", "status", "HVG50_r", "HVG1000_r", "PROGENy14_r"]
+    genbio_table_md = (
+        genbio_df[genbio_cols].round(4).to_markdown(index=False)
+        if len(genbio_df) else "(not available)"
+    )
 
     md = f"""# FINAL_RESULTS.md
 
@@ -303,8 +374,8 @@ seed 0).
     print(f"[20_build_final_results] wrote {out_dir}")
     for p in sorted((out_dir / "tables").iterdir()):
         print(f"  tables/{p.name}")
-    print(f"  folds/cv_folds_used.csv")
-    print(f"  FINAL_RESULTS.md")
+    print("  folds/cv_folds_used.csv")
+    print("  FINAL_RESULTS.md")
 
 
 if __name__ == "__main__":

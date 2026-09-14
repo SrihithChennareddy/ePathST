@@ -138,8 +138,10 @@ def get_mpp(adata) -> float:
     sf = adata.uns["spatial"][tech]["scalefactors"]
     mpp = 55.0 / sf["spot_diameter_fullres"]
     assert 0.05 <= mpp <= 2.0, (
-        f"implausible mpp={mpp:.4f} um/px (spot_diameter_fullres={sf['spot_diameter_fullres']}, tech={tech}) "
-        "-- unexpected ST technology, not validated by this script's mpp convention")
+        f"implausible mpp={mpp:.4f} um/px "
+        f"(spot_diameter_fullres={sf['spot_diameter_fullres']}, tech={tech}) "
+        "-- unexpected ST technology, not validated by this script's mpp convention"
+    )
     return mpp
 
 
@@ -179,14 +181,18 @@ def _row_for(sample_id: str, split_df: pd.DataFrame) -> pd.Series:
     return split_df[split_df["sample_id"] == sample_id].iloc[0]
 
 
-def build_manifest_rows(sample_ids: list[str], cache: SampleCache, split_df: pd.DataFrame) -> list[dict]:
+def build_manifest_rows(
+    sample_ids: list[str], cache: SampleCache, split_df: pd.DataFrame
+) -> list[dict]:
     rows = []
     for sid in sample_ids:
         row = _row_for(sid, split_df)
         entry = cache.get(sid, row["patches_path"], row["expr_path"])
         for i, bc in enumerate(entry["barcodes"]):
-            rows.append({"spot_uid": f"{sid}::{bc}", "x_um": entry["coords_um"][i, 0],
-                         "y_um": entry["coords_um"][i, 1], "patient_id": sid})
+            rows.append({
+                "spot_uid": f"{sid}::{bc}", "x_um": entry["coords_um"][i, 0],
+                "y_um": entry["coords_um"][i, 1], "patient_id": sid,
+            })
     return rows
 
 
@@ -205,8 +211,10 @@ def gather(sample_ids: list[str], cache: SampleCache, split_df: pd.DataFrame):
     return ids, feats_by_src, y
 
 
-def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, seed: int, device: str,
-                    max_folds: int | None) -> list[dict]:
+def run_one_cancer(
+    bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, seed: int, device: str,
+    max_folds: int | None,
+) -> list[dict]:
     cancer_root = bench_root / cancer
     genes = json.loads((cancer_root / "var_50genes.json").read_text())["genes"]
     split_dir = cancer_root / "splits"
@@ -237,10 +245,15 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
         else:
             train_ids_s, val_ids_s = train_samples_all, train_samples_all
         test_ids_s = test_df["sample_id"].tolist()
-        fallback_note = " (val==train fallback, too few samples for a real held-out split)" \
+        fallback_note = (
+            " (val==train fallback, too few samples for a real held-out split)"
             if val_ids_s == train_ids_s else ""
-        print(f"[22_official_hest_ablation_grid] {cancer} fold{fold}: "
-              f"{len(train_ids_s)} train / {len(val_ids_s)} val / {len(test_ids_s)} test samples{fallback_note}")
+        )
+        print(
+            f"[22_official_hest_ablation_grid] {cancer} fold{fold}: "
+            f"{len(train_ids_s)} train / {len(val_ids_s)} val / {len(test_ids_s)} "
+            f"test samples{fallback_note}"
+        )
 
         # dict.fromkeys dedupes while preserving order -- train_ids_s == val_ids_s in the
         # val==train fallback case above, and building manifest rows for the same sample
@@ -267,11 +280,19 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
         y_path_val = np.full((len(ids_val), 1), np.nan, dtype=np.float32)
         y_path_test = np.full((len(ids_test), 1), np.nan, dtype=np.float32)
 
-        x_by_source = {src: {"train": x_by_src_train[src], "val": x_by_src_val[src], "test": x_by_src_test[src]}
-                       for src in embed_fns}
-        patch_heads = {src: train_patch_head(x_by_source[src]["train"], x_by_source[src]["val"],
-                                              y_gene_train, y_path_train, y_gene_val, y_path_val, cfg, device)
-                       for src in embed_fns}
+        x_by_source = {
+            src: {
+                "train": x_by_src_train[src], "val": x_by_src_val[src], "test": x_by_src_test[src],
+            }
+            for src in embed_fns
+        }
+        patch_heads = {
+            src: train_patch_head(
+                x_by_source[src]["train"], x_by_source[src]["val"],
+                y_gene_train, y_path_train, y_gene_val, y_path_val, cfg, device,
+            )
+            for src in embed_fns
+        }
 
         # ids_test -> row index, so eval_ids_test (run_ablation's own prediction order --
         # identity order for A0-A3, per-patient-regrouped for graph ablations A4-A9, see
@@ -281,12 +302,16 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
 
         for spec in ABLATION_GRID:
             src = spec.feature_source if spec.feature_source in x_by_source else "distilled"
-            sx_train, sx_val, sx_test = x_by_source[src]["train"], x_by_source[src]["val"], x_by_source[src]["test"]
+            sx_train = x_by_source[src]["train"]
+            sx_val = x_by_source[src]["val"]
+            sx_test = x_by_source[src]["test"]
             spec_patch_head = patch_heads[src]
             preds, r_metrics, eval_ids_test = run_ablation(
-                spec, sx_train, sx_val, sx_test, ids_train, ids_val, ids_test, y_gene_train, y_path_train,
-                y_gene_val, y_path_val, y_gene_test, y_path_test, spec_patch_head, manifest, cfg, seed, device,
-                n_hvg50=len(genes), pathway_names=["_unused_dummy_pathway"])
+                spec, sx_train, sx_val, sx_test, ids_train, ids_val, ids_test,
+                y_gene_train, y_path_train, y_gene_val, y_path_val, y_gene_test, y_path_test,
+                spec_patch_head, manifest, cfg, seed, device,
+                n_hvg50=len(genes), pathway_names=["_unused_dummy_pathway"],
+            )
             r_metrics = {k: v for k, v in r_metrics.items() if not k.startswith("pathway_")}
 
             # Official HEST-1k Benchmark metric (see docs/HEST_OFFICIAL_ABLATION_RESULTS.md):
@@ -300,27 +325,45 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
             official_pearson_mean = official_pooled_pearson(y_true_ord, y_pred)
             r_metrics["official_pooled_pearson_mean"] = official_pearson_mean
 
-            row = {"cancer": cancer, "fold": fold, "seed": seed, "ablation": spec.name,
-                   "n_train_spots": len(ids_train), "n_val_spots": len(ids_val), "n_test_spots": len(ids_test),
-                   "n_train_samples": len(train_ids_s), "n_test_samples": len(test_ids_s), **r_metrics}
+            row = {
+                "cancer": cancer, "fold": fold, "seed": seed, "ablation": spec.name,
+                "n_train_spots": len(ids_train), "n_val_spots": len(ids_val),
+                "n_test_spots": len(ids_test),
+                "n_train_samples": len(train_ids_s), "n_test_samples": len(test_ids_s),
+                **r_metrics,
+            }
             metrics_rows.append(row)
             r_val = r_metrics.get("fisher_z_mean_patient_R")
-            print(f"[22_official_hest_ablation_grid] {cancer} fold{fold} {spec.name}: "
-                  f"fisher_z_R={r_val:.4f} official_pooled_R={official_pearson_mean:.4f}"
-                  if r_val is not None else "n/a")
+            print(
+                (
+                    f"[22_official_hest_ablation_grid] {cancer} fold{fold} {spec.name}: "
+                    f"fisher_z_R={r_val:.4f} official_pooled_R={official_pearson_mean:.4f}"
+                )
+                if r_val is not None else "n/a"
+            )
     return metrics_rows
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/base.yaml")
-    ap.add_argument("--bench-root", default="/lustre/nvwulf/scratch/schennareddy/HEST-1k/hest_bench")
+    ap.add_argument(
+        "--bench-root", default="/lustre/nvwulf/scratch/schennareddy/HEST-1k/hest_bench"
+    )
     ap.add_argument("--cancers", nargs="+", default=["IDC", "COAD", "CCRCC"])
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--seed", type=int, default=1, help="official BenchmarkConfig default (matches script 19)")
-    ap.add_argument("--feature-seed", type=int, default=0, help="which locked distilled-encoder checkpoint to use")
-    ap.add_argument("--max-folds-per-cancer", type=int, default=None,
-                     help="run only the first N official folds per cancer (time-budgeted / smoke-test runs)")
+    ap.add_argument(
+        "--seed", type=int, default=1,
+        help="official BenchmarkConfig default (matches script 19)",
+    )
+    ap.add_argument(
+        "--feature-seed", type=int, default=0,
+        help="which locked distilled-encoder checkpoint to use",
+    )
+    ap.add_argument(
+        "--max-folds-per-cancer", type=int, default=None,
+        help="run only the first N official folds per cancer (time-budgeted / smoke-test runs)",
+    )
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
@@ -328,9 +371,11 @@ def main():
     seed_everything(args.seed)
 
     # load frozen encoders
-    distilled = load_locked_encoder(
-        torch.load(paths["student_checkpoints"] / f"locked_encoder_seed{args.feature_seed}.pt",
-                   map_location=args.device)["encoder_state_dict"], args.device)
+    checkpoint = torch.load(
+        paths["student_checkpoints"] / f"locked_encoder_seed{args.feature_seed}.pt",
+        map_location=args.device,
+    )
+    distilled = load_locked_encoder(checkpoint["encoder_state_dict"], args.device)
     imagenet = ConvNeXtV2AttoStudent(pretrained="imagenet").to(args.device).eval()
 
     def embed_distilled(imgs):
@@ -343,8 +388,10 @@ def main():
 
     all_rows = []
     for cancer in args.cancers:
-        all_rows.extend(run_one_cancer(bench_root, cancer, embed_fns, cfg, args.seed, args.device,
-                                        args.max_folds_per_cancer))  # run ablation grid per cancer
+        # run ablation grid per cancer
+        all_rows.extend(run_one_cancer(
+            bench_root, cancer, embed_fns, cfg, args.seed, args.device, args.max_folds_per_cancer
+        ))
 
     # save results
     out_dir = paths["results"] / "official_hest_ablation_grid"

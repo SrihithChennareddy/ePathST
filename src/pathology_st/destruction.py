@@ -1,7 +1,5 @@
-"""Graph-destruction controls used by ablations A4 (random) and A5
-(degree-preserving shuffle), plus the dose-response sweep. All functions
-preserve the real graph's total (undirected) edge count, so any
-performance difference is attributable to topology, not degree/capacity."""
+"""Graph-destruction controls for ablations A4 (random) and A5 (degree-preserving shuffle) plus the
+dose-response sweep; all preserve total edge count, so any effect is attributable to topology, not degree."""
 from __future__ import annotations
 
 import numpy as np
@@ -20,9 +18,7 @@ def _symmetrize(pairs: np.ndarray) -> np.ndarray:
 
 
 def random_graph(edge_index: np.ndarray, n_nodes: int, seed: int) -> np.ndarray:
-    """A4: same node count, same (undirected) edge count, edges placed
-    uniformly at random within the slide -- no physical-distance
-    information used at all."""
+    """A4: same node/edge count, edges placed uniformly at random -- no physical-distance information used."""
     rng = np.random.RandomState(seed)
     n_edges = _undirected_pairs(edge_index).shape[0]
     max_possible = n_nodes * (n_nodes - 1) // 2
@@ -38,18 +34,17 @@ def random_graph(edge_index: np.ndarray, n_nodes: int, seed: int) -> np.ndarray:
     return _symmetrize(pairs)
 
 
-def degree_preserving_rewire(edge_index: np.ndarray, seed: int, n_swap_multiplier: int = 10) -> np.ndarray:
-    """A5, the critical negative control: double-edge-swap rewiring.
-    Exactly preserves every node's degree while destroying the real
-    physical adjacency structure."""
+def degree_preserving_rewire(
+    edge_index: np.ndarray, seed: int, n_swap_multiplier: int = 10
+) -> np.ndarray:
+    """A5, the critical negative control: double-edge-swap rewiring that exactly preserves every node's degree while destroying real physical adjacency."""
     rng = np.random.RandomState(seed)
     pairs = _undirected_pairs(edge_index)
     edge_set = {tuple(p) for p in pairs}
     edges = [tuple(p) for p in pairs]
     n_attempts = n_swap_multiplier * max(1, len(edges))
 
-    # double-edge swaps: (a,b),(c,d) -> (a,d),(c,b), rejecting swaps that
-    # would create a duplicate or self-loop edge
+    # double-edge swaps: (a,b),(c,d) -> (a,d),(c,b), rejecting duplicate/self-loop results
     for _ in range(n_attempts):
         if len(edges) < 2:
             break
@@ -74,11 +69,15 @@ def degree_preserving_rewire(edge_index: np.ndarray, seed: int, n_swap_multiplie
     return _symmetrize(pairs)
 
 
-def partial_edge_replacement(edge_index: np.ndarray, n_nodes: int, fraction: float, seed: int,
-                              distance_um: np.ndarray | None = None, placeholder_distance: float = 0.0) -> dict:
-    """Dose-response sweep: replace `fraction` of the real physical
-    (undirected) edges with random edges, keeping total edge count fixed.
-    fraction in {0, 0.25, 0.5, 0.75, 1.0}."""
+def partial_edge_replacement(
+    edge_index: np.ndarray,
+    n_nodes: int,
+    fraction: float,
+    seed: int,
+    distance_um: np.ndarray | None = None,
+    placeholder_distance: float = 0.0,
+) -> dict:
+    """Dose-response sweep: replaces `fraction` of real edges with random ones, keeping total edge count fixed (fraction in {0, 0.25, 0.5, 0.75, 1.0})."""
     rng = np.random.RandomState(seed)
     real_pairs = _undirected_pairs(edge_index)
     n_edges = len(real_pairs)

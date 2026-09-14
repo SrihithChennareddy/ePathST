@@ -1,7 +1,5 @@
-"""Distillation training loop and the S0/S1/S2 baseline definitions: S0 is
-ImageNet ConvNeXt V2-Atto with no distillation, S1 is ImageNet-init distilled
-against the GenBio teacher (the main comparison target), and S2 is
-random-init distilled against the same teacher."""
+"""Distillation training loop and the S0/S1/S2 baseline definitions.
+S0 = ImageNet ConvNeXt V2-Atto, no distillation; S1 = ImageNet-init distilled against the GenBio teacher (main comparison target); S2 = random-init distilled against the same teacher."""
 from __future__ import annotations
 
 import math
@@ -21,8 +19,7 @@ IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
 def augment_train(patch_uint8: np.ndarray, rng: np.random.RandomState, cfg: dict) -> np.ndarray:
-    """Flips, 90-deg rotations, moderate color/stain augmentation, mild
-    brightness/contrast -- never destructive to tissue morphology."""
+    """Flips, 90-deg rotations, moderate color/stain augmentation, mild brightness/contrast -- never destructive to tissue morphology."""
     aug = cfg["distillation"]["augmentation"]
     img = patch_uint8.copy()
     if aug["hflip"] and rng.rand() < 0.5:
@@ -52,11 +49,11 @@ def to_tensor_normalized(img_float01: np.ndarray) -> np.ndarray:
 
 
 class CPTACDistillDataset(Dataset):
-    """Reads patches on-demand from per-WSI HDF5 shards (pathology_st.wsi_patches
-    format) and pairs each with its cached teacher embedding by patch_id.
-    Asserts every manifest patch has a cached embedding before training starts."""
+    """Reads patches on-demand from per-WSI HDF5 shards (pathology_st.wsi_patches format) and pairs each with its cached teacher embedding by patch_id; asserts every manifest patch has a cached embedding before training starts."""
 
-    def __init__(self, patch_manifest, teacher_h5_path: str, shard_dir: str, train: bool, cfg: dict):
+    def __init__(
+        self, patch_manifest, teacher_h5_path: str, shard_dir: str, train: bool, cfg: dict
+    ):
         self.manifest = patch_manifest.reset_index(drop=True)
         self.shard_dir = Path(shard_dir)
         self.train = train
@@ -78,7 +75,11 @@ class CPTACDistillDataset(Dataset):
             pos = int(np.where(pids == row["patch_id"])[0][0])
             patch = f["patches"][pos]
         rng = np.random.RandomState(abs(hash((row["patch_id"], idx))) % (2 ** 31))
-        img = augment_train(patch, rng, self.cfg) if self.train else patch.astype(np.float32) / 255.0
+        img = (
+            augment_train(patch, rng, self.cfg)
+            if self.train
+            else patch.astype(np.float32) / 255.0
+        )
         x = to_tensor_normalized(img)
         teacher_emb = self._teacher_by_id[row["patch_id"]]
         return torch.from_numpy(x), torch.from_numpy(teacher_emb), row["patch_id"]
@@ -113,20 +114,17 @@ def evaluate_val_cosine(model, loader, device) -> float:
     return float(np.concatenate(sims).mean()) if sims else float("nan")
 
 
-def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, seed: int, device: str = "cuda",
-                   time_budget_seconds: float | None = None) -> dict:
-    """`baseline` in {"S1", "S2"} (S0 needs no training loop). Saves the
-    best checkpoint (by validation teacher-cosine similarity, never test)
-    to out_dir/{baseline}_seed{seed}_best.pt.
-
-    Resumable and wall-clock-budgeted for SLURM: a full training-state
-    snapshot (model+optimizer+scaler+step counters, not just best-val
-    weights) is saved every epoch to out_dir/{baseline}_seed{seed}_resume.pt
-    and reloaded automatically if present, so a job killed by the wall
-    clock resumes on the next `sbatch` instead of restarting. If
-    `time_budget_seconds` is set, training stops (after saving both
-    checkpoints) once elapsed time exceeds it, returning
-    `stopped_early_for_time=True` rather than raising."""
+def train_student(
+    baseline: str,
+    train_ds,
+    val_ds,
+    cfg: dict,
+    out_dir: Path,
+    seed: int,
+    device: str = "cuda",
+    time_budget_seconds: float | None = None,
+) -> dict:
+    """`baseline` in {"S1", "S2"} (S0 needs no training loop); saves the best checkpoint (by validation teacher-cosine similarity, never test) to out_dir/{baseline}_seed{seed}_best.pt, and is resumable/wall-clock-budgeted for SLURM: a full training-state snapshot (model+optimizer+scaler+step counters) is saved every epoch to out_dir/{baseline}_seed{seed}_resume.pt and reloaded automatically if present, so a job killed by the wall clock resumes on the next `sbatch`; if `time_budget_seconds` is set, training stops (after saving both checkpoints) once elapsed time exceeds it, returning `stopped_early_for_time=True` rather than raising."""
     import time
     from pathology_st.utils import seed_everything
     seed_everything(seed)
@@ -140,7 +138,9 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
 
     train_loader = torch.utils.data.DataLoader(train_ds, batch_size=d["batch_size"], shuffle=True,
                                                 num_workers=8, drop_last=True, pin_memory=True)
-    val_loader = torch.utils.data.DataLoader(val_ds, batch_size=d["batch_size"], shuffle=False, num_workers=4)
+    val_loader = torch.utils.data.DataLoader(
+        val_ds, batch_size=d["batch_size"], shuffle=False, num_workers=4
+    )
 
     steps_per_epoch = len(train_loader)
     total_steps = steps_per_epoch * d["max_epochs"]
@@ -183,7 +183,9 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
             opt.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast(enabled=d["amp"]):
                 out = model(x)
-                losses = distillation_loss(out["projected"], teacher_emb, d["lambda_feature"], d["feature_loss"])
+                losses = distillation_loss(
+                    out["projected"], teacher_emb, d["lambda_feature"], d["feature_loss"]
+                )
 
             # backward + optimizer step
             scaler.scale(losses["loss"]).backward()
@@ -194,52 +196,90 @@ def train_student(baseline: str, train_ds, val_ds, cfg: dict, out_dir: Path, see
             epoch_losses.append(float(losses["loss"].item()))
             global_step += 1
 
-            if time_budget_seconds is not None and global_step % 200 == 0 and (time.time() - t0) > time_budget_seconds:
+            if (
+                time_budget_seconds is not None
+                and global_step % 200 == 0
+                and (time.time() - t0) > time_budget_seconds
+            ):
                 stopped_early_for_time = True
                 break
 
         # validation + logging
         val_cos = evaluate_val_cosine(model, val_loader, device)
-        history.append({"epoch": epoch, "train_loss": float(np.mean(epoch_losses)), "val_cosine_sim": val_cos})
-        print(f"[{baseline} seed{seed}] epoch {epoch}: train_loss={np.mean(epoch_losses):.4f} val_cos={val_cos:.4f}"
-              + (" [time-budget hit mid-epoch]" if stopped_early_for_time else ""))
+        history.append({
+            "epoch": epoch,
+            "train_loss": float(np.mean(epoch_losses)),
+            "val_cosine_sim": val_cos,
+        })
+        print(
+            f"[{baseline} seed{seed}] epoch {epoch}: "
+            f"train_loss={np.mean(epoch_losses):.4f} val_cos={val_cos:.4f}"
+            + (" [time-budget hit mid-epoch]" if stopped_early_for_time else "")
+        )
 
         # save best-so-far checkpoint
         if val_cos > best_val_cos:
             best_val_cos, best_epoch, patience_ctr = val_cos, epoch, 0
-            torch.save({"model_state_dict": model.state_dict(), "epoch": epoch, "val_cosine_sim": val_cos,
-                        "baseline": baseline, "seed": seed}, ckpt_path)
+            torch.save({
+                "model_state_dict": model.state_dict(),
+                "epoch": epoch,
+                "val_cosine_sim": val_cos,
+                "baseline": baseline,
+                "seed": seed,
+            }, ckpt_path)
         else:
             patience_ctr += 1
 
         # save resumable full training state
-        torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": opt.state_dict(),
-                    "scaler_state_dict": scaler.state_dict(), "epoch": epoch, "best_val_cos": best_val_cos,
-                    "best_epoch": best_epoch, "patience_ctr": patience_ctr, "global_step": global_step,
-                    "history": history}, resume_path)
+        torch.save({
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": opt.state_dict(),
+            "scaler_state_dict": scaler.state_dict(),
+            "epoch": epoch,
+            "best_val_cos": best_val_cos,
+            "best_epoch": best_epoch,
+            "patience_ctr": patience_ctr,
+            "global_step": global_step,
+            "history": history,
+        }, resume_path)
 
-        # Milestone snapshots every 10 completed epochs (epoch is 0-indexed,
-        # so epoch+1 = completed count): permanent, never-overwritten files
-        # so training stages can be compared later, unlike `ckpt_path`
-        # (only ever best-so-far) or `resume_path` (overwritten each epoch).
+        # Milestone snapshots every 10 completed epochs (epoch 0-indexed, so epoch+1=completed count): permanent, never-overwritten, unlike `ckpt_path` (best-so-far) or `resume_path` (overwritten each epoch).
         completed = epoch + 1
         if completed % 10 == 0:
             milestone_path = out_dir / f"{baseline}_seed{seed}_epoch{completed}.pt"
-            torch.save({"model_state_dict": model.state_dict(), "epoch": epoch, "val_cosine_sim": val_cos,
-                        "train_loss": float(np.mean(epoch_losses)), "baseline": baseline, "seed": seed},
-                       milestone_path)
-            print(f"[{baseline} seed{seed}] saved milestone checkpoint at epoch {completed} -> {milestone_path}")
-        save_json({"history": history, "best_epoch": best_epoch, "best_val_cosine_sim": best_val_cos,
-                   "stopped_early_for_time": stopped_early_for_time}, history_path)
+            torch.save({
+                "model_state_dict": model.state_dict(),
+                "epoch": epoch,
+                "val_cosine_sim": val_cos,
+                "train_loss": float(np.mean(epoch_losses)),
+                "baseline": baseline,
+                "seed": seed,
+            }, milestone_path)
+            print(
+                f"[{baseline} seed{seed}] saved milestone checkpoint at epoch {completed} "
+                f"-> {milestone_path}"
+            )
+        save_json({
+            "history": history,
+            "best_epoch": best_epoch,
+            "best_val_cosine_sim": best_val_cos,
+            "stopped_early_for_time": stopped_early_for_time,
+        }, history_path)
 
         if stopped_early_for_time:
-            print(f"[{baseline} seed{seed}] time budget ({time_budget_seconds}s) reached at epoch {epoch} -- "
-                  f"resume checkpoint saved, rerun to continue")
+            print(
+                f"[{baseline} seed{seed}] time budget ({time_budget_seconds}s) reached at "
+                f"epoch {epoch} -- resume checkpoint saved, rerun to continue"
+            )
             break
 
         if epoch + 1 >= d["min_epochs"] and patience_ctr >= d["early_stop_patience"]:
             print(f"[{baseline} seed{seed}] early stopping at epoch {epoch} (best={best_epoch})")
             break
 
-    return {"checkpoint": str(ckpt_path), "best_epoch": best_epoch, "best_val_cosine_sim": best_val_cos,
-            "stopped_early_for_time": stopped_early_for_time}
+    return {
+        "checkpoint": str(ckpt_path),
+        "best_epoch": best_epoch,
+        "best_val_cosine_sim": best_val_cos,
+        "stopped_early_for_time": stopped_early_for_time,
+    }

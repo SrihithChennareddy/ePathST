@@ -1,9 +1,6 @@
 #!/usr/bin/env python
-"""The main downstream experiment loop: for every cancer's patient-level CV
-folds x every seed, build leakage-free HVG/pathway targets, train the
-patch-only molecular bottleneck head, then train/evaluate every ablation
-in pathology_st.ablations.ABLATION_GRID (A0-A9), asserting full
-(cancer, fold, seed, ablation) run completeness before returning."""
+"""Main downstream experiment loop: builds leakage-free HVG/pathway targets per (cancer, fold, seed),
+trains/evaluates every ABLATION_GRID ablation (A0-A9), asserts full run completeness."""
 from __future__ import annotations
 
 import argparse
@@ -33,17 +30,7 @@ from pathology_st.utils import RunEnvironment, load_config, resolve_run_paths, s
 
 
 def load_fold_expression(hest_samples, spot_manifest, hest_root, patients, cfg):
-    """Loads + per-slide normalizes+log1p's every sample belonging to
-    `patients`, returns (expr_df[spot x common_genes], progeny_df, spot_meta).
-
-    Indexed by `spot_uid` (`{sample_id}::{spot_id}`), NOT bare `spot_id` --
-    HEST spot ids are Visium array-grid coordinates (e.g. "010x016"), not
-    global barcodes, and collide heavily across samples (two real breast
-    samples were found sharing 144/176 spot_ids). Since a fold's train/val/
-    test patients always span multiple samples, concatenating frames
-    indexed by bare spot_id would produce a duplicate-keyed index and every
-    downstream `.loc[]` lookup would become ambiguous across patients --
-    see src/scripts/08_prepare_hest_metadata.py's `spot_uid` column."""
+    """Indexed by spot_uid, not bare spot_id -- spot_id collides across samples (two real breast samples share 144/176 ids), so pooling by spot_id would give a duplicate-keyed index and ambiguous cross-patient .loc[] lookups."""
     frames, progeny_frames, genes_by_sample = [], [], {}
     net = fetch_and_cache_progeny_net(Path(cfg["paths"]["work_dir"]) / "progeny_net.csv",
                                        cfg["molecular_targets"]["pathway_top_genes"])
@@ -76,13 +63,10 @@ def build_graph_data(feat_dict, coords, spot_ids, gene_target, pathway_target, p
 
 
 def train_patch_head(x_train, x_val, y_gene_train, y_path_train, y_gene_val, y_path_val, cfg, device):
-    """Trains one MolecularBottleneckHead to convergence with the locked
-    optimizer/loss/early-stopping recipe, factored out so A1 (ImageNet
-    features) and A2 (distilled features) each get their own patch_head
-    trained identically except for which frozen encoder's features they
-    see -- the only difference the Gate 1 (distillation) comparison is
-    supposed to isolate."""
-    patch_head = build_patch_head(cfg, x_train.shape[1], y_gene_train.shape[1], y_path_train.shape[1]).to(device)
+    """Trains one MolecularBottleneckHead with the locked recipe; factored out so A1/A2 get identically-trained patch_heads differing only in which frozen encoder's features they see -- the one difference Gate 1 is supposed to isolate."""
+    patch_head = build_patch_head(
+        cfg, x_train.shape[1], y_gene_train.shape[1], y_path_train.shape[1]
+    ).to(device)
     opt = torch.optim.AdamW(patch_head.parameters(), lr=cfg["patch_head"]["lr"],
                              weight_decay=cfg["patch_head"]["weight_decay"])
 
@@ -104,9 +88,12 @@ def train_patch_head(x_train, x_val, y_gene_train, y_path_train, y_gene_val, y_p
             xv = torch.tensor(x_val, dtype=torch.float32, device=device)
             gv = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
             pv = torch.tensor(y_path_val, dtype=torch.float32, device=device)
-            val_loss = patch_head_loss(patch_head(xv), gv, pv, cfg["patch_head"]["pathway_loss_weight"])["loss"].item()
+            pw = cfg["patch_head"]["pathway_loss_weight"]
+            val_loss = patch_head_loss(patch_head(xv), gv, pv, pw)["loss"].item()
         if val_loss < best_val:
-            best_val, patience_ctr, best_state = val_loss, 0, {k: v.clone() for k, v in patch_head.state_dict().items()}
+            best_val = val_loss
+            patience_ctr = 0
+            best_state = {k: v.clone() for k, v in patch_head.state_dict().items()}
         else:
             patience_ctr += 1
         if patience_ctr >= cfg["patch_head"]["early_stop_patience"]:
@@ -137,10 +124,7 @@ def main():
     hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
     hest_samples = exclude_targeted_panel_samples(hest_samples)
     spot_manifest = pd.read_csv(paths["manifests"] / "hest_spot_manifest.csv")
-    # Both encoders' caches must be loaded here (not just "distilled"), each asserted via
-    # load_cached_features(expected_encoder_name=...) to only ever serve its own encoder's
-    # features -- otherwise A1 ("imagenet") silently gets distilled features too. See
-    # src/pathology_st/ablations.py and load_feats() below.
+    # both encoder caches are loaded here, each asserted via expected_encoder_name= so A1 (imagenet) can never silently get distilled features -- see load_feats() below
     FEATURE_SOURCES = ("distilled", "imagenet")
     feat_dirs = {src: paths["student_embeddings"] / src for src in FEATURE_SOURCES}
 
@@ -180,8 +164,11 @@ def main():
                     path_std = TrainOnlyStandardizer().fit(train_progeny.values, ids=train_progeny.index)
 
                     def build_targets(patients):
-                        expr, progeny, _, _ = load_fold_expression(hest_samples, spot_manifest, hest_root, patients, cfg)
-                        gene_std.assert_no_leakage(expr.index) if patients != train_p else None
+                        expr, progeny, _, _ = load_fold_expression(
+                            hest_samples, spot_manifest, hest_root, patients, cfg
+                        )
+                        if patients != train_p:
+                            gene_std.assert_no_leakage(expr.index)
                         gene_t = gene_std.transform(expr[hvg["hvg1000"]].reindex(columns=hvg["hvg1000"]).values)
                         path_t = path_std.transform(progeny.reindex(columns=net["source"].unique()).values)
                         return gene_t, path_t, expr.index.astype(str)
@@ -207,17 +194,19 @@ def main():
                             out.append(cache["embedding"][pos])
                         return np.stack(out)
 
-                    # A1 and A2 each get their OWN features AND their own patch_head
-                    # (trained identically otherwise) -- see train_patch_head's docstring.
-                    x_by_source = {src: {"train": load_feats(ids_train, src), "val": load_feats(ids_val, src),
-                                          "test": load_feats(ids_test, src)} for src in FEATURE_SOURCES}
-                    patch_heads = {src: train_patch_head(x_by_source[src]["train"], x_by_source[src]["val"],
-                                                          y_gene_train, y_path_train, y_gene_val, y_path_val,
-                                                          cfg, args.device)
-                                   for src in FEATURE_SOURCES}
-                    x_train, x_val, x_test = x_by_source["distilled"]["train"], x_by_source["distilled"]["val"], \
-                        x_by_source["distilled"]["test"]
-                    patch_head = patch_heads["distilled"]  # the anchor y_patch,i (A2) / graph-ablation base
+                    # A1/A2 each get their own features AND own patch_head, trained identically otherwise -- see train_patch_head's docstring
+                    x_by_source = {
+                        src: {"train": load_feats(ids_train, src), "val": load_feats(ids_val, src),
+                              "test": load_feats(ids_test, src)}
+                        for src in FEATURE_SOURCES
+                    }
+                    patch_heads = {
+                        src: train_patch_head(
+                            x_by_source[src]["train"], x_by_source[src]["val"],
+                            y_gene_train, y_path_train, y_gene_val, y_path_val, cfg, args.device,
+                        )
+                        for src in FEATURE_SOURCES
+                    }
 
                     # save patch-head checkpoints
                     ckpt_dir = paths["student_checkpoints"] / "patch_head" / cancer / f"fold{fold['fold']}"
@@ -226,22 +215,19 @@ def main():
                         suffix = "" if src == "distilled" else f"_{src}"  # keep the historical "distilled" filename
                         torch.save(ph.state_dict(), ckpt_dir / f"seed{seed}{suffix}.pt")
 
-                    # ABLATION_GRID is already ordered primary block first (A1/A2/A5/A6/A7/A8),
-                    # secondary block second (A0/A3/A4/A9).
+                    # ABLATION_GRID is already ordered primary block first (A1/A2/A5/A6/A7/A8), secondary block second (A0/A3/A4/A9)
                     for spec in ABLATION_GRID:
                         src = spec.feature_source if spec.feature_source in x_by_source else "distilled"
-                        spec_x_train, spec_x_val, spec_x_test = x_by_source[src]["train"], x_by_source[src]["val"], \
-                            x_by_source[src]["test"]
+                        spec_x_train = x_by_source[src]["train"]
+                        spec_x_val = x_by_source[src]["val"]
+                        spec_x_test = x_by_source[src]["test"]
                         spec_patch_head = patch_heads[src]
                         preds, r_metrics, eval_ids_test = run_ablation(
                             spec, spec_x_train, spec_x_val, spec_x_test, ids_train, ids_val, ids_test, y_gene_train,
                             y_path_train, y_gene_val, y_path_val, y_gene_test, y_path_test, spec_patch_head,
                             spot_manifest, cfg, seed, args.device, n_hvg50=len(hvg["hvg50"]),
                             pathway_names=list(net["source"].unique()))
-                        # `eval_ids_test` is `ids_test` in the SAME order run_ablation actually scored
-                        # `preds` against (identity for A0-A3; per-patient-grouped for graph ablations,
-                        # see run_ablation's alignment-fix comment below) -- zipping the original
-                        # (unreordered) `ids_test` here would reintroduce the same misalignment bug.
+                        # eval_ids_test is ids_test in the order preds was actually scored against (identity for A0-A3, per-patient-grouped for graph ablations, see the alignment-fix comment below) -- zipping the original ids_test here would reintroduce the misalignment bug
                         for pid, g_pred, p_pred in zip(eval_ids_test, preds["gene"], preds["pathway"]):
                             all_predictions.append({"cancer": cancer, "fold": fold["fold"], "seed": seed,
                                                      "ablation": spec.name, "spot_uid": pid,
@@ -253,9 +239,7 @@ def main():
     pd.DataFrame(all_metrics).to_csv(paths["results"] / "cv_ablation_metrics.csv", index=False)
     print(f"[10_run_patient_cv] wrote {paths['results'] / 'cv_ablation_metrics.csv'}")
 
-    # Hard completeness gate before this run is trusted for any downstream aggregation --
-    # see docs/POC5_RESULTS.md for the exact failure this prevents (a cross-fold aggregate
-    # silently pooling only 3 of 4 completed folds).
+    # hard completeness gate before this run is trusted for aggregation -- see docs/POC5_RESULTS.md (prevents silently pooling only 3 of 4 completed folds)
     expected_keys = expected_run_keys(cv_grid, [a.name for a in ABLATION_GRID], unit="per_cancer")
     assert_run_completeness(expected_keys, completed_keys, context="10_run_patient_cv final gate")
     print("[10_run_patient_cv] completeness gate PASSED -- every expected (cancer, fold, seed, ablation) run present")
@@ -264,18 +248,8 @@ def main():
 def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_gene_train, y_path_train,
                   y_gene_val, y_path_val, y_gene_test, y_path_test, patch_head, spot_manifest, cfg, seed, device,
                   n_hvg50, pathway_names):
-    """Trains/evaluates one ablation from pathology_st.ablations.ABLATION_GRID.
-    Returns (test predictions, headline metrics, eval_ids_test), where
-    eval_ids_test is the spot_uid order `preds`/`metrics` were actually
-    scored against -- identity order for A0-A3, per-patient-grouped for
-    graph ablations. Dispatches on (spec.graph_source, spec.backend):
-      A0 (graph_source='none', feature_source='none'): training-mean baseline, no model at all.
-      A1/A2 (graph_source='none'): frozen patch_head forward pass -- y_patch,i itself.
-      A3 (graph_source='none', but NOT reusing patch_head): parameter-matched MLP, no neighbors.
-      A4/A5/A6/A7 (backend='pna_union'), A9 (backend='gatv2'): residual graph correction, union edge features.
-      A8 (backend='scale_aware'): residual graph correction, per-scale edge features + edge_scale tags."""
-    # Joined on `spot_uid`, never bare `spot_id` -- see load_fold_expression's docstring
-    # for why (spot_id collides across samples, and ids_train/val/test span multiple patients).
+    # dispatches on (graph_source, backend): A0=mean baseline, A1/A2=frozen patch_head, A3=matched MLP (no graph), A4/A5/A6/A7/A9=pna_union/gatv2 graph correction, A8=scale_aware graph correction; returns (preds, metrics, eval_ids_test) in the order actually scored
+    # joined on spot_uid, never bare spot_id -- see load_fold_expression's docstring for why (spot_id collides across samples)
     spot_by_uid = spot_manifest.set_index("spot_uid")
 
     def coords_for(spot_uids):
@@ -290,13 +264,18 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
         gene_pred = np.repeat(gene_mean, len(ids_test), axis=0)
         path_pred = np.repeat(path_mean, len(ids_test), axis=0)
     elif spec.name == "A3_matched_mlp":
-        # parameter-matched MLP, same distilled features, no neighbors -- tests whether extra
-        # capacity alone (without any graph structure) explains a would-be gain.
+        # parameter-matched MLP, same features, no neighbors -- tests whether extra capacity alone explains a would-be gain
         pna_param_count = sum(p.numel() for p in patch_head.parameters())
-        h = matched_mlp_hidden_dim(pna_param_count, x_train.shape[1], y_gene_train.shape[1] + y_path_train.shape[1])
-        mlp = MolecularBottleneckHead(x_train.shape[1], [x_train.shape[1], h, h], y_gene_train.shape[1],
-                                       y_path_train.shape[1]).to(device)
-        opt = torch.optim.AdamW(mlp.parameters(), lr=cfg["patch_head"]["lr"], weight_decay=cfg["patch_head"]["weight_decay"])
+        h = matched_mlp_hidden_dim(
+            pna_param_count, x_train.shape[1], y_gene_train.shape[1] + y_path_train.shape[1]
+        )
+        mlp = MolecularBottleneckHead(
+            x_train.shape[1], [x_train.shape[1], h, h], y_gene_train.shape[1], y_path_train.shape[1]
+        ).to(device)
+        opt = torch.optim.AdamW(
+            mlp.parameters(), lr=cfg["patch_head"]["lr"],
+            weight_decay=cfg["patch_head"]["weight_decay"],
+        )
         best_val, patience_ctr, best_state = float("inf"), 0, None
         for epoch in range(cfg["patch_head"]["max_epochs"]):
             mlp.train()
@@ -312,9 +291,12 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
                 xv = torch.tensor(x_val, dtype=torch.float32, device=device)
                 gv = torch.tensor(y_gene_val, dtype=torch.float32, device=device)
                 pv = torch.tensor(y_path_val, dtype=torch.float32, device=device)
-                val_loss = patch_head_loss(mlp(xv), gv, pv, cfg["patch_head"]["pathway_loss_weight"])["loss"].item()
+                pw = cfg["patch_head"]["pathway_loss_weight"]
+                val_loss = patch_head_loss(mlp(xv), gv, pv, pw)["loss"].item()
             if val_loss < best_val:
-                best_val, patience_ctr, best_state = val_loss, 0, {k: v.clone() for k, v in mlp.state_dict().items()}
+                best_val = val_loss
+                patience_ctr = 0
+                best_state = {k: v.clone() for k, v in mlp.state_dict().items()}
             else:
                 patience_ctr += 1
             if patience_ctr >= cfg["patch_head"]["early_stop_patience"]:
@@ -332,18 +314,39 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
         gene_pred, path_pred = out["gene"].cpu().numpy(), out["pathway"].cpu().numpy()
     else:
         backend = spec.backend
-        graphs_train = [build_graph_data(x_train[patient_for(ids_train) == p], coords_for(ids_train[patient_for(ids_train) == p]),
-                                          ids_train[patient_for(ids_train) == p], y_gene_train[patient_for(ids_train) == p],
-                                          y_path_train[patient_for(ids_train) == p], p, spec.graph_source, backend, cfg, seed)
-                         for p in np.unique(patient_for(ids_train))]
-        graphs_val = [build_graph_data(x_val[patient_for(ids_val) == p], coords_for(ids_val[patient_for(ids_val) == p]),
-                                        ids_val[patient_for(ids_val) == p], y_gene_val[patient_for(ids_val) == p],
-                                        y_path_val[patient_for(ids_val) == p], p, spec.graph_source, backend, cfg, seed)
-                       for p in np.unique(patient_for(ids_val))]
-        graphs_test = [build_graph_data(x_test[patient_for(ids_test) == p], coords_for(ids_test[patient_for(ids_test) == p]),
-                                         ids_test[patient_for(ids_test) == p], y_gene_test[patient_for(ids_test) == p],
-                                         y_path_test[patient_for(ids_test) == p], p, spec.graph_source, backend, cfg, seed)
-                        for p in np.unique(patient_for(ids_test))]
+        graphs_train = [
+            build_graph_data(
+                x_train[patient_for(ids_train) == p],
+                coords_for(ids_train[patient_for(ids_train) == p]),
+                ids_train[patient_for(ids_train) == p],
+                y_gene_train[patient_for(ids_train) == p],
+                y_path_train[patient_for(ids_train) == p],
+                p, spec.graph_source, backend, cfg, seed,
+            )
+            for p in np.unique(patient_for(ids_train))
+        ]
+        graphs_val = [
+            build_graph_data(
+                x_val[patient_for(ids_val) == p],
+                coords_for(ids_val[patient_for(ids_val) == p]),
+                ids_val[patient_for(ids_val) == p],
+                y_gene_val[patient_for(ids_val) == p],
+                y_path_val[patient_for(ids_val) == p],
+                p, spec.graph_source, backend, cfg, seed,
+            )
+            for p in np.unique(patient_for(ids_val))
+        ]
+        graphs_test = [
+            build_graph_data(
+                x_test[patient_for(ids_test) == p],
+                coords_for(ids_test[patient_for(ids_test) == p]),
+                ids_test[patient_for(ids_test) == p],
+                y_gene_test[patient_for(ids_test) == p],
+                y_path_test[patient_for(ids_test) == p],
+                p, spec.graph_source, backend, cfg, seed,
+            )
+            for p in np.unique(patient_for(ids_test))
+        ]
 
         ckpt_path = Path(cfg["paths"]["work_dir"]) / "student_checkpoints" / f"graph_{spec.name}_seed{seed}.pt"
         train_graph_model(patch_head, graphs_train, graphs_val, cfg, ckpt_path, seed, device, backend=backend)
@@ -355,23 +358,13 @@ def run_ablation(spec, x_train, x_val, x_test, ids_train, ids_val, ids_test, y_g
         model = ResidualGraphPredictor(patch_head, graph_corr).to(device)
         preds = predict_graph_model(model, graphs_test, device, backend=backend)
         gene_pred, path_pred = preds["gene_pred"], preds["pathway_pred"]
-        # predict_graph_model concatenates node predictions in the same per-patient grouping
-        # order used to build graphs_test above, so ids_test (AND the ground-truth arrays
-        # y_gene_test/y_path_test used in evaluate_predictions below) must be reordered before
-        # indexing spot-level metadata downstream. Reordering only ids_test while leaving the
-        # targets in original order silently misaligns target vs. prediction for every graph
-        # ablation (A4-A9) -- verified via src/scripts/debug_idc_pipeline.py to turn a near-perfect
-        # predictor (r~1.0) into r~0.08. This is the single most important correctness
-        # invariant in this function; do not "simplify" it away.
+        # predict_graph_model outputs per-patient-grouped order, so ids_test AND y_gene_test/y_path_test must be reordered together -- reordering only ids_test silently breaks every graph ablation (verified via debug_idc_pipeline.py: r~1.0 -> r~0.08); the single most important correctness invariant in this function, do not "simplify" it away
         order = np.concatenate([np.where(patient_for(ids_test) == p)[0] for p in np.unique(patient_for(ids_test))])
         ids_test = ids_test[order]
         y_gene_test = y_gene_test[order]
         y_path_test = y_path_test[order]
 
-    # The results table needs HVG50/HVG1000/pathway evaluated separately, not one pooled
-    # number relabeled after the fact -- HVG50 is exactly the first n_hvg50 columns of the
-    # HVG1000 target (nested by construction, see pathology_st.expression.select_hvg_for_fold), so no
-    # separate model/prediction is needed, just a column slice.
+    # HVG50/HVG1000/pathway are evaluated separately, not one pooled number relabeled -- HVG50 is exactly the first n_hvg50 columns of HVG1000 (nested by construction, see select_hvg_for_fold), so no separate model is needed, just a column slice
     pids, cancer_placeholder = patient_for(ids_test), np.array(["cancer"] * len(ids_test))
     m_hvg1000 = evaluate_predictions(y_gene_test, gene_pred, pids, cancer_placeholder,
                                       [str(i) for i in range(y_gene_test.shape[1])], cfg).get("overall", {})

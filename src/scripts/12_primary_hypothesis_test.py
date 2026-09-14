@@ -1,8 +1,6 @@
 #!/usr/bin/env python
-"""Aggregates results/cv_ablation_metrics.csv, verifies completeness, then
-runs the three primary statistical gates (1: distillation A2>A1, 2: spatial
-context A8>A2, 3: true topology A8>A5 -- the decisive shuffled-graph
-negative control), reported per cancer with a pooled summary."""
+"""Aggregates cv_ablation_metrics.csv, verifies completeness, runs the 3 primary gates (A2>A1
+distillation, A8>A2 spatial context, A8>A5 true topology/negative control), pooled + per cancer."""
 from __future__ import annotations
 
 import argparse
@@ -39,12 +37,13 @@ def main():
     stats_cfg = cfg["statistics"]
 
     # completeness gate
-    # Refuse to compute any statistic over a run set that doesn't match
-    # what the CV design actually calls for.
+    # refuse to compute any statistic over a run set that doesn't match what the CV design calls for
     if not args.skip_completeness_check:
         hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
-        patients_by_cancer = {c: hest_samples[hest_samples["cancer"] == c]["patient_id"].unique().tolist()
-                               for c in cfg["cancers"]["hest"]}
+        patients_by_cancer = {
+            c: hest_samples[hest_samples["cancer"] == c]["patient_id"].unique().tolist()
+            for c in cfg["cancers"]["hest"]
+        }
         cv_grid = build_cv_grid(patients_by_cancer, cfg)
         if args.max_folds_per_cancer is not None:
             for info in cv_grid["per_cancer"].values():
@@ -56,10 +55,7 @@ def main():
         assert_run_completeness(expected, completed, context="12_primary_hypothesis_test")
 
     def patient_scores(ablation: str, cancer: str | None = None) -> dict:
-        """Per-(fold,seed) Fisher-z patient-macro R for one ablation,
-        optionally restricted to one cancer -- these fold/seed cells are
-        the bootstrap resampling unit here (coarser than resampling true
-        per-patient R_p values directly; see Known limitation note below)."""
+        # per-(fold,seed) Fisher-z patient-macro R; these cells are the bootstrap resampling unit here, coarser than true per-patient R_p (see the known-limitation note below)
         sub = df[df["ablation"] == ablation]
         if cancer is not None:
             sub = sub[sub["cancer"] == cancer]
@@ -71,7 +67,9 @@ def main():
         if not common:
             return {"n_units": 0, "note": "no overlapping (cancer,fold,seed) cells for this comparison yet"}
         deltas = np.array([ra[c] - rb[c] for c in common])
-        bootstrap = patient_bootstrap_ci(deltas, n_iterations=stats_cfg["n_bootstrap"], ci=tuple(stats_cfg["ci"]))
+        bootstrap = patient_bootstrap_ci(
+            deltas, n_iterations=stats_cfg["n_bootstrap"], ci=tuple(stats_cfg["ci"])
+        )
         sign_flip = paired_sign_flip_test(deltas, n_iterations=stats_cfg["n_bootstrap"])
         return {"better": better, "worse": worse, "units": common, "bootstrap": bootstrap,
                 "sign_flip_test": sign_flip, "supported_ci_above_zero": bool(bootstrap["ci_low"] > 0.0)}
@@ -86,15 +84,17 @@ def main():
     results = {"pooled": {}, "per_cancer": {}}
     for gate_key, spec in gates_cfg.items():
         results["pooled"][gate_key] = gate_test(spec["better"], spec["worse"])
+        supported = results["pooled"][gate_key].get("supported_ci_above_zero")
         print(f"[12_primary_hypothesis_test] {gate_names.get(gate_key, gate_key)} (pooled): "
-              f"{'SUPPORTED' if results['pooled'][gate_key].get('supported_ci_above_zero') else 'NOT SUPPORTED'}")
+              f"{'SUPPORTED' if supported else 'NOT SUPPORTED'}")
         for cancer in cfg["cancers"]["hest"]:
-            results["per_cancer"].setdefault(cancer, {})[gate_key] = gate_test(spec["better"], spec["worse"], cancer)
+            results["per_cancer"].setdefault(cancer, {})[gate_key] = gate_test(
+                spec["better"], spec["worse"], cancer
+            )
 
     save_json(results, paths["results"] / "primary_hypothesis_test.json")
 
-    # run secondary comparisons
-    # (V2 Phase 22 doesn't remove these, only reprioritizes the 3 gates above)
+    # run secondary comparisons (V2 Phase 22 only reprioritizes the 3 gates above, doesn't remove these)
     secondary = {}
     for name, (a, b) in {
         "scale_aware_vs_local": ("A8_scale_aware_pna", "A6_local_pna"),

@@ -32,12 +32,16 @@ def _headline_metric(results_dir: Path) -> str:
         # "per_cancer": {...}} -- there is no top-level "bootstrap" key. Pick gate2 (spatial
         # context, the flagship comparison) as the headline, falling back to whichever gate exists.
         pooled = d.get("pooled", {})
-        gate_name = next((g for g in ("gate2_spatial_context", "gate3_true_topology", "gate1_distillation")
-                           if g in pooled), next(iter(pooled), None))
+        gate_priority = ("gate2_spatial_context", "gate3_true_topology", "gate1_distillation")
+        gate_name = next(
+            (g for g in gate_priority if g in pooled), next(iter(pooled), None)
+        )
         b = pooled.get(gate_name, {}).get("bootstrap", {}) if gate_name else {}
         if b.get("mean_delta") is not None:
-            return (f"{gate_name}_delta_R={b['mean_delta']:.4f} "
-                    f"CI=[{b.get('ci_low', float('nan')):.4f},{b.get('ci_high', float('nan')):.4f}]")
+            return (
+                f"{gate_name}_delta_R={b['mean_delta']:.4f} "
+                f"CI=[{b.get('ci_low', float('nan')):.4f},{b.get('ci_high', float('nan')):.4f}]"
+            )
 
     table = results_dir / "final_results_table.csv"
     if table.exists():
@@ -63,7 +67,8 @@ def _headline_metric(results_dir: Path) -> str:
             if key.startswith("S1_"):
                 v = d[key].get("best_val_cosine_sim")
                 if v is not None:
-                    return f"S1 training best_val_cosine_sim={v:.4f} (epoch {d[key].get('best_epoch')})"
+                    epoch = d[key].get("best_epoch")
+                    return f"S1 training best_val_cosine_sim={v:.4f} (epoch {epoch})"
 
     return "N/A"
 
@@ -74,8 +79,12 @@ def main():
     ap.add_argument("--job-id", default="")
     ap.add_argument("--partition", default="")
     ap.add_argument("--gpu", default="")
-    ap.add_argument("--label", default="run", help="short slug for the run_id, e.g. cptac_distill_b40x4")
-    ap.add_argument("--stage", default="", help="free-text: what stage/milestone this snapshot represents")
+    ap.add_argument(
+        "--label", default="run", help="short slug for the run_id, e.g. cptac_distill_b40x4"
+    )
+    ap.add_argument(
+        "--stage", default="", help="free-text: what stage/milestone this snapshot represents"
+    )
     ap.add_argument("--run-id", default=None, help="override the auto-generated run_id")
     args = ap.parse_args()
 
@@ -115,7 +124,8 @@ def main():
         "gpu": args.gpu or None,
         "stage": args.stage or None,
         "source_work_dir": str(paths["work_dir"]),
-        "source_persist_dir": str(paths["work_dir"].parent),  # not exact, informational only
+        # not exact, informational only
+        "source_persist_dir": str(paths["work_dir"].parent),
         "files_captured": copied,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
@@ -123,8 +133,10 @@ def main():
     # write notes
     notes_path = out_dir / "notes.md"
     if not notes_path.exists():
-        notes_path.write_text(f"# {run_id}\n\nStage: {args.stage or '(unspecified)'}\n\n"
-                               f"(add free-text observations about this snapshot here)\n")
+        notes_path.write_text(
+            f"# {run_id}\n\nStage: {args.stage or '(unspecified)'}\n\n"
+            f"(add free-text observations about this snapshot here)\n"
+        )
 
     headline = _headline_metric(out_dir / "results") if (out_dir / "results").exists() else "N/A"
 
@@ -134,9 +146,13 @@ def main():
     with open(index_path, "a", newline="") as f:
         writer = csv.writer(f)
         if is_new:
-            writer.writerow(["run_id", "date", "job_id", "partition", "gpu", "stage_reached",
-                              "headline_metric", "notes"])
-        writer.writerow([run_id, today, args.job_id, args.partition, args.gpu, args.stage, headline, ""])
+            writer.writerow([
+                "run_id", "date", "job_id", "partition", "gpu", "stage_reached",
+                "headline_metric", "notes",
+            ])
+        writer.writerow([
+            run_id, today, args.job_id, args.partition, args.gpu, args.stage, headline, "",
+        ])
 
     print(f"[snapshot_experiment] captured {run_id} -> {out_dir}")
     print(f"[snapshot_experiment] results files: {copied['results']}")

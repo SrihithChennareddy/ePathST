@@ -1,14 +1,14 @@
-"""Distillation objective: L = L_cos + lambda * L_feature, with cosine
-similarity as the primary term and a normalized feature-regression term as
-a secondary signal. Deliberately never uses raw unnormalized 4608-D MSE as
-the sole objective -- embedding magnitude is not meaningful, only direction."""
+"""Distillation objective: L = L_cos + lambda * L_feature (cosine similarity primary, normalized feature-regression secondary).
+Deliberately never uses raw unnormalized 4608-D MSE as the sole objective -- embedding magnitude is not meaningful, only direction."""
 from __future__ import annotations
 
 import torch
 import torch.nn.functional as F
 
 
-def cosine_distillation_loss(student_projected: torch.Tensor, teacher_embedding: torch.Tensor) -> torch.Tensor:
+def cosine_distillation_loss(
+    student_projected: torch.Tensor, teacher_embedding: torch.Tensor
+) -> torch.Tensor:
     """L_cos = 1 - cosine_similarity(normalize(student_proj), normalize(teacher))."""
     s = F.normalize(student_projected, dim=-1)
     t = F.normalize(teacher_embedding, dim=-1)

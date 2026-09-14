@@ -19,8 +19,7 @@ def test_multiscale_edges_within_radius():
 
 
 def test_union_edge_features_shape():
-    # V2 Phase 9 correction: 1 normalized distance + 16 RBF + 3-D scale one-hot = 20-D
-    # (V1's original implementation omitted the explicit distance scalar -> 19-D, a bug).
+    # V2 Phase 9 correction: 1 distance + 16 RBF + 3-D scale one-hot = 20-D (V1 omitted the distance scalar -> 19-D, a bug).
     d = np.array([10.0, 200.0, 500.0], dtype=np.float32)
     scale = np.array(["local", "meso", "macro"], dtype=object)
     feats = graph_builder.union_edge_features(d, scale, 600.0, n_rbf=16)
@@ -30,8 +29,7 @@ def test_union_edge_features_shape():
 
 
 def test_per_scale_edge_features_shape():
-    # V2 Phase 9: scale-aware branches don't need the one-hot (branch identity IS the scale)
-    # -> 1 normalized distance + 16 RBF = 17-D.
+    # V2 Phase 9: scale-aware branches don't need the one-hot (branch identity IS the scale) -> 1 distance + 16 RBF = 17-D.
     d = np.array([10.0, 200.0, 500.0], dtype=np.float32)
     feats = graph_builder.per_scale_edge_features(d, 600.0, n_rbf=16)
     assert feats.shape == (3, 17)
@@ -67,9 +65,6 @@ def test_degree_preserving_rewire_keeps_degree_and_edge_count():
 
 
 def test_random_graph_preserves_edge_count():
-    edge_index = np.array([[0, 1, 2], [1, 0, 3]])
-    out = destruction.random_graph(edge_index, n_nodes=10, seed=0)
-    n_undirected_in = 1  # (0,1)/(1,0) is one undirected pair; (2,3) is another -> 2 total
     edge_index2 = np.array([[0, 1, 2, 3], [1, 0, 3, 2]])
     out2 = destruction.random_graph(edge_index2, n_nodes=10, seed=0)
     assert out2.shape[1] == edge_index2.shape[1]
@@ -79,7 +74,9 @@ def test_patient_fisher_z_pearson_perfect_correlation():
     y_true = np.array([[1.0], [2.0], [3.0], [4.0]])
     y_pred = np.array([[1.0], [2.0], [3.0], [4.0]])
     patient_ids = np.array(["p1", "p1", "p1", "p1"])
-    df = metrics.per_patient_per_column_pearson(y_true, y_pred, patient_ids, ["gene0"], min_regions=3)
+    df = metrics.per_patient_per_column_pearson(
+        y_true, y_pred, patient_ids, ["gene0"], min_regions=3
+    )
     assert np.isclose(df["r"].iloc[0], 1.0)
 
 

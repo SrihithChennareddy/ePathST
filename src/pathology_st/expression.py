@@ -1,7 +1,5 @@
-"""HEST molecular preprocessing: per-slide normalize+log1p, train-fold-only
-standardization, and leakage-free per-fold HVG1000/HVG50 selection (nested:
-G_50 subset G_1000). Adapted from STS_PoC/PoC_5/crcspatial/expression.py;
-generalized for multiple cancer types / ST platforms."""
+"""HEST molecular preprocessing: per-slide normalize+log1p, train-fold-only standardization, and leakage-free per-fold HVG1000/HVG50 selection (nested: G_50 subset G_1000).
+Adapted from STS_PoC/PoC_5/crcspatial/expression.py, generalized for multiple cancer types/ST platforms."""
 from __future__ import annotations
 
 import numpy as np
@@ -10,26 +8,13 @@ import scanpy as sc
 
 
 def normalize_log1p_slide(adata, target_sum: float = 1e4) -> None:
-    """In-place per-slide normalize_total + log1p (never across the pooled
-    cohort -- slides differ in technology/sequencing depth)."""
+    """In-place per-slide normalize_total + log1p (never across the pooled cohort -- slides differ in technology/sequencing depth)."""
     sc.pp.normalize_total(adata, target_sum=target_sum)
     sc.pp.log1p(adata)
 
 
 def ensure_gene_symbol_index(adata):
-    """HEST slides mix gene-ID conventions (e.g. breast/IDC `NCBI*` samples
-    index by HGNC symbol, `SPA1xx` by Ensembl ID with symbol in
-    `var['SYMBOL']`), but everything downstream is keyed by symbol, so an
-    unconverted Ensembl-indexed slide has ~zero overlap or crashes decoupler
-    ('No sources with more than tmin=N targets'). Detects an Ensembl-style
-    index (`ENSG...`) with a `SYMBOL` column and remaps to it, dropping
-    genes with no symbol and keeping the first of any duplicates; always
-    finishes with var_names_make_unique() since some real COAD slides
-    (TENX128/154/155/156) are symbol-indexed but contain naturally
-    duplicate symbols that would otherwise crash decoupler's MLM ('mat
-    contains repeated feature names') -- the resulting suffixed duplicates
-    (GENE-1, ...) simply won't match any symbol-keyed net/HVG list, same as
-    any other absent gene."""
+    """Remaps Ensembl-indexed slides (`ENSG...` with a `SYMBOL` column) to gene-symbol index since everything downstream is symbol-keyed; always finishes with var_names_make_unique() since some real COAD slides (TENX128/154/155/156) have naturally duplicate symbols that would otherwise crash decoupler's MLM."""
     is_ensembl_indexed = (
         adata.var.index.size and str(adata.var.index[0]).startswith("ENSG")
         and "SYMBOL" in adata.var.columns
@@ -44,9 +29,7 @@ def ensure_gene_symbol_index(adata):
 
 
 class TrainOnlyStandardizer:
-    """Fits mu/sigma on training spots only; applies identically to val/
-    test. Never let val/test statistics leak into the scaling -- tracks
-    fit ids so leakage can be asserted via `assert_no_leakage`."""
+    """Fits mu/sigma on training spots only, applies identically to val/test; tracks fit ids so leakage can be asserted via `assert_no_leakage`."""
 
     def __init__(self, eps: float = 1e-8):
         self.eps = eps
@@ -73,9 +56,7 @@ class TrainOnlyStandardizer:
 
 
 def cross_platform_gene_intersection(genes_by_slide: dict[str, set[str]]) -> list[str]:
-    """Common genes across slides/platforms, as a deterministic
-    (lexicographically sorted) list -- gene order must never change
-    silently between calls."""
+    """Common genes across slides/platforms as a deterministic, lexicographically sorted list -- gene order must never change silently between calls."""
     common = set.intersection(*genes_by_slide.values()) if genes_by_slide else set()
     return sorted(common)
 
@@ -84,11 +65,7 @@ def select_hvg_for_fold(
     train_expr: pd.DataFrame, common_genes: list[str], n_hvg1000: int, n_hvg50: int,
     min_variance: float = 1e-8,
 ) -> dict:
-    """Rank `common_genes` by variance across TRAINING spots only, drop
-    near-zero-variance genes, take top n_hvg1000 as G_1000, and the top
-    n_hvg50 of THAT ranking as G_50 (nested targets: G_50 subset G_1000, one
-    1000-output model serves both evaluations). Never called with
-    validation/test expression."""
+    """Ranks `common_genes` by TRAINING-only variance, drops near-zero-variance genes, and takes top n_hvg1000 as G_1000 and its top n_hvg50 as G_50 (nested: one 1000-output model serves both); never called with val/test expression."""
     var = train_expr[common_genes].var(axis=0, skipna=True)
     usable = var[var >= min_variance].sort_values(ascending=False)
     hvg1000 = usable.index[:n_hvg1000].tolist()

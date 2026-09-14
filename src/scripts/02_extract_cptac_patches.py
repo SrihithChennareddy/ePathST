@@ -1,10 +1,6 @@
 #!/usr/bin/env python
-"""Step 2: tissue-masked, spatially-sampled 224x224 patch extraction at
-~0.5 um/px from every selected CPTAC WSI, written as one HDF5 shard per
-WSI plus a global patch manifest.
-
-Parallel + resumable, same as src/scripts/01_select_cptac_wsi.py: one process
-per WSI, and a WSI whose shard already exists on disk is skipped on rerun."""
+"""Extracts tissue-masked 224x224 patches (~0.5um/px) per CPTAC WSI into one HDF5 shard each plus a
+global manifest; resumable like script 01 (existing shards skipped on rerun)."""
 from __future__ import annotations
 
 import argparse
@@ -22,8 +18,7 @@ from pathology_st.wsi_patches import open_slide, patch_tissue_fraction, sample_p
 
 
 def _extract_one(wsi: dict, cfg: dict, shard_dir: str) -> list[dict]:
-    """Runs in a worker process. Returns this WSI's patch-manifest rows (or
-    [] on failure -- logged, not fatal to the whole pool)."""
+    # returns [] on failure -- logged, not fatal to the whole pool
     shard_path = Path(shard_dir) / f"{wsi['wsi_id']}.h5"
     try:
         reader = open_slide(wsi["wsi_path"])
@@ -49,12 +44,14 @@ def _extract_one(wsi: dict, cfg: dict, shard_dir: str) -> list[dict]:
         patches = np.stack(patches)
         write_patch_shard(shard_path, patch_ids, patches,
                            {"x": [c[0] for c in kept_coords], "y": [c[1] for c in kept_coords]})
-        return [{"patch_id": pid, "patient_id": wsi["patient_id"], "cancer_type": wsi["cancer_type"],
-                  "wsi_id": wsi["wsi_id"], "x": x, "y": y, "mpp": target_mpp, "tissue_fraction": tf}
-                for pid, (x, y, tf) in zip(patch_ids, kept_coords)]
+        return [
+            {"patch_id": pid, "patient_id": wsi["patient_id"], "cancer_type": wsi["cancer_type"],
+             "wsi_id": wsi["wsi_id"], "x": x, "y": y, "mpp": target_mpp, "tissue_fraction": tf}
+            for pid, (x, y, tf) in zip(patch_ids, kept_coords)
+        ]
     except Exception as e:
-        print(f"[02_extract_cptac_patches] FAILED {wsi['wsi_id']} ({wsi['patient_id']}): {type(e).__name__}: {e}",
-              file=sys.stderr)
+        print(f"[02_extract_cptac_patches] FAILED {wsi['wsi_id']} ({wsi['patient_id']}): "
+              f"{type(e).__name__}: {e}", file=sys.stderr)
         return []
 
 
@@ -88,7 +85,8 @@ def main():
             print(f"[02_extract_cptac_patches] resuming: {len(done_wsi_ids)} WSIs already extracted")
 
         todo = [row.to_dict() for _, row in selected.iterrows() if row["wsi_id"] not in done_wsi_ids]
-        print(f"[02_extract_cptac_patches] {len(todo)} WSIs left to extract, using {args.workers} parallel workers")
+        print(f"[02_extract_cptac_patches] {len(todo)} WSIs left to extract, "
+              f"using {args.workers} parallel workers")
 
         # run extraction in parallel
         manifest_rows = list(existing_rows)
@@ -109,8 +107,10 @@ def main():
         out_manifest.to_csv(manifest_path, index=False)
 
         counts = out_manifest.groupby("wsi_id").size()
-        print(f"[02_extract_cptac_patches] {len(out_manifest)} total patches across {out_manifest['wsi_id'].nunique()} WSIs")
-        print(f"[02_extract_cptac_patches] per-WSI patch count: min={counts.min()} median={counts.median()} max={counts.max()}")
+        print(f"[02_extract_cptac_patches] {len(out_manifest)} total patches across "
+              f"{out_manifest['wsi_id'].nunique()} WSIs")
+        print(f"[02_extract_cptac_patches] per-WSI patch count: min={counts.min()} "
+              f"median={counts.median()} max={counts.max()}")
         print(f"[02_extract_cptac_patches] wrote {manifest_path}")
 
 

@@ -1,6 +1,5 @@
-"""PROGENy14 pathway scoring via decoupler's MLM method. Uses the installed
-decoupler v2 API (`dc.op.progeny`, `dc.mt.mlm`), not the v1 API
-(`dc.get_progeny`, `dc.run_mlm`) this was adapted from."""
+"""PROGENy14 pathway scoring via decoupler's MLM method.
+Uses the installed decoupler v2 API (`dc.op.progeny`, `dc.mt.mlm`), not the v1 API (`dc.get_progeny`, `dc.run_mlm`) this was adapted from."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,8 +10,7 @@ import pandas as pd
 def fetch_and_cache_progeny_net(
     cache_path: str | Path, top: int = 100, organism: str = "human",
 ) -> pd.DataFrame:
-    """Fetches the PROGENy model (14 pathways x weighted target genes) once
-    and caches it so re-runs reuse the exact same gene-weight table."""
+    """Fetches the PROGENy model (14 pathways x weighted target genes) once and caches it so re-runs reuse the exact same gene-weight table."""
     cache_path = Path(cache_path)
     if cache_path.exists():
         return pd.read_csv(cache_path)
@@ -27,8 +25,7 @@ def fetch_and_cache_progeny_net(
 def check_pathway_gene_coverage(
     net: pd.DataFrame, genes_by_slide: dict[str, set[str]],
 ) -> pd.DataFrame:
-    """Checks pathway target-gene coverage per ST platform/slide, so
-    pathways with poor coverage on any retained slide can be excluded."""
+    """Checks pathway target-gene coverage per ST platform/slide, so pathways with poor coverage on any retained slide can be excluded."""
     rows = []
     for pathway, sub in net.groupby("source"):
         targets = set(sub["target"])
@@ -49,15 +46,10 @@ def check_pathway_gene_coverage(
 def compute_progeny_scores(
     expr_df: pd.DataFrame, net: pd.DataFrame, min_n: int = 5,
 ) -> pd.DataFrame:
-    """Runs decoupler's MLM method on log-normalized full expression
-    (not just HVG1000). Returns (spots x pathways), reindexed to exactly
-    expr_df's row index/order; spots decoupler drops as degenerate are
-    filled NaN (handled by the same missingness-aware QC as any other
-    target)."""
+    """Runs decoupler's MLM on log-normalized full expression (not just HVG1000); returns (spots x pathways) reindexed to expr_df's row order, with decoupler-dropped degenerate spots filled NaN like any other missing target."""
     import decoupler as dc
 
-    # v2 API: source/target/weight are inferred from net's standard columns (no longer kwargs),
-    # and v1's min_n kwarg is now tmin.
+    # v2 API infers source/target/weight from net's columns (not kwargs); v1's min_n kwarg is now tmin.
     acts, pvals = dc.mt.mlm(data=expr_df, net=net, tmin=min_n, verbose=False)
     acts.index = acts.index.astype(expr_df.index.dtype)
     n_dropped = expr_df.shape[0] - acts.shape[0]

@@ -1,7 +1,5 @@
-"""The 8 project figures. Every figure function takes already-computed
-data (never re-derives results); example-selection functions take an
-explicit `criterion` string so visualization examples are never picked
-just because they look good."""
+"""The 8 project figures; every figure function takes already-computed data (never re-derives results),
+and example-selection functions take an explicit `criterion` string so examples are never picked because they look good."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,10 +14,17 @@ import pandas as pd
 def fig1_pipeline_diagram(out_path: Path) -> None:
     """Teacher -> student -> graph pipeline schematic."""
     fig, ax = plt.subplots(figsize=(10, 3))
-    stages = ["CPTAC H&E\npatch", "GenBio-PathFM\n(1.1B, frozen)", "ConvNeXt V2-Atto\nstudent (3.7M)",
-              "320-D\nembedding", "PNA graph\ncorrection", "y_final =\ny_patch + dy"]
+    stages = [
+        "CPTAC H&E\npatch",
+        "GenBio-PathFM\n(1.1B, frozen)",
+        "ConvNeXt V2-Atto\nstudent (3.7M)",
+        "320-D\nembedding",
+        "PNA graph\ncorrection",
+        "y_final =\ny_patch + dy",
+    ]
     for i, s in enumerate(stages):
-        ax.add_patch(plt.Rectangle((i * 2, 0), 1.6, 1, fill=True, facecolor="#e8eef7", edgecolor="black"))
+        box = plt.Rectangle((i * 2, 0), 1.6, 1, fill=True, facecolor="#e8eef7", edgecolor="black")
+        ax.add_patch(box)
         ax.text(i * 2 + 0.8, 0.5, s, ha="center", va="center", fontsize=8)
         if i < len(stages) - 1:
             ax.annotate("", xy=(i * 2 + 2, 0.5), xytext=(i * 2 + 1.6, 0.5),
@@ -32,7 +37,9 @@ def fig1_pipeline_diagram(out_path: Path) -> None:
     plt.close(fig)
 
 
-def fig2_wsi_patch_examples(thumbnails: list[np.ndarray], patch_examples: list[np.ndarray], out_path: Path) -> None:
+def fig2_wsi_patch_examples(
+    thumbnails: list[np.ndarray], patch_examples: list[np.ndarray], out_path: Path
+) -> None:
     n = min(4, len(thumbnails))
     fig, axes = plt.subplots(2, n, figsize=(3 * n, 6))
     for i in range(n):
@@ -58,7 +65,9 @@ def fig3_representation_agreement(cosine_sims: dict[str, np.ndarray], out_path: 
     plt.close(fig)
 
 
-def fig4_ablation_bars(results_df: pd.DataFrame, out_path: Path, metric_col: str = "fisher_z_mean_patient_R") -> None:
+def fig4_ablation_bars(
+    results_df: pd.DataFrame, out_path: Path, metric_col: str = "fisher_z_mean_patient_R"
+) -> None:
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.bar(results_df["model"], results_df[metric_col])
     ax.set_ylabel(metric_col)
@@ -69,8 +78,13 @@ def fig4_ablation_bars(results_df: pd.DataFrame, out_path: Path, metric_col: str
     plt.close(fig)
 
 
-def fig5_destruction_dose_response(q_values: list[float], r_mean: list[float], r_ci_low: list[float],
-                                    r_ci_high: list[float], out_path: Path) -> None:
+def fig5_destruction_dose_response(
+    q_values: list[float],
+    r_mean: list[float],
+    r_ci_low: list[float],
+    r_ci_high: list[float],
+    out_path: Path,
+) -> None:
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(q_values, r_mean, marker="o")
     ax.fill_between(q_values, r_ci_low, r_ci_high, alpha=0.2)
@@ -93,8 +107,9 @@ def fig6_morans_vs_improvement(morans_i: np.ndarray, delta_r: np.ndarray, out_pa
     plt.close(fig)
 
 
-def fig7_efficiency_vs_performance(param_counts: list[float], performance: list[float], labels: list[str],
-                                    out_path: Path) -> None:
+def fig7_efficiency_vs_performance(
+    param_counts: list[float], performance: list[float], labels: list[str], out_path: Path
+) -> None:
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.scatter(param_counts, performance)
     for x, y, l in zip(param_counts, performance, labels):
@@ -108,8 +123,14 @@ def fig7_efficiency_vs_performance(param_counts: list[float], performance: list[
     plt.close(fig)
 
 
-def fig8_spatial_maps(coords_um: np.ndarray, y_true: np.ndarray, y_pred: np.ndarray, gene_name: str,
-                       selection_criterion: str, out_path: Path) -> None:
+def fig8_spatial_maps(
+    coords_um: np.ndarray,
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    gene_name: str,
+    selection_criterion: str,
+    out_path: Path,
+) -> None:
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
     sc0 = axes[0].scatter(coords_um[:, 0], coords_um[:, 1], c=y_true, s=8, cmap="viridis")
     axes[0].set_title(f"{gene_name} -- ground truth")
@@ -126,9 +147,7 @@ def fig8_spatial_maps(coords_um: np.ndarray, y_true: np.ndarray, y_pred: np.ndar
 
 
 def representative_gene_selection(per_gene_r: pd.Series, criterion: str = "median") -> str:
-    """Predetermined, documented example selection (never cherry-picked):
-    median-performing gene by default; also supports 'best' / 'worst' /
-    'top_quartile_median'."""
+    """Predetermined, documented example selection (never cherry-picked): median-performing gene by default, also supports 'best'/'worst'/'top_quartile_median'."""
     s = per_gene_r.dropna().sort_values()
     if len(s) == 0:
         return None

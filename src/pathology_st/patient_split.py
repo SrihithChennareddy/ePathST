@@ -1,6 +1,5 @@
-"""Patient-level 80/10/10 CPTAC split, stratified by cancer type, computed
-before any patch is touched. No patient's patches may appear in more than
-one split."""
+"""Patient-level 80/10/10 CPTAC split, stratified by cancer type, computed before any patch is touched.
+No patient's patches may appear in more than one split."""
 from __future__ import annotations
 
 import numpy as np
@@ -8,10 +7,7 @@ import pandas as pd
 
 
 def cptac_patient_split(manifest: pd.DataFrame, cfg: dict, seed: int) -> pd.DataFrame:
-    """`manifest` must have one row per selected WSI (== one row per
-    patient). Returns a DataFrame with columns
-    [patient_id, cancer_type, split] where split in {train, val, test},
-    stratified per cancer_type using the configured fractions."""
+    """`manifest` has one row per selected WSI (== per patient); returns [patient_id, cancer_type, split] stratified per cancer_type using the configured fractions."""
     sc = cfg["cptac_split"]
     rng = np.random.RandomState(seed)
     rows = []
@@ -41,8 +37,7 @@ def cptac_patient_split(manifest: pd.DataFrame, cfg: dict, seed: int) -> pd.Data
 
 
 def assert_no_patch_leakage(patch_manifest: pd.DataFrame, split_df: pd.DataFrame) -> None:
-    """Every patch's patient_id must map to exactly one split, and no
-    patient may contribute patches to more than one split."""
+    """Every patch's patient_id must map to exactly one split, and no patient may contribute patches to more than one split."""
     merged = patch_manifest.merge(
         split_df[["patient_id", "split"]], on="patient_id", how="left", validate="m:1",
     )

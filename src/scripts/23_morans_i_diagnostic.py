@@ -50,8 +50,10 @@ def gather_coords(sample_ids: list[str], cache, split_df: pd.DataFrame) -> np.nd
     return np.concatenate(out, axis=0)
 
 
-def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, seed: int, device: str,
-                    max_folds: int | None) -> pd.DataFrame:
+def run_one_cancer(
+    bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, seed: int, device: str,
+    max_folds: int | None,
+) -> pd.DataFrame:
     import json
     cancer_root = bench_root / cancer
     genes = json.loads((cancer_root / "var_50genes.json").read_text())["genes"]
@@ -84,7 +86,8 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
         ids_train, x_by_src_train, y_train_raw = _s22.gather(train_ids_s, cache, all_df)
         ids_val, x_by_src_val, y_val_raw = _s22.gather(val_ids_s, cache, all_df)
         ids_test, x_by_src_test, y_test_raw = _s22.gather(test_ids_s, cache, all_df)
-        coords_test = gather_coords(test_ids_s, cache, all_df)  # same spot order as ids_test/y_test_raw
+        # same spot order as ids_test/y_test_raw
+        coords_test = gather_coords(test_ids_s, cache, all_df)
 
         std = TrainOnlyStandardizer().fit(y_train_raw, ids=ids_train)
         if val_ids_s != train_ids_s:
@@ -98,11 +101,19 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
         y_path_val = np.full((len(ids_val), 1), np.nan, dtype=np.float32)
         y_path_test = np.full((len(ids_test), 1), np.nan, dtype=np.float32)
 
-        x_by_source = {src: {"train": x_by_src_train[src], "val": x_by_src_val[src], "test": x_by_src_test[src]}
-                       for src in embed_fns}
-        patch_heads = {src: _s22.train_patch_head(x_by_source[src]["train"], x_by_source[src]["val"],
-                                                   y_gene_train, y_path_train, y_gene_val, y_path_val, cfg, device)
-                       for src in embed_fns}
+        x_by_source = {
+            src: {
+                "train": x_by_src_train[src], "val": x_by_src_val[src], "test": x_by_src_test[src],
+            }
+            for src in embed_fns
+        }
+        patch_heads = {
+            src: _s22.train_patch_head(
+                x_by_source[src]["train"], x_by_source[src]["val"],
+                y_gene_train, y_path_train, y_gene_val, y_path_val, cfg, device,
+            )
+            for src in embed_fns
+        }
 
         row_of = {uid: i for i, uid in enumerate(ids_test)}
         patient_ids_test_raw = np.array([uid.split("::")[0] for uid in ids_test])
@@ -110,26 +121,37 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
         # ground-truth Moran's I per test spot, computed once per fold (not per-ablation,
         # since it depends only on y_gene_test/coords_test), in spatial_benefit_vs_autocorrelation's
         # expected per-gene column format.
-        morans_df = ground_truth_morans_i_per_gene(y_gene_test, coords_test, patient_ids_test_raw, genes, k=6)
+        morans_df = ground_truth_morans_i_per_gene(
+            y_gene_test, coords_test, patient_ids_test_raw, genes, k=6
+        )
         morans_by_gene = morans_df.set_index("column")["morans_i"]
 
         r_by_gene = {}
         for spec in (A2_SPEC, A8_SPEC):
             src = spec.feature_source if spec.feature_source in x_by_source else "distilled"
-            sx_train, sx_val, sx_test = x_by_source[src]["train"], x_by_source[src]["val"], x_by_source[src]["test"]
+            sx_train = x_by_source[src]["train"]
+            sx_val = x_by_source[src]["val"]
+            sx_test = x_by_source[src]["test"]
             spec_patch_head = patch_heads[src]
             preds, _, eval_ids_test = _s22.run_ablation(
-                spec, sx_train, sx_val, sx_test, ids_train, ids_val, ids_test, y_gene_train, y_path_train,
-                y_gene_val, y_path_val, y_gene_test, y_path_test, spec_patch_head, manifest, cfg, seed, device,
-                n_hvg50=len(genes), pathway_names=["_unused_dummy_pathway"])
+                spec, sx_train, sx_val, sx_test, ids_train, ids_val, ids_test,
+                y_gene_train, y_path_train, y_gene_val, y_path_val, y_gene_test, y_path_test,
+                spec_patch_head, manifest, cfg, seed, device,
+                n_hvg50=len(genes), pathway_names=["_unused_dummy_pathway"],
+            )
             order = [row_of[u] for u in eval_ids_test]
             y_true_ord = y_gene_test[order]
             patient_ids_ord = patient_ids_test_raw[order]
-            per_patient_gene = per_patient_per_column_pearson(y_true_ord, preds["gene"], patient_ids_ord,
-                                                                genes, min_regions=1)
-            r_by_gene[spec.name] = per_patient_gene.dropna(subset=["r"]).groupby("column")["r"].mean()
-            print(f"[23_morans_i_diagnostic] {cancer} fold{fold} {spec.name}: computed {len(r_by_gene[spec.name])} "
-                  f"per-gene R values")
+            per_patient_gene = per_patient_per_column_pearson(
+                y_true_ord, preds["gene"], patient_ids_ord, genes, min_regions=1
+            )
+            r_by_gene[spec.name] = (
+                per_patient_gene.dropna(subset=["r"]).groupby("column")["r"].mean()
+            )
+            print(
+                f"[23_morans_i_diagnostic] {cancer} fold{fold} {spec.name}: "
+                f"computed {len(r_by_gene[spec.name])} per-gene R values"
+            )
 
         for gene in genes:
             per_gene_rows.append({
@@ -145,11 +167,19 @@ def run_one_cancer(bench_root: Path, cancer: str, embed_fns: dict, cfg: dict, se
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/base.yaml")
-    ap.add_argument("--bench-root", default="/lustre/nvwulf/scratch/schennareddy/HEST-1k/hest_bench")
+    ap.add_argument(
+        "--bench-root", default="/lustre/nvwulf/scratch/schennareddy/HEST-1k/hest_bench"
+    )
     ap.add_argument("--cancers", nargs="+", default=["IDC", "COAD", "CCRCC"])
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--seed", type=int, default=1, help="official BenchmarkConfig default (matches scripts 19/22)")
-    ap.add_argument("--feature-seed", type=int, default=0, help="which locked distilled-encoder checkpoint to use")
+    ap.add_argument(
+        "--seed", type=int, default=1,
+        help="official BenchmarkConfig default (matches scripts 19/22)",
+    )
+    ap.add_argument(
+        "--feature-seed", type=int, default=0,
+        help="which locked distilled-encoder checkpoint to use",
+    )
     ap.add_argument("--max-folds-per-cancer", type=int, default=None)
     args = ap.parse_args()
     cfg = load_config(args.config)
@@ -158,9 +188,11 @@ def main():
     seed_everything(args.seed)
 
     # load frozen encoders
-    distilled = load_locked_encoder(
-        torch.load(paths["student_checkpoints"] / f"locked_encoder_seed{args.feature_seed}.pt",
-                   map_location=args.device)["encoder_state_dict"], args.device)
+    checkpoint = torch.load(
+        paths["student_checkpoints"] / f"locked_encoder_seed{args.feature_seed}.pt",
+        map_location=args.device,
+    )
+    distilled = load_locked_encoder(checkpoint["encoder_state_dict"], args.device)
     imagenet = ConvNeXtV2AttoStudent(pretrained="imagenet").to(args.device).eval()
 
     def embed_distilled(imgs):
@@ -173,14 +205,17 @@ def main():
 
     per_cancer_dfs = []
     for cancer in args.cancers:
-        per_cancer_dfs.append(run_one_cancer(bench_root, cancer, embed_fns, cfg, args.seed, args.device,
-                                              args.max_folds_per_cancer))
+        per_cancer_dfs.append(run_one_cancer(
+            bench_root, cancer, embed_fns, cfg, args.seed, args.device, args.max_folds_per_cancer
+        ))
     full_df = pd.concat(per_cancer_dfs, ignore_index=True)
 
     # average per-gene R and Moran's I across folds within a cancer (panel is fixed per cancer)
-    per_gene_avg = (full_df.groupby(["cancer", "gene"])
-                    .agg(r_a2=("r_a2", "mean"), r_a8=("r_a8", "mean"), morans_i=("morans_i", "mean"))
-                    .reset_index())
+    per_gene_avg = (
+        full_df.groupby(["cancer", "gene"])
+        .agg(r_a2=("r_a2", "mean"), r_a8=("r_a8", "mean"), morans_i=("morans_i", "mean"))
+        .reset_index()
+    )
     per_gene_avg["delta"] = per_gene_avg["r_a8"] - per_gene_avg["r_a2"]
 
     out_dir = paths["results"] / "morans_i_diagnostic"
@@ -192,14 +227,21 @@ def main():
     # schema) rather than relying on pandas' implicit common-column merge fallback.
     def _corr(df: pd.DataFrame) -> dict:
         renamed = df.rename(columns={"gene": "column"}).set_index("column")
-        return spatial_benefit_vs_autocorrelation(renamed[["delta"]], renamed[["morans_i"]].reset_index())
+        return spatial_benefit_vs_autocorrelation(
+            renamed[["delta"]], renamed[["morans_i"]].reset_index()
+        )
 
     results = {}
     for cancer in args.cancers:
         results[cancer] = _corr(per_gene_avg[per_gene_avg["cancer"] == cancer])
-        print(f"[23_morans_i_diagnostic] {cancer}: n_genes={results[cancer]['n_genes']} "
-              f"pearson_r={results[cancer]['pearson_r']:.4f} p={results[cancer]['p_value']:.4f}"
-              if results[cancer]["n_genes"] >= 5 else f"[23_morans_i_diagnostic] {cancer}: too few valid genes")
+        print(
+            (
+                f"[23_morans_i_diagnostic] {cancer}: n_genes={results[cancer]['n_genes']} "
+                f"pearson_r={results[cancer]['pearson_r']:.4f} p={results[cancer]['p_value']:.4f}"
+            )
+            if results[cancer]["n_genes"] >= 5
+            else f"[23_morans_i_diagnostic] {cancer}: too few valid genes"
+        )
 
     # pooled: prefix gene names by cancer so identical gene symbols across cancers don't collide
     pooled = per_gene_avg.copy()

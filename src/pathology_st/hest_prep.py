@@ -11,9 +11,7 @@ HEST_SAMPLE_COLUMNS = ["sample_id", "patient_id", "study", "cancer", "organ", "s
 
 
 def audit_hest_samples(raw_meta: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, dict]:
-    """Keep only human cancer H&E+ST samples for {IDC/breast, COAD/colon,
-    CCRCC/kidney}; drop mouse, off-target tissue, and duplicates.
-    Returns (clean_df, report)."""
+    """Keeps only human cancer H&E+ST samples for {IDC/breast, COAD/colon, CCRCC/kidney}; drops mouse, off-target tissue, duplicates; returns (clean_df, report)."""
     df = raw_meta.copy()
     n0 = len(df)
     reasons = {}
@@ -43,10 +41,7 @@ def audit_hest_samples(raw_meta: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame,
 
 
 def enforce_patient_section_grouping(df: pd.DataFrame) -> pd.DataFrame:
-    """Multiple sections from one patient must stay in the same train/test
-    fold. No-op beyond asserting the grouping key exists -- actual
-    grouping happens in pathology_st.cv_folds, which splits on
-    `patient_id`, never `sample_id`."""
+    """No-op beyond asserting `patient_id` exists -- actual fold-grouping (never by `sample_id`) happens in cv_folds, since sections from one patient must share a fold."""
     assert "patient_id" in df.columns and df["patient_id"].notna().all()
     return df
 
@@ -55,10 +50,7 @@ def alignment_qc_sample(
     he_reader, spot_coords_px: np.ndarray, spot_ids: list[str], mpp: float, cfg: dict,
     seed: int = 0,
 ) -> dict:
-    """For a random subsample of spots, extract the ST-centered patch and
-    check it overlaps tissue rather than background -- a cheap proxy for
-    correct H&E/ST registration. Systematic misregistration shows up as
-    near-zero tissue fraction across most spots."""
+    """Cheap H&E/ST registration proxy: samples spots, checks the ST-centered patch overlaps tissue not background; systematic misregistration shows up as near-zero tissue fraction across most spots."""
     from pathology_st.cptac_select import tissue_mask_from_thumbnail
 
     n = cfg["hest"]["n_alignment_qc_samples"]
@@ -94,11 +86,7 @@ def extract_hest_patches_for_sample(
     he_reader, spot_ids: list[str], coords_px: np.ndarray, mpp: float,
     cfg: dict, n_threads: int = 8,
 ) -> np.ndarray:
-    """224x224 patch centered on every ST spot at ~0.5 um/px. Reads
-    concurrently via a thread pool on one shared WSI handle -- openslide's
-    `read_region` releases the GIL during tile decode, so this is real
-    I/O-bound parallelism. Each thread writes a disjoint index of
-    `patches`, so no locking is needed."""
+    """224x224 patch per ST spot at ~0.5 um/px, read concurrently via a thread pool (openslide releases the GIL during decode, so this is real I/O parallelism); each thread writes a disjoint index, so no locking is needed."""
     from concurrent.futures import ThreadPoolExecutor
 
     patches = np.empty(
@@ -119,8 +107,7 @@ def extract_hest_patches_for_sample(
 def integrity_check_spot_alignment(
     spot_ids: list[str], patch_ids: list[str], coords: np.ndarray, expr_index: pd.Index,
 ) -> dict:
-    """spot_id <-> patch <-> coordinate <-> expression vector must remain
-    exactly aligned; catches a silent reorder."""
+    """spot_id <-> patch <-> coordinate <-> expression vector must remain exactly aligned; catches a silent reorder."""
     ok_patch = list(spot_ids) == list(patch_ids)
     ok_expr = list(spot_ids) == list(expr_index)
     ok_coords = coords.shape[0] == len(spot_ids)

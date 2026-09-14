@@ -71,26 +71,36 @@ def t1_alignment_bug():
     ids_test_buggy = ids_test_original[order]
     pids_buggy = np.array([s.split("::")[0] for s in ids_test_buggy])
     # ...but y_gene_test/y_path_test (here: y_true) were NEVER reordered.
-    m_before = evaluate_predictions(y_true, y_pred_grouped, pids_buggy, cancer_placeholder,
-                                     [str(i) for i in range(n_genes)], _fake_cfg())["overall"]
+    gene_cols = [str(i) for i in range(n_genes)]
+    m_before = evaluate_predictions(
+        y_true, y_pred_grouped, pids_buggy, cancer_placeholder, gene_cols, _fake_cfg()
+    )["overall"]
 
     # --- AFTER FIX: reorder y_true with the SAME `order` used for predictions ---
     y_true_fixed = y_true[order]
-    m_after = evaluate_predictions(y_true_fixed, y_pred_grouped, pids_buggy, cancer_placeholder,
-                                    [str(i) for i in range(n_genes)], _fake_cfg())["overall"]
+    m_after = evaluate_predictions(
+        y_true_fixed, y_pred_grouped, pids_buggy, cancer_placeholder, gene_cols, _fake_cfg()
+    )["overall"]
 
     result = {
-        "description": "y_pred is a near-exact (0.01-noise) copy of y_true's per-patient rows, "
-                        "just permuted into per-patient-grouped order -- a correct pipeline must "
-                        "recover fisher_z_mean_patient_R close to 1.0.",
+        "description": (
+            "y_pred is a near-exact (0.01-noise) copy of y_true's per-patient rows, "
+            "just permuted into per-patient-grouped order -- a correct pipeline must "
+            "recover fisher_z_mean_patient_R close to 1.0."
+        ),
         "before_fix_fisher_z_mean_patient_R": m_before["fisher_z_mean_patient_R"],
         "after_fix_fisher_z_mean_patient_R": m_after["fisher_z_mean_patient_R"],
         "expected_after_fix": "close to 1.0 (near-perfect self-recovery)",
-        "bug_confirmed": bool(m_before["fisher_z_mean_patient_R"] < 0.9 and m_after["fisher_z_mean_patient_R"] > 0.95),
+        "bug_confirmed": bool(
+            m_before["fisher_z_mean_patient_R"] < 0.9
+            and m_after["fisher_z_mean_patient_R"] > 0.95
+        ),
     }
     print(json.dumps(result, indent=2))
     assert result["after_fix_fisher_z_mean_patient_R"] > 0.95, "fix verification FAILED"
-    assert result["before_fix_fisher_z_mean_patient_R"] < 0.9, "bug reproduction FAILED (should have been misaligned)"
+    assert result["before_fix_fisher_z_mean_patient_R"] < 0.9, (
+        "bug reproduction FAILED (should have been misaligned)"
+    )
     return result
 
 

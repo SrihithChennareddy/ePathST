@@ -1,6 +1,5 @@
-"""Extracts frozen encoder features on HEST patches and caches them to
-disk, with spot_id <-> patch <-> coordinate <-> embedding <-> expression
-integrity assertions."""
+"""Extracts frozen encoder features on HEST patches and caches them to disk.
+Includes spot_id <-> patch <-> coordinate <-> embedding <-> expression integrity assertions."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,9 +14,7 @@ def extract_student_features(
     encoder, patches_uint8: np.ndarray, device: str, batch_size: int = 256,
     downstream_proj=None,
 ) -> np.ndarray:
-    """Runs the frozen encoder over patches in batches; image only, no
-    expression data touches this path. Returns R^320 features (R^256 if
-    `downstream_proj` is given)."""
+    """Runs the frozen encoder over patches in batches (image only, no expression data touches this path); returns R^320 features, or R^256 if `downstream_proj` is given."""
     from pathology_st.distill_train import IMAGENET_MEAN, IMAGENET_STD
 
     encoder.eval()
@@ -41,10 +38,7 @@ def cache_features(
     encoder_name: str | None = None, checkpoint_source: str | None = None,
     sample_id: str | None = None,
 ) -> None:
-    """Stores `encoder_name`/`checkpoint_source`/`sample_id` as h5 attrs so
-    `load_cached_features` can assert a cache belongs to the encoder the
-    caller expects -- without this, A1 (ImageNet) and A2 (distilled) can
-    silently load each other's features (see src/pathology_st/ablations.py)."""
+    """Stores `encoder_name`/`checkpoint_source`/`sample_id` as h5 attrs so `load_cached_features` can assert the cache matches the expected encoder -- without this, A1/A2 can silently load each other's features (see ablations.py)."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(out_path, "w") as f:
@@ -78,9 +72,7 @@ def load_cached_features(path: str | Path, expected_encoder_name: str | None = N
 
 def assert_full_alignment(spot_ids: list[str], embedding: np.ndarray, coords_um: np.ndarray,
                            expr_df, expr_spot_col: str = None) -> dict:
-    """Checks that spot_id <-> patch <-> coordinate <-> embedding <->
-    expression stay in identical order. `expr_df` is indexed (or has a
-    column) by spot_id."""
+    """Checks that spot_id <-> patch <-> coordinate <-> embedding <-> expression stay in identical order; `expr_df` is indexed (or has a column) by spot_id."""
     expr_ids = (
         expr_df.index.astype(str).tolist() if expr_spot_col is None
         else expr_df[expr_spot_col].astype(str).tolist()

@@ -1,9 +1,6 @@
 #!/usr/bin/env python
-"""Step 9: lock the student. Given hyperparameters chosen from train/val
-only, either (Option A) keep the validated S1 checkpoint per seed, or
-(Option B) retrain on ALL CPTAC patients with the locked config. Either
-way: drop the 4608-D teacher projection head and save only the 320-D
-ConvNeXt V2-Atto encoder as the final pathology encoder."""
+"""Locks the student (hyperparameters chosen from train/val only): keeps validated S1 (A) or retrains
+on all CPTAC patients (B); either way, saves only the ConvNeXt V2-Atto encoder."""
 from __future__ import annotations
 
 import argparse
@@ -24,7 +21,8 @@ def main():
     ap.add_argument("--config", default="configs/base.yaml")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--mode", choices=["A", "B"], default="A",
-                     help="A: keep validated per-seed checkpoint. B: retrain on all patients with locked hparams.")
+                     help="A: keep validated per-seed checkpoint. "
+                          "B: retrain on all patients with locked hparams.")
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
@@ -49,7 +47,8 @@ def main():
             else:
                 # retrain on all patients
                 train_ds = CPTACDistillDataset(patch_manifest, teacher_h5, shard_dir, train=True, cfg=cfg)
-                val_pm = patch_manifest.sample(frac=0.05, random_state=seed)  # small holdout purely for checkpoint selection
+                # small holdout purely for checkpoint selection
+                val_pm = patch_manifest.sample(frac=0.05, random_state=seed)
                 val_ds = CPTACDistillDataset(val_pm, teacher_h5, shard_dir, train=False, cfg=cfg)
                 res = train_student("S1", train_ds, val_ds, cfg, paths["student_checkpoints"], seed, args.device)
                 state = torch.load(res["checkpoint"], map_location=args.device)
@@ -64,7 +63,8 @@ def main():
 
             params = count_parameters(model.encoder)
             save_json(params, paths["results"] / f"student_encoder_param_count_seed{seed}.json")
-            print(f"[07_lock_student] seed{seed}: locked encoder ({params['total_parameters']:,} params) -> {out_path}")
+            print(f"[07_lock_student] seed{seed}: locked encoder "
+                  f"({params['total_parameters']:,} params) -> {out_path}")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,5 @@
-"""Frozen GenBio-PathFM teacher (https://huggingface.co/genbio-ai/genbio-pathfm),
-run once and cached. Inference only -- no gradients, 1.1B parameters never
-updated. Every CPTAC patch is embedded exactly once; embeddings are
-cached to disk (FP16) and reused across every distillation epoch, since
-re-running the teacher per epoch would be prohibitively expensive."""
+"""Frozen GenBio-PathFM teacher (https://huggingface.co/genbio-ai/genbio-pathfm); inference only, no gradients.
+Each CPTAC patch is embedded once and its embedding cached to disk (FP16), since re-running the teacher per epoch would be prohibitively expensive."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,14 +9,7 @@ import numpy as np
 
 
 class GenBioPathFMTeacher:
-    """Follows the model card's documented usage, which differs from the
-    generic HF AutoModel/AutoImageProcessor pattern:
-      - No `preprocessor_config.json` in the repo, so
-        `AutoImageProcessor.from_pretrained` fails -- preprocessing is a
-        plain Resize(224,224) -> ToTensor -> Normalize with GenBio-PathFM-
-        specific stats (not ImageNet's).
-      - `model(x)` returns the [B, 4608] CLS-feature tensor directly, not
-        a HF-style ModelOutput with `.last_hidden_state`."""
+    """Follows the model card's usage, not the generic HF AutoModel/AutoImageProcessor pattern: no `preprocessor_config.json` (manual Resize/Normalize with GenBio-PathFM stats, not ImageNet's), and `model(x)` returns the [B, 4608] CLS tensor directly, not a ModelOutput with `.last_hidden_state`."""
 
     GENBIO_MEAN = (0.697, 0.575, 0.728)
     GENBIO_STD = (0.188, 0.240, 0.187)
@@ -46,15 +36,12 @@ class GenBioPathFMTeacher:
         return self._n_params
 
     def _preprocess(self, patches_uint8: np.ndarray):
-        """patches_uint8: (B, 224, 224, 3) uint8 RGB. Patches are already
-        224x224, but resize is applied anyway as a safety net for
-        non-224 input."""
+        """patches_uint8: (B, 224, 224, 3) uint8 RGB. Resize is applied anyway as a safety net in case a patch isn't exactly 224x224."""
         import torch
         import torch.nn.functional as F
 
         x = torch.from_numpy(patches_uint8).to(self.device).float() / 255.0
-        # (B, H, W, 3) -> (B, 3, H, W); must be .contiguous() -- the model's forward() does
-        # pixel_values.view(...) internally, which fails on permute()'s non-contiguous strides.
+        # (B,H,W,3)->(B,3,H,W); .contiguous() is required since forward()'s view() fails on permute()'s non-contiguous strides.
         x = x.permute(0, 3, 1, 2).contiguous()
         if x.shape[-1] != 224 or x.shape[-2] != 224:
             x = F.interpolate(x, size=(224, 224), mode="bilinear", align_corners=False)
@@ -63,8 +50,7 @@ class GenBioPathFMTeacher:
         return ((x - mean) / std).contiguous().to(self.dtype)
 
     def embed_batch(self, patches_uint8: np.ndarray) -> np.ndarray:
-        """patches_uint8: (B, H, W, 3) uint8 RGB. Returns (B, 4608) float32
-        L2-normalized CLS embeddings."""
+        """patches_uint8: (B, H, W, 3) uint8 RGB; returns (B, 4608) float32 L2-normalized CLS embeddings."""
         import torch
         x = self._preprocess(patches_uint8)
         with torch.no_grad():
@@ -78,22 +64,27 @@ class GenBioPathFMTeacher:
         return (cls / norm).astype(np.float32)
 
 
-def cache_teacher_embeddings(out_path: str | Path, patch_ids: list[str], embeddings: np.ndarray) -> None:
-    """Appends patch_id <-> teacher_embedding to disk (FP16 -- embeddings
-    are unit-norm, so FP16 precision is adequate). Uses h5py's
-    variable-length string dtype for `patch_id`, not a fixed-width numpy
-    `dtype="S"` array, since a fixed-width dtype freezes its byte-width at
-    the first call's longest string and silently truncates longer ids
-    appended later -- this previously collided unrelated CPTAC patches
-    (id length varies with pixel-coordinate digits) and broke resumability."""
+def cache_teacher_embeddings(
+    out_path: str | Path, patch_ids: list[str], embeddings: np.ndarray
+) -> None:
+    """Appends patch_id/teacher_embedding to disk (FP16 -- adequate since embeddings are unit-norm); uses h5py's variable-length string dtype for `patch_id`, not a fixed-width numpy `dtype="S"`, since a fixed width freezes at the first call's longest string and previously silently truncated/collided later CPTAC ids (length varies with pixel-coordinate digits) and broke resumability."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     str_dtype = h5py.string_dtype(encoding="utf-8")
     with h5py.File(out_path, "a") as f:
         if "teacher_embedding" not in f:
             # first write: create datasets
-            f.create_dataset("teacher_embedding", data=embeddings.astype(np.float16), maxshape=(None, embeddings.shape[1]))
-            f.create_dataset("patch_id", data=np.array(patch_ids, dtype=object), dtype=str_dtype, maxshape=(None,))
+            f.create_dataset(
+                "teacher_embedding",
+                data=embeddings.astype(np.float16),
+                maxshape=(None, embeddings.shape[1]),
+            )
+            f.create_dataset(
+                "patch_id",
+                data=np.array(patch_ids, dtype=object),
+                dtype=str_dtype,
+                maxshape=(None,),
+            )
         else:
             # append to existing datasets
             n0 = f["teacher_embedding"].shape[0]
@@ -105,8 +96,7 @@ def cache_teacher_embeddings(out_path: str | Path, patch_ids: list[str], embeddi
 
 
 def verify_teacher_cache(path: str | Path, expected_dim: int) -> dict:
-    """Integrity checks: no NaNs, expected dimension, near-unit norms, and
-    no duplicate patch_ids."""
+    """Integrity checks: no NaNs, expected dimension, near-unit norms, no duplicate patch_ids."""
     with h5py.File(path, "r") as f:
         emb = f["teacher_embedding"][:].astype(np.float32)
         pids = f["patch_id"][:].astype(str)
