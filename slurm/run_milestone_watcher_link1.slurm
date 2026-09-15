@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 import torch
 
-CKPT_DIR = Path("/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_genbio_distill_hest_pna/student_checkpoints")
+CKPT_DIR = Path("/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_hoptimus0_distill_hest_pna/student_checkpoints")
 RESUME_PATH = CKPT_DIR / "S1_seed0_resume.pt"
 POLL_SECONDS = 120
 

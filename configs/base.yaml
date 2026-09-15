@@ -3,7 +3,7 @@
 # base.json (see src/epathst/utils.load_config) so GPU nodes without PyYAML can
 # still read it.
 
-experiment_name: cptac_genbio_distill_hest_pna
+experiment_name: cptac_hoptimus0_distill_hest_pna
 seeds: [0, 1, 2]
 
 paths:
