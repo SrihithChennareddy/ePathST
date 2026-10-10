@@ -1,0 +1,39 @@
+{
+  "program_type": {
+    "IDC": {
+      "state": ["FASN","SCD","TOP2A","MMP1","MMP12","SERPINA3"],
+      "identity": ["ABCC11","ADH1B","ADIPOQ","ANKRD30A","AQP1","AQP3","CCR7","CD3E","CEACAM6","CEACAM8","CLIC6","CYTIP","ESR1","GATA3","IL2RG","IL7R","KIT","KLF5","KRT14","KRT5","KRT6B","MS4A1","MUC6","MYH11","MYLK","OXTR","PIGR","PTPRC","SCGB2A1","SFRP1","SLAMF7","TACSTD2","TCL1A","TENT5C","TPSAB1","TRAC","VWF"],
+      "other": ["DST","ERBB2","MYBPC1","OPRPN","PTGDS","PTN","SERHL2"]
+    },
+    "COAD": {
+      "state": ["AREG","CCL20","CXCL10","DUOX2","IL1B","LCN2","MMP1","MMP3","PI3","TYMS"],
+      "identity": ["AQP8","BANK1","CA1","CA4","CCR7","CD177","CEACAM6","CEACAM7","CHGA","CHGB","CLCA1","CLCA4","CTSE","FCRL1","GATA2","GCG","GUCA2A","GUCA2B","INSL5","ITLN1","MS4A1","MS4A12","NXPE4","OLFM4","OTOP2","PRPH","RETNLB","SCGN","SLC26A3","SPIB","TCL1A","TMIGD1"],
+      "other": ["CALB2","CHI3L2","COL11A1","CXCL13","DMBT1","HEPACAM2","SCG2","UGT2B17"]
+    },
+    "CCRCC": {
+      "state": ["DERL1","GADD45B","HMOX1","HSPA1A","IFI27","IFI6","IRF7","ISG15","LY6E","NAMPT","PARP10","TFRC","TP53INP1","VMP1"],
+      "identity": ["CD14","EGFL7","GPNMB","NOTCH3","S100A9","TRBC1"],
+      "other": ["AKAP8","BLVRB","BTF3","CD109","CHST15","CIB1","CKB","CPD","CPE","DNAJB12","FLNB","H3F3A","HNRNPK","HTRA1","KRTCAP2","LAPTM4B","LRRC41","NOL3","NT5DC2","PTGS1","PXN","RXRA","SCARB1","SEMA4B","SLC15A4","SLC39A14","STK39","TM2D3","TMEM91","YWHAE"]
+    }
+  },
+  "domain_markers": {
+    "IDC": {
+      "tumor_epithelium": ["ESR1","GATA3","ERBB2","TACSTD2","SCGB2A1","ANKRD30A","ABCC11","CEACAM6"],
+      "immune": ["PTPRC","CD3E","TRAC","IL7R","MS4A1","TCL1A","CCR7","CYTIP","IL2RG","SLAMF7"],
+      "stroma_vascular": ["MYH11","MYLK","VWF","AQP1","PTGDS","PTN"],
+      "adipose": ["ADH1B","ADIPOQ"],
+      "basal_myoepithelial": ["KRT5","KRT14","KRT6B","OXTR","SFRP1"]
+    },
+    "COAD": {
+      "tumor_epithelium": ["CEACAM6","CEACAM7","OLFM4","LCN2","DMBT1","CTSE"],
+      "normal_mucosa": ["CA1","CA4","GUCA2A","GUCA2B","AQP8","SLC26A3","MS4A12","CLCA4","CLCA1"],
+      "immune": ["MS4A1","BANK1","CXCL13","CCR7","TCL1A","FCRL1","SPIB"],
+      "stroma": ["COL11A1","MMP1","MMP3","CALB2","PRPH"]
+    },
+    "CCRCC": {
+      "interferon_immune": ["IFI27","ISG15","IRF7","IFI6","LY6E","TRBC1"],
+      "myeloid": ["CD14","GPNMB","S100A9","HMOX1"],
+      "vascular": ["EGFL7","NOTCH3"]
+    }
+  }
+}
