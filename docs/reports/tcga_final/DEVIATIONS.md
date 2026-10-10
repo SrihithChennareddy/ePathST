@@ -20,3 +20,9 @@
 - **What changed:** `50_tcga_audit.py` does not emit a standalone A8 check. Inspection of `epathst/tcga/prediction.py::predict_from_embeddings` shows all three systems are scored against the same `coords_um` array within one function call, so their spot sets cannot differ by construction — there is no code path that produces different spots per system.
 - **Fix:** added `assert all(p.shape[0] == n for p in preds.values())` at the end of `predict_from_embeddings` so a future refactor that broke this guarantee would fail loudly instead of silently.
 - **Outcomes seen:** no.
+
+## 2026-10-10 — Step 8 KIRC Stage III subgroup: tau lowered by Step 5.4's rule
+
+- **What changed:** the KIRC Stage III subgroup analysis (8.6) ran at tau=4.00 years (1461.0 days) instead of the nominal 5-year horizon.
+- **Why:** this subgroup has only 117 patients / 47 events; Step 5.4's rule (>=10% TE at risk, tau<=TR max follow-up, >=1 TE patient with time<tau in every outer split) failed at 5 years and was satisfied at 4. This is `56_survival_exploratory.py`'s reuse of `54_tcga_survival.py`'s `pick_tau`/`run_cohort`, which lowers tau automatically; this entry was added after the run completed because the subgroup path didn't wire its deviation list back to this file (a gap in `56_survival_exploratory.py`, noted for completeness, not re-run for it alone since the result itself is already correct).
+- **Outcomes seen:** logged after the run. Tau was lowered automatically by the pre-registered Step 5.4 rule, based on follow-up only; no choice was made after seeing outcomes.
