@@ -296,7 +296,17 @@ def main():
     all_cindex, all_alpha, all_coef, all_pcavar, all_folds = [], [], [], [], []
     oof_P_full = {}
     independence_rows, ph_rows = [], []
+    oof_rows = []
     deviations: list[str] = []
+
+    def flatten_oof(cancer, cohort_tag, oof_dict):
+        for fset, per_repeat in oof_dict.items():
+            for r, pct_by_patient in per_repeat.items():
+                for patient, pct in pct_by_patient.items():
+                    oof_rows.append(
+                        {"cancer": cancer, "cohort": cohort_tag, "feature_set": fset,
+                         "repeat": r, "patient": patient, "percentile": pct}
+                    )
 
     for project, cancer in PROJECTS.items():
         panel = panels[cancer]
@@ -311,6 +321,7 @@ def main():
         all_cindex.append(cindex); all_alpha.append(alpha); all_coef.append(coef)
         all_pcavar.append(pcavar); all_folds.append(folds)
         oof_P_full[cancer] = oof.get("C+P", {})
+        flatten_oof(cancer, "full", oof)
 
         df_rna = df_full[df_full["has_rna"]].reset_index(drop=True)
         if len(df_rna) >= 20:
@@ -319,11 +330,14 @@ def main():
             )
             all_cindex.append(cindex_r); all_alpha.append(alpha_r); all_coef.append(coef_r)
             all_pcavar.append(pcavar_r); all_folds.append(folds_r)
+            flatten_oof(cancer, "rna", oof_r)
 
         ind, ph = independence_and_ph(cancer, df_full, oof_P_full[cancer])
         independence_rows.append(ind)
         ph_rows.append(ph)
         log.info("%s done", cancer)
+
+    pd.DataFrame(oof_rows).to_csv(out / "oof_percentiles.csv", index=False)
 
     if deviations:
         dev_path = out_root / "DEVIATIONS.md"
