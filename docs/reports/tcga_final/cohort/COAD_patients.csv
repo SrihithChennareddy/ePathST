@@ -1,0 +1,430 @@
+patient,status,cancer,step1_eligible,has_rna,age_per_10y,stage_III_IV,grade_kirc,histological_type,OS,OS.time,PFI,PFI.time,endpoint,event,time_days,CPE,ER,HER2,survival_eligible
+TCGA-CM-5341,ok,COAD,True,True,8.2,1.0,,Colon Adenocarcinoma,0.0,884.0,0.0,884.0,PFI,0.0,884.0,0.6573,,,True
+TCGA-CK-6748,ok,COAD,True,True,4.5,1.0,,Colon Mucinous Adenocarcinoma,0.0,61.0,0.0,61.0,PFI,0.0,61.0,0.8676,,,True
+TCGA-AY-4070,ok,COAD,True,True,5.0,1.0,,Colon Adenocarcinoma,1.0,496.0,1.0,186.0,PFI,1.0,186.0,0.6353,,,True
+TCGA-A6-6142,ok,COAD,True,True,5.6,1.0,,Colon Adenocarcinoma,0.0,763.0,1.0,654.0,PFI,1.0,654.0,0.6378,,,True
+TCGA-AA-A02O,ok,COAD,True,True,8.2,0.0,,Colon Adenocarcinoma,0.0,28.0,0.0,28.0,PFI,0.0,28.0,0.8452,,,True
+TCGA-AY-6197,ok,COAD,True,True,6.0,0.0,,Colon Adenocarcinoma,0.0,652.0,0.0,652.0,PFI,0.0,652.0,0.8412,,,True
+TCGA-CA-6719,ok,COAD,True,True,7.7,0.0,,Colon Adenocarcinoma,0.0,435.0,1.0,354.0,PFI,1.0,354.0,0.7307,,,True
+TCGA-CK-6746,ok,COAD,True,True,8.4,0.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.829,,,False
+TCGA-AA-3517,ok,COAD,True,True,6.0,0.0,,Colon Adenocarcinoma,0.0,1186.0,1.0,821.0,PFI,1.0,821.0,0.7623,,,True
+TCGA-F4-6704,ok,COAD,True,True,6.0,1.0,,Colon Mucinous Adenocarcinoma,0.0,47.0,0.0,47.0,PFI,0.0,47.0,0.6413,,,True
+TCGA-G4-6304,ok,COAD,True,True,6.6,0.0,,Colon Adenocarcinoma,0.0,1631.0,1.0,859.0,PFI,1.0,859.0,0.6126,,,True
+TCGA-DM-A1D4,ok,COAD,True,True,8.0,0.0,,Colon Adenocarcinoma,1.0,2821.0,1.0,1920.0,PFI,1.0,1920.0,0.8848,,,True
+TCGA-AA-3511,skipped_no_mpp,COAD,False,True,6.4,0.0,,Colon Adenocarcinoma,0.0,212.0,1.0,59.0,PFI,1.0,59.0,0.7517,,,False
+TCGA-AA-3980,ok,COAD,True,True,8.9,0.0,,Colon Adenocarcinoma,0.0,822.0,0.0,822.0,PFI,0.0,822.0,0.792,,,True
+TCGA-AZ-4616,ok,COAD,True,True,8.2,1.0,,Colon Adenocarcinoma,1.0,156.0,1.0,156.0,PFI,1.0,156.0,0.6906,,,True
+TCGA-CM-4750,ok,COAD,True,True,3.4,1.0,,Colon Adenocarcinoma,0.0,244.0,0.0,244.0,PFI,0.0,244.0,0.7913,,,True
+TCGA-AA-3968,ok,COAD,True,True,5.5,0.0,,Colon Adenocarcinoma,0.0,669.0,0.0,669.0,PFI,0.0,669.0,0.809,,,True
+TCGA-AA-3666,ok,COAD,True,True,6.8,1.0,,Colon Adenocarcinoma,1.0,61.0,1.0,61.0,PFI,1.0,61.0,0.9594,,,True
+TCGA-AD-6890,ok,COAD,True,True,6.5,,,Colon Adenocarcinoma,0.0,746.0,0.0,746.0,PFI,0.0,746.0,0.7392,,,False
+TCGA-DM-A1DB,ok,COAD,True,True,6.8,0.0,,Colon Adenocarcinoma,1.0,1348.0,0.0,1348.0,PFI,0.0,1348.0,0.8767,,,True
+TCGA-AA-3930,ok,COAD,True,True,6.6,1.0,,Colon Adenocarcinoma,1.0,61.0,1.0,61.0,PFI,1.0,61.0,0.766,,,True
+TCGA-AA-3870,ok,COAD,True,True,7.1,1.0,,Colon Adenocarcinoma,0.0,912.0,0.0,912.0,PFI,0.0,912.0,0.7663,,,True
+TCGA-NH-A8F8,ok,COAD,True,True,7.9,1.0,,Colon Adenocarcinoma,1.0,511.0,1.0,511.0,PFI,1.0,511.0,0.7977,,,True
+TCGA-DM-A1D0,ok,COAD,True,True,7.9,0.0,,Colon Adenocarcinoma,0.0,3974.0,0.0,3974.0,PFI,0.0,3974.0,0.9594,,,True
+TCGA-AZ-6598,ok,COAD,True,True,7.7,0.0,,Colon Adenocarcinoma,1.0,1503.0,0.0,1503.0,PFI,0.0,1503.0,0.8718,,,True
+TCGA-AA-A00A,ok,COAD,True,True,8.0,0.0,,Colon Adenocarcinoma,0.0,1157.0,0.0,1157.0,PFI,0.0,1157.0,0.8806,,,True
+TCGA-AA-3952,ok,COAD,True,True,6.8,1.0,,Colon Adenocarcinoma,1.0,61.0,1.0,61.0,PFI,1.0,61.0,0.8056,,,True
+TCGA-AA-3858,ok,COAD,True,True,6.7,0.0,,Colon Adenocarcinoma,0.0,945.0,0.0,945.0,PFI,0.0,945.0,0.7521,,,True
+TCGA-AA-3561,ok,COAD,True,True,7.2,0.0,,Colon Adenocarcinoma,0.0,424.0,0.0,424.0,PFI,0.0,424.0,0.8956,,,True
+TCGA-AA-3850,ok,COAD,True,True,7.4,0.0,,Colon Adenocarcinoma,1.0,0.0,1.0,0.0,PFI,1.0,0.0,0.7903,,,False
+TCGA-AA-3495,skipped_no_mpp,COAD,False,True,7.9,0.0,,Colon Adenocarcinoma,0.0,1127.0,0.0,1127.0,PFI,0.0,1127.0,0.7841,,,False
+TCGA-AA-A00N,ok,COAD,True,True,7.5,0.0,,Colon Mucinous Adenocarcinoma,1.0,122.0,1.0,122.0,PFI,1.0,122.0,0.8093,,,True
+TCGA-AD-6964,ok,COAD,True,True,5.8,,,Colon Adenocarcinoma,1.0,331.0,1.0,325.0,PFI,1.0,325.0,0.6854,,,False
+TCGA-AA-3560,ok,COAD,True,True,7.2,1.0,,Colon Adenocarcinoma,0.0,608.0,0.0,608.0,PFI,0.0,608.0,0.8307,,,True
+TCGA-DM-A1D6,ok,COAD,True,True,8.8,0.0,,Colon Mucinous Adenocarcinoma,1.0,1518.0,0.0,1518.0,PFI,0.0,1518.0,0.9916,,,True
+TCGA-NH-A6GB,ok,COAD,True,True,7.1,1.0,,Colon Adenocarcinoma,0.0,476.0,0.0,476.0,PFI,0.0,476.0,0.7019,,,True
+TCGA-AA-3681,ok,COAD,True,True,7.7,1.0,,Colon Adenocarcinoma,0.0,182.0,0.0,182.0,PFI,0.0,182.0,0.7027,,,True
+TCGA-AA-3841,ok,COAD,True,True,6.6,0.0,,Colon Adenocarcinoma,0.0,1124.0,0.0,1124.0,PFI,0.0,1124.0,0.7406,,,True
+TCGA-DM-A1D9,ok,COAD,True,True,6.7,0.0,,Colon Adenocarcinoma,0.0,4270.0,0.0,4270.0,PFI,0.0,4270.0,0.8888,,,True
+TCGA-AA-3872,ok,COAD,True,True,4.5,1.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.7568,,,False
+TCGA-5M-AAT4,ok,COAD,True,True,7.4,1.0,,Colon Adenocarcinoma,1.0,49.0,1.0,49.0,PFI,1.0,49.0,0.8372,,,True
+TCGA-A6-5662,ok,COAD,True,True,4.6,1.0,,Colon Adenocarcinoma,0.0,718.0,1.0,495.0,PFI,1.0,495.0,0.9569,,,True
+TCGA-CK-5913,ok,COAD,True,True,5.8,0.0,,Colon Adenocarcinoma,0.0,1561.0,0.0,1561.0,PFI,0.0,1561.0,0.7758,,,True
+TCGA-CM-6171,ok,COAD,True,True,7.7,0.0,,Colon Adenocarcinoma,0.0,427.0,0.0,427.0,PFI,0.0,427.0,0.8398,,,True
+TCGA-AA-A01T,ok,COAD,True,True,6.3,1.0,,Colon Adenocarcinoma,0.0,1005.0,0.0,1005.0,PFI,0.0,1005.0,0.8249,,,True
+TCGA-CM-6166,ok,COAD,True,True,4.8,0.0,,Colon Adenocarcinoma,0.0,669.0,0.0,669.0,PFI,0.0,669.0,0.8595,,,True
+TCGA-CA-6715,ok,COAD,True,True,6.3,1.0,,Colon Adenocarcinoma,0.0,383.0,0.0,383.0,PFI,0.0,383.0,0.9473,,,True
+TCGA-AA-3542,ok,COAD,True,True,6.9,1.0,,Colon Adenocarcinoma,0.0,395.0,0.0,395.0,PFI,0.0,395.0,0.8449,,,True
+TCGA-AA-A00R,ok,COAD,True,True,6.4,0.0,,Colon Adenocarcinoma,0.0,30.0,0.0,30.0,PFI,0.0,30.0,0.7636,,,True
+TCGA-CM-6674,ok,COAD,True,True,3.9,0.0,,Colon Adenocarcinoma,0.0,394.0,0.0,394.0,PFI,0.0,394.0,0.7055,,,True
+TCGA-AA-3852,ok,COAD,True,True,8.8,0.0,,Colon Mucinous Adenocarcinoma,1.0,0.0,1.0,0.0,PFI,1.0,0.0,0.7135,,,False
+TCGA-AA-3522,ok,COAD,True,True,6.7,0.0,,Colon Adenocarcinoma,0.0,1127.0,0.0,1127.0,PFI,0.0,1127.0,0.6299,,,True
+TCGA-DM-A1HA,ok,COAD,True,True,8.2,1.0,,Colon Adenocarcinoma,0.0,4000.0,0.0,4000.0,PFI,0.0,4000.0,0.925,,,True
+TCGA-AA-3667,ok,COAD,True,True,3.6,0.0,,Colon Adenocarcinoma,0.0,426.0,0.0,426.0,PFI,0.0,426.0,0.8577,,,True
+TCGA-AA-3679,ok,COAD,True,True,5.9,1.0,,Colon Adenocarcinoma,0.0,457.0,0.0,457.0,PFI,0.0,457.0,0.8293,,,True
+TCGA-F4-6806,ok,COAD,True,True,5.9,0.0,,Colon Adenocarcinoma,0.0,1260.0,1.0,336.0,PFI,1.0,336.0,0.8361,,,True
+TCGA-A6-2675,skipped_no_tissue_patches,COAD,False,True,7.8,0.0,,Colon Adenocarcinoma,0.0,1321.0,0.0,1321.0,PFI,0.0,1321.0,0.6193,,,False
+TCGA-AA-3994,ok,COAD,True,True,6.9,1.0,,Colon Mucinous Adenocarcinoma,0.0,822.0,0.0,822.0,PFI,0.0,822.0,0.8709,,,True
+TCGA-CM-6677,ok,COAD,True,True,7.5,0.0,,Colon Adenocarcinoma,0.0,337.0,0.0,337.0,PFI,0.0,337.0,0.6683,,,True
+TCGA-AA-A02F,ok,COAD,True,True,6.8,1.0,,Colon Adenocarcinoma,0.0,1216.0,0.0,1216.0,PFI,0.0,1216.0,1.0,,,True
+TCGA-G4-6297,ok,COAD,True,True,5.5,1.0,,Colon Adenocarcinoma,0.0,2506.0,1.0,439.0,PFI,1.0,439.0,0.6654,,,True
+TCGA-AA-A03J,ok,COAD,True,True,6.5,0.0,,Colon Adenocarcinoma,0.0,1246.0,0.0,1246.0,PFI,0.0,1246.0,0.6905,,,True
+TCGA-AA-3692,ok,COAD,True,True,4.7,1.0,,Colon Mucinous Adenocarcinoma,1.0,1095.0,1.0,396.0,PFI,1.0,396.0,0.8603,,,True
+TCGA-AA-3867,ok,COAD,True,True,7.4,1.0,,Colon Adenocarcinoma,0.0,731.0,1.0,394.0,PFI,1.0,394.0,0.7169,,,True
+TCGA-CM-5860,ok,COAD,True,True,4.4,0.0,,Colon Adenocarcinoma,0.0,974.0,0.0,974.0,PFI,0.0,974.0,0.7451,,,True
+TCGA-A6-2674,ok,COAD,True,True,7.1,1.0,,Colon Mucinous Adenocarcinoma,0.0,1331.0,1.0,735.0,PFI,1.0,735.0,0.551,,,True
+TCGA-A6-A5ZU,ok,COAD,True,True,5.9,1.0,,Colon Adenocarcinoma,0.0,293.0,0.0,293.0,PFI,0.0,293.0,0.7049,,,True
+TCGA-G4-6628,ok,COAD,True,True,7.8,0.0,,Colon Adenocarcinoma,0.0,2424.0,0.0,2424.0,PFI,0.0,2424.0,0.6779,,,True
+TCGA-A6-2671,ok,COAD,True,True,8.5,1.0,,Colon Adenocarcinoma,1.0,1331.0,1.0,535.0,PFI,1.0,535.0,0.8394,,,True
+TCGA-AY-A54L,ok,COAD,True,True,7.4,0.0,,Colon Adenocarcinoma,0.0,525.0,1.0,396.0,PFI,1.0,396.0,0.836,,,True
+TCGA-A6-2683,ok,COAD,True,True,5.7,1.0,,Colon Adenocarcinoma,1.0,504.0,1.0,300.0,PFI,1.0,300.0,0.786,,,True
+TCGA-AA-3663,skipped_no_mpp,COAD,False,True,4.2,0.0,,Colon Adenocarcinoma,0.0,212.0,0.0,212.0,PFI,0.0,212.0,0.8893,,,False
+TCGA-A6-5664,ok,COAD,True,True,8.0,1.0,,Colon Adenocarcinoma,0.0,672.0,1.0,183.0,PFI,1.0,183.0,0.6426,,,True
+TCGA-AA-3488,skipped_no_mpp,COAD,False,True,5.8,1.0,,Colon Adenocarcinoma,1.0,153.0,1.0,153.0,PFI,1.0,153.0,0.8806,,,False
+TCGA-F4-6805,ok,COAD,True,True,5.8,0.0,,Colon Adenocarcinoma,0.0,1047.0,0.0,1047.0,PFI,0.0,1047.0,0.6399,,,True
+TCGA-D5-6531,ok,COAD,True,True,7.5,0.0,,Colon Adenocarcinoma,0.0,540.0,0.0,540.0,PFI,0.0,540.0,0.7597,,,True
+TCGA-G4-6321,ok,COAD,True,True,6.0,1.0,,Colon Adenocarcinoma,0.0,672.0,0.0,672.0,PFI,0.0,672.0,0.6939,,,True
+TCGA-F4-6808,ok,COAD,True,True,5.4,0.0,,Colon Adenocarcinoma,0.0,1024.0,0.0,1024.0,PFI,0.0,1024.0,0.6939,,,True
+TCGA-D5-6920,ok,COAD,True,True,7.7,0.0,,Colon Adenocarcinoma,0.0,377.0,0.0,377.0,PFI,0.0,377.0,0.8457,,,True
+TCGA-AA-3846,ok,COAD,True,True,7.4,0.0,,Colon Adenocarcinoma,0.0,518.0,0.0,518.0,PFI,0.0,518.0,0.7169,,,True
+TCGA-A6-6651,ok,COAD,True,True,5.5,1.0,,Colon Adenocarcinoma,0.0,662.0,0.0,662.0,PFI,0.0,662.0,0.606,,,True
+TCGA-AA-A017,ok,COAD,True,True,5.7,0.0,,Colon Adenocarcinoma,0.0,457.0,0.0,457.0,PFI,0.0,457.0,0.7074,,,True
+TCGA-AD-6548,ok,COAD,True,True,8.1,0.0,,Colon Adenocarcinoma,0.0,650.0,0.0,650.0,PFI,0.0,650.0,0.6725,,,True
+TCGA-D5-6928,ok,COAD,True,True,8.0,0.0,,Colon Mucinous Adenocarcinoma,0.0,354.0,0.0,354.0,PFI,0.0,354.0,0.4635,,,True
+TCGA-AD-6899,ok,COAD,True,True,8.4,1.0,,Colon Mucinous Adenocarcinoma,1.0,176.0,0.0,176.0,PFI,0.0,176.0,0.7507,,,True
+TCGA-D5-6533,ok,COAD,True,True,6.8,,,Colon Adenocarcinoma,0.0,775.0,0.0,775.0,PFI,0.0,775.0,0.7948,,,False
+TCGA-AZ-4684,ok,COAD,True,True,4.9,1.0,,Colon Adenocarcinoma,0.0,1977.0,1.0,411.0,PFI,1.0,411.0,0.729,,,True
+TCGA-AA-3531,ok,COAD,True,True,7.5,0.0,,Colon Adenocarcinoma,0.0,1035.0,0.0,1035.0,PFI,0.0,1035.0,0.722,,,True
+TCGA-AA-3941,ok,COAD,True,True,8.4,1.0,,Colon Adenocarcinoma,0.0,730.0,0.0,730.0,PFI,0.0,730.0,0.8435,,,True
+TCGA-AA-3814,ok,COAD,True,True,8.5,0.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.7607,,,False
+TCGA-DM-A280,ok,COAD,True,True,7.0,0.0,,Colon Mucinous Adenocarcinoma,1.0,236.0,0.0,236.0,PFI,0.0,236.0,0.5422,,,True
+TCGA-AA-3526,ok,COAD,True,True,5.7,0.0,,Colon Adenocarcinoma,0.0,580.0,0.0,580.0,PFI,0.0,580.0,0.8233,,,True
+TCGA-A6-2679,ok,COAD,True,True,7.3,0.0,,Colon Adenocarcinoma,0.0,1366.0,0.0,1366.0,PFI,0.0,1366.0,0.6226,,,True
+TCGA-D5-6535,ok,COAD,True,True,8.0,1.0,,Colon Adenocarcinoma,0.0,460.0,0.0,460.0,PFI,0.0,460.0,0.6964,,,True
+TCGA-CM-6168,ok,COAD,True,True,8.4,0.0,,Colon Adenocarcinoma,0.0,395.0,0.0,395.0,PFI,0.0,395.0,0.6256,,,True
+TCGA-CK-4951,ok,COAD,True,True,7.9,0.0,,Colon Mucinous Adenocarcinoma,1.0,2134.0,1.0,480.0,PFI,1.0,480.0,0.6729,,,True
+TCGA-CA-5796,ok,COAD,True,True,5.2,0.0,,Colon Mucinous Adenocarcinoma,0.0,377.0,0.0,377.0,PFI,0.0,377.0,0.9105,,,True
+TCGA-A6-A56B,ok,COAD,True,True,5.7,1.0,,Colon Adenocarcinoma,1.0,1711.0,1.0,1678.0,PFI,1.0,1678.0,0.8971,,,True
+TCGA-D5-5537,ok,COAD,True,True,8.3,,,Colon Adenocarcinoma,1.0,1381.0,1.0,722.0,PFI,1.0,722.0,0.8361,,,False
+TCGA-4N-A93T,ok,COAD,True,True,6.7,1.0,,Colon Adenocarcinoma,0.0,146.0,0.0,146.0,PFI,0.0,146.0,0.7898,,,True
+TCGA-CM-6163,ok,COAD,True,True,7.4,0.0,,Colon Adenocarcinoma,0.0,427.0,0.0,427.0,PFI,0.0,427.0,0.717,,,True
+TCGA-CK-5912,ok,COAD,True,True,8.1,0.0,,Colon Adenocarcinoma,1.0,1493.0,0.0,1493.0,PFI,0.0,1493.0,0.9025,,,True
+TCGA-A6-5666,ok,COAD,True,True,7.8,0.0,,Colon Adenocarcinoma,0.0,995.0,1.0,509.0,PFI,1.0,509.0,0.8924,,,True
+TCGA-D5-6538,ok,COAD,True,True,7.9,1.0,,Colon Adenocarcinoma,0.0,521.0,0.0,521.0,PFI,0.0,521.0,0.9535,,,True
+TCGA-A6-5656,ok,COAD,True,True,7.4,0.0,,Colon Adenocarcinoma,0.0,1001.0,0.0,1001.0,PFI,0.0,1001.0,0.7,,,True
+TCGA-A6-2681,ok,COAD,True,True,7.3,0.0,,Colon Adenocarcinoma,0.0,1387.0,1.0,1150.0,PFI,1.0,1150.0,0.6939,,,True
+TCGA-CM-6167,ok,COAD,True,True,5.7,1.0,,Colon Adenocarcinoma,0.0,456.0,0.0,456.0,PFI,0.0,456.0,0.5728,,,True
+TCGA-AA-3821,ok,COAD,True,True,8.1,0.0,,Colon Mucinous Adenocarcinoma,0.0,31.0,0.0,31.0,PFI,0.0,31.0,0.5862,,,True
+TCGA-AU-6004,ok,COAD,True,True,6.9,0.0,,Colon Adenocarcinoma,0.0,824.0,0.0,824.0,PFI,0.0,824.0,0.6553,,,True
+TCGA-AA-3678,ok,COAD,True,True,6.0,1.0,,Colon Adenocarcinoma,0.0,1430.0,0.0,1430.0,PFI,0.0,1430.0,0.8411,,,True
+TCGA-NH-A50U,ok,COAD,True,True,4.2,1.0,,Colon Mucinous Adenocarcinoma,1.0,334.0,1.0,276.0,PFI,1.0,276.0,0.7334,,,True
+TCGA-AA-3812,ok,COAD,True,True,8.2,0.0,,Colon Adenocarcinoma,0.0,1066.0,1.0,762.0,PFI,1.0,762.0,0.693,,,True
+TCGA-AA-3660,skipped_no_mpp,COAD,False,True,5.1,0.0,,Colon Adenocarcinoma,0.0,2375.0,0.0,2375.0,PFI,0.0,2375.0,0.893,,,False
+TCGA-AD-6901,ok,COAD,True,True,7.8,,,Colon Adenocarcinoma,1.0,682.0,1.0,468.0,PFI,1.0,468.0,0.7059,,,False
+TCGA-AA-A01Z,ok,COAD,True,True,6.8,0.0,,Colon Adenocarcinoma,0.0,1126.0,1.0,1126.0,PFI,1.0,1126.0,0.9404,,,True
+TCGA-AA-3538,ok,COAD,True,True,5.4,0.0,,Colon Adenocarcinoma,0.0,791.0,0.0,791.0,PFI,0.0,791.0,0.8551,,,True
+TCGA-CM-5863,ok,COAD,True,True,6.0,1.0,,Colon Mucinous Adenocarcinoma,0.0,457.0,0.0,457.0,PFI,0.0,457.0,0.792,,,True
+TCGA-AA-3844,ok,COAD,True,True,7.8,1.0,,Colon Adenocarcinoma,0.0,454.0,1.0,365.0,PFI,1.0,365.0,0.9041,,,True
+TCGA-AA-3710,ok,COAD,True,True,8.0,0.0,,Colon Adenocarcinoma,0.0,821.0,0.0,821.0,PFI,0.0,821.0,0.8956,,,True
+TCGA-CM-5864,ok,COAD,True,True,6.0,0.0,,Colon Adenocarcinoma,0.0,457.0,0.0,457.0,PFI,0.0,457.0,0.874,,,True
+TCGA-AA-A00U,ok,COAD,True,True,5.0,1.0,,Colon Adenocarcinoma,0.0,518.0,0.0,518.0,PFI,0.0,518.0,0.8835,,,True
+TCGA-D5-6540,ok,COAD,True,True,6.6,0.0,,Colon Mucinous Adenocarcinoma,0.0,491.0,0.0,491.0,PFI,0.0,491.0,0.8273,,,True
+TCGA-AA-A00D,ok,COAD,True,True,7.0,0.0,,Colon Adenocarcinoma,0.0,578.0,0.0,578.0,PFI,0.0,578.0,0.656,,,True
+TCGA-CM-6678,ok,COAD,True,True,6.3,1.0,,Colon Adenocarcinoma,0.0,335.0,1.0,0.0,PFI,1.0,0.0,0.768,,,False
+TCGA-AA-3842,ok,COAD,True,True,5.1,1.0,,Colon Adenocarcinoma,0.0,1126.0,1.0,396.0,PFI,1.0,396.0,0.8103,,,True
+TCGA-AA-3693,ok,COAD,True,True,7.7,1.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.9515,,,False
+TCGA-D5-6926,ok,COAD,True,True,6.5,1.0,,Colon Adenocarcinoma,0.0,275.0,0.0,275.0,PFI,0.0,275.0,0.6854,,,True
+TCGA-A6-2678,ok,COAD,True,True,4.3,1.0,,Colon Adenocarcinoma,0.0,1286.0,0.0,1286.0,PFI,0.0,1286.0,0.767,,,True
+TCGA-NH-A6GA,ok,COAD,True,True,5.8,1.0,,Colon Adenocarcinoma,1.0,302.0,1.0,6.0,PFI,1.0,6.0,0.8064,,,True
+TCGA-AA-3555,ok,COAD,True,True,8.1,0.0,,Colon Mucinous Adenocarcinoma,0.0,911.0,1.0,91.0,PFI,1.0,91.0,0.8279,,,True
+TCGA-G4-6303,ok,COAD,True,True,5.4,1.0,,Colon Adenocarcinoma,1.0,2003.0,1.0,872.0,PFI,1.0,872.0,0.8252,,,True
+TCGA-AZ-4615,ok,COAD,True,True,8.4,1.0,,Colon Adenocarcinoma,0.0,1002.0,1.0,688.0,PFI,1.0,688.0,0.7509,,,True
+TCGA-5M-AAT6,ok,COAD,True,True,4.0,1.0,,Colon Adenocarcinoma,1.0,290.0,1.0,219.0,PFI,1.0,219.0,0.6712,,,True
+TCGA-F4-6463,ok,COAD,True,True,5.1,0.0,,Colon Mucinous Adenocarcinoma,0.0,1087.0,0.0,1087.0,PFI,0.0,1087.0,0.7027,,,True
+TCGA-AZ-6599,ok,COAD,True,True,7.2,0.0,,Colon Adenocarcinoma,1.0,206.0,0.0,206.0,PFI,0.0,206.0,0.7203,,,True
+TCGA-AY-6386,ok,COAD,True,True,6.6,1.0,,Colon Adenocarcinoma,0.0,542.0,0.0,542.0,PFI,0.0,542.0,0.8266,,,True
+TCGA-G4-6322,ok,COAD,True,True,6.5,1.0,,Colon Mucinous Adenocarcinoma,0.0,792.0,1.0,789.0,PFI,1.0,789.0,0.8249,,,True
+TCGA-AZ-5403,ok,COAD,True,True,4.3,0.0,,Colon Adenocarcinoma,1.0,1910.0,1.0,304.0,PFI,1.0,304.0,0.7542,,,True
+TCGA-CA-5255,ok,COAD,True,True,4.5,0.0,,Colon Adenocarcinoma,0.0,376.0,0.0,376.0,PFI,0.0,376.0,0.6927,,,True
+TCGA-AZ-5407,ok,COAD,True,True,5.1,0.0,,Colon Adenocarcinoma,0.0,2683.0,0.0,2683.0,PFI,0.0,2683.0,0.8533,,,True
+TCGA-AA-3695,ok,COAD,True,True,6.3,1.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.8103,,,False
+TCGA-AA-3973,ok,COAD,True,True,6.9,1.0,,Colon Adenocarcinoma,0.0,397.0,0.0,397.0,PFI,0.0,397.0,0.8956,,,True
+TCGA-AA-A01D,ok,COAD,True,True,4.7,1.0,,Colon Mucinous Adenocarcinoma,1.0,334.0,1.0,183.0,PFI,1.0,183.0,0.6444,,,True
+TCGA-A6-6653,ok,COAD,True,True,8.2,0.0,,Colon Adenocarcinoma,0.0,742.0,0.0,742.0,PFI,0.0,742.0,0.826,,,True
+TCGA-A6-6648,ok,COAD,True,True,5.6,1.0,,Colon Adenocarcinoma,0.0,766.0,1.0,686.0,PFI,1.0,686.0,0.7204,,,True
+TCGA-CA-6718,ok,COAD,True,True,4.6,0.0,,Colon Adenocarcinoma,1.0,306.0,1.0,207.0,PFI,1.0,207.0,0.6664,,,True
+TCGA-AA-3986,ok,COAD,True,True,7.3,0.0,,Colon Adenocarcinoma,0.0,580.0,0.0,580.0,PFI,0.0,580.0,0.7379,,,True
+TCGA-AA-3655,skipped_no_mpp,COAD,False,True,6.8,0.0,,Colon Adenocarcinoma,0.0,1856.0,0.0,1856.0,PFI,0.0,1856.0,0.841,,,False
+TCGA-AA-3866,ok,COAD,True,True,7.8,0.0,,Colon Adenocarcinoma,0.0,518.0,0.0,518.0,PFI,0.0,518.0,0.6921,,,True
+TCGA-AA-A004,ok,COAD,True,True,7.6,0.0,,Colon Adenocarcinoma,0.0,424.0,0.0,424.0,PFI,0.0,424.0,0.749,,,True
+TCGA-NH-A8F7,ok,COAD,True,True,5.3,0.0,,Colon Adenocarcinoma,0.0,543.0,0.0,543.0,PFI,0.0,543.0,,,,True
+TCGA-D5-5539,ok,COAD,True,True,6.0,1.0,,Colon Mucinous Adenocarcinoma,0.0,596.0,1.0,579.0,PFI,1.0,579.0,0.7091,,,True
+TCGA-5M-AATE,ok,COAD,True,True,7.6,0.0,,Colon Adenocarcinoma,0.0,1200.0,1.0,810.0,PFI,1.0,810.0,0.8443,,,True
+TCGA-A6-2672,ok,COAD,True,True,8.2,1.0,,Colon Adenocarcinoma,0.0,1419.0,0.0,1419.0,PFI,0.0,1419.0,0.6965,,,True
+TCGA-DM-A282,ok,COAD,True,True,6.0,0.0,,Colon Adenocarcinoma,0.0,4233.0,0.0,4233.0,PFI,0.0,4233.0,0.8559,,,True
+TCGA-F4-6703,ok,COAD,True,True,6.4,0.0,,Colon Adenocarcinoma,0.0,1456.0,0.0,1456.0,PFI,0.0,1456.0,0.3651,,,True
+TCGA-AA-3548,ok,COAD,True,True,7.1,1.0,,Colon Adenocarcinoma,0.0,1034.0,0.0,1034.0,PFI,0.0,1034.0,0.8262,,,True
+TCGA-AA-A02E,ok,COAD,True,True,8.2,1.0,,Colon Adenocarcinoma,1.0,90.0,1.0,90.0,PFI,1.0,90.0,0.7995,,,True
+TCGA-D5-6929,ok,COAD,True,True,4.9,1.0,,Colon Adenocarcinoma,0.0,408.0,0.0,408.0,PFI,0.0,408.0,0.7439,,,True
+TCGA-AA-3848,ok,COAD,True,True,8.2,1.0,,Colon Adenocarcinoma,1.0,306.0,1.0,306.0,PFI,1.0,306.0,0.7657,,,True
+TCGA-AA-3989,ok,COAD,True,True,8.4,1.0,,Colon Adenocarcinoma,1.0,242.0,1.0,242.0,PFI,1.0,242.0,0.6932,,,True
+TCGA-DM-A288,ok,COAD,True,True,6.8,1.0,,Colon Mucinous Adenocarcinoma,1.0,427.0,1.0,320.0,PFI,1.0,320.0,0.8526,,,True
+TCGA-AA-3864,ok,COAD,True,True,7.1,0.0,,Colon Adenocarcinoma,0.0,1612.0,0.0,1612.0,PFI,0.0,1612.0,0.7992,,,True
+TCGA-AA-3492,skipped_no_mpp,COAD,False,True,9.0,0.0,,Colon Adenocarcinoma,1.0,92.0,0.0,92.0,PFI,0.0,92.0,0.8306,,,False
+TCGA-AA-3977,ok,COAD,True,True,6.5,,,Colon Adenocarcinoma,0.0,761.0,0.0,761.0,PFI,0.0,761.0,0.7961,,,False
+TCGA-D5-6532,ok,COAD,True,True,6.1,0.0,,Colon Adenocarcinoma,0.0,555.0,0.0,555.0,PFI,0.0,555.0,0.8245,,,True
+TCGA-T9-A92H,skipped_<200_spots,COAD,False,True,8.2,0.0,,Colon Adenocarcinoma,0.0,362.0,1.0,81.0,PFI,1.0,81.0,0.8238,,,False
+TCGA-AZ-4614,ok,COAD,True,True,7.1,1.0,,Colon Adenocarcinoma,1.0,172.0,1.0,172.0,PFI,1.0,172.0,0.9149,,,True
+TCGA-F4-6854,ok,COAD,True,True,7.7,0.0,,Colon Adenocarcinoma,0.0,16.0,0.0,16.0,PFI,0.0,16.0,0.79,,,True
+TCGA-CA-5256,ok,COAD,True,True,5.4,0.0,,Colon Adenocarcinoma,0.0,379.0,0.0,379.0,PFI,0.0,379.0,0.8469,,,True
+TCGA-CM-5344,ok,COAD,True,True,3.9,1.0,,Colon Adenocarcinoma,0.0,670.0,0.0,670.0,PFI,0.0,670.0,0.7177,,,True
+TCGA-F4-6807,ok,COAD,True,True,5.1,1.0,,Colon Adenocarcinoma,0.0,1309.0,0.0,1309.0,PFI,0.0,1309.0,0.667,,,True
+TCGA-A6-2684,ok,COAD,True,True,7.5,0.0,,Colon Adenocarcinoma,0.0,1127.0,1.0,976.0,PFI,1.0,976.0,0.725,,,True
+TCGA-AA-3947,ok,COAD,True,True,6.0,0.0,,Colon Mucinous Adenocarcinoma,0.0,1004.0,0.0,1004.0,PFI,0.0,1004.0,0.8137,,,True
+TCGA-AM-5820,ok,COAD,True,True,5.9,1.0,,Colon Adenocarcinoma,0.0,14.0,0.0,14.0,PFI,0.0,14.0,0.8495,,,True
+TCGA-DM-A28M,ok,COAD,True,True,6.3,0.0,,Colon Adenocarcinoma,0.0,2895.0,0.0,2895.0,PFI,0.0,2895.0,0.8391,,,True
+TCGA-QG-A5Z1,ok,COAD,True,True,7.1,1.0,,Colon Adenocarcinoma,1.0,256.0,0.0,256.0,PFI,0.0,256.0,0.8827,,,True
+TCGA-CM-6680,ok,COAD,True,True,7.8,1.0,,Colon Adenocarcinoma,0.0,366.0,0.0,366.0,PFI,0.0,366.0,0.7525,,,True
+TCGA-CM-4744,ok,COAD,True,True,6.9,0.0,,Colon Adenocarcinoma,0.0,609.0,0.0,609.0,PFI,0.0,609.0,0.7982,,,True
+TCGA-D5-6536,ok,COAD,True,True,7.3,0.0,,Colon Adenocarcinoma,0.0,543.0,1.0,493.0,PFI,1.0,493.0,0.7527,,,True
+TCGA-G4-6323,ok,COAD,True,True,5.0,0.0,,Colon Adenocarcinoma,0.0,419.0,0.0,419.0,PFI,0.0,419.0,0.5896,,,True
+TCGA-D5-6537,ok,COAD,True,True,6.4,1.0,,Colon Adenocarcinoma,1.0,146.0,1.0,123.0,PFI,1.0,123.0,0.8767,,,True
+TCGA-A6-2676,ok,COAD,True,True,7.5,0.0,,Colon Adenocarcinoma,1.0,1305.0,0.0,1305.0,PFI,0.0,1305.0,0.8171,,,True
+TCGA-3L-AA1B,ok,COAD,True,True,6.1,0.0,,Colon Adenocarcinoma,0.0,475.0,0.0,475.0,PFI,0.0,475.0,0.7913,,,True
+TCGA-AD-6895,ok,COAD,True,True,8.4,1.0,,Colon Adenocarcinoma,0.0,763.0,0.0,763.0,PFI,0.0,763.0,0.7422,,,True
+TCGA-5M-AAT5,ok,COAD,True,True,,,,,,,,,PFI,,,0.817,,,False
+TCGA-G4-6294,ok,COAD,True,True,7.5,1.0,,Colon Adenocarcinoma,1.0,858.0,1.0,517.0,PFI,1.0,517.0,0.8756,,,True
+TCGA-CM-5862,ok,COAD,True,True,8.0,1.0,,Colon Adenocarcinoma,1.0,153.0,1.0,31.0,PFI,1.0,31.0,0.8896,,,True
+TCGA-D5-6922,ok,COAD,True,True,7.6,1.0,,Colon Adenocarcinoma,0.0,308.0,0.0,308.0,PFI,0.0,308.0,0.7744,,,True
+TCGA-AA-3869,ok,COAD,True,True,7.6,1.0,,Colon Adenocarcinoma,1.0,822.0,1.0,822.0,PFI,1.0,822.0,0.7866,,,True
+TCGA-AA-3524,ok,COAD,True,True,8.5,0.0,,Colon Adenocarcinoma,0.0,1096.0,0.0,1096.0,PFI,0.0,1096.0,0.8229,,,True
+TCGA-A6-A567,ok,COAD,True,True,5.6,1.0,,Colon Adenocarcinoma,1.0,1881.0,1.0,612.0,PFI,1.0,612.0,0.8594,,,True
+TCGA-AA-3520,ok,COAD,True,True,8.6,0.0,,Colon Adenocarcinoma,0.0,731.0,0.0,731.0,PFI,0.0,731.0,0.7372,,,True
+TCGA-AA-A01F,ok,COAD,True,True,7.2,1.0,,Colon Adenocarcinoma,0.0,974.0,0.0,974.0,PFI,0.0,974.0,0.8733,,,True
+TCGA-QG-A5YX,ok,COAD,True,True,6.1,0.0,,Colon Adenocarcinoma,0.0,1003.0,0.0,1003.0,PFI,0.0,1003.0,0.8641,,,True
+TCGA-CK-5914,ok,COAD,True,True,8.1,1.0,,Colon Adenocarcinoma,0.0,669.0,0.0,669.0,PFI,0.0,669.0,0.8818,,,True
+TCGA-AY-5543,ok,COAD,True,True,6.5,1.0,,Colon Adenocarcinoma,0.0,1004.0,0.0,1004.0,PFI,0.0,1004.0,0.8266,,,True
+TCGA-A6-3809,ok,COAD,True,True,7.1,0.0,,Colon Mucinous Adenocarcinoma,0.0,996.0,0.0,996.0,PFI,0.0,996.0,0.6996,,,True
+TCGA-DM-A28F,ok,COAD,True,True,7.3,1.0,,Colon Adenocarcinoma,1.0,1094.0,0.0,1094.0,PFI,0.0,1094.0,0.7866,,,True
+TCGA-A6-6649,ok,COAD,True,True,6.6,1.0,,Colon Adenocarcinoma,0.0,735.0,0.0,735.0,PFI,0.0,735.0,0.7857,,,True
+TCGA-AD-A5EJ,ok,COAD,True,True,7.4,0.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.7913,,,False
+TCGA-AA-A00L,ok,COAD,True,True,6.6,0.0,,Colon Adenocarcinoma,0.0,1157.0,0.0,1157.0,PFI,0.0,1157.0,0.9075,,,True
+TCGA-CK-6747,ok,COAD,True,True,8.7,0.0,,Colon Adenocarcinoma,0.0,2523.0,0.0,2523.0,PFI,0.0,2523.0,0.851,,,True
+TCGA-AA-3877,ok,COAD,True,True,8.3,0.0,,Colon Mucinous Adenocarcinoma,0.0,943.0,0.0,943.0,PFI,0.0,943.0,0.749,,,True
+TCGA-AA-A00F,ok,COAD,True,True,6.6,1.0,,Colon Adenocarcinoma,0.0,1035.0,0.0,1035.0,PFI,0.0,1035.0,0.5896,,,True
+TCGA-CM-6172,ok,COAD,True,True,7.0,1.0,,Colon Adenocarcinoma,0.0,335.0,0.0,335.0,PFI,0.0,335.0,0.867,,,True
+TCGA-A6-3810,ok,COAD,True,True,6.2,0.0,,Colon Adenocarcinoma,0.0,1111.0,0.0,1111.0,PFI,0.0,1111.0,0.759,,,True
+TCGA-AA-3514,ok,COAD,True,True,8.1,0.0,,Colon Adenocarcinoma,0.0,31.0,0.0,31.0,PFI,0.0,31.0,0.8022,,,True
+TCGA-CM-4746,ok,COAD,True,True,6.1,0.0,,Colon Adenocarcinoma,0.0,1126.0,0.0,1126.0,PFI,0.0,1126.0,0.7736,,,True
+TCGA-DM-A28H,ok,COAD,True,True,5.0,1.0,,Colon Adenocarcinoma,0.0,3561.0,1.0,484.0,PFI,1.0,484.0,0.8688,,,True
+TCGA-AA-3955,ok,COAD,True,True,3.8,1.0,,Colon Adenocarcinoma,0.0,638.0,0.0,638.0,PFI,0.0,638.0,0.8262,,,True
+TCGA-AA-3549,ok,COAD,True,True,6.9,0.0,,Colon Adenocarcinoma,0.0,639.0,0.0,639.0,PFI,0.0,639.0,0.788,,,True
+TCGA-G4-6317,ok,COAD,True,True,5.1,1.0,,Colon Adenocarcinoma,0.0,1095.0,1.0,592.0,PFI,1.0,592.0,0.8967,,,True
+TCGA-D5-5540,ok,COAD,True,True,7.3,0.0,,Colon Adenocarcinoma,0.0,1706.0,0.0,1706.0,PFI,0.0,1706.0,0.9467,,,True
+TCGA-AA-3525,ok,COAD,True,True,9.0,1.0,,Colon Adenocarcinoma,0.0,245.0,0.0,245.0,PFI,0.0,245.0,0.7697,,,True
+TCGA-AA-A022,ok,COAD,True,True,8.8,0.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.7866,,,False
+TCGA-AD-5900,ok,COAD,True,True,6.7,0.0,,Colon Mucinous Adenocarcinoma,0.0,370.0,0.0,370.0,PFI,0.0,370.0,0.7192,,,True
+TCGA-F4-6461,ok,COAD,True,True,4.1,1.0,,Colon Adenocarcinoma,1.0,338.0,1.0,288.0,PFI,1.0,288.0,0.7498,,,True
+TCGA-CM-6676,ok,COAD,True,True,8.2,0.0,,Colon Adenocarcinoma,0.0,337.0,0.0,337.0,PFI,0.0,337.0,0.7789,,,True
+TCGA-AY-A8YK,ok,COAD,True,True,4.4,1.0,,Colon Adenocarcinoma,0.0,573.0,0.0,573.0,PFI,0.0,573.0,0.9395,,,True
+TCGA-CA-5254,ok,COAD,True,True,4.2,0.0,,Colon Adenocarcinoma,0.0,386.0,0.0,386.0,PFI,0.0,386.0,0.7914,,,True
+TCGA-NH-A50T,ok,COAD,True,True,6.8,0.0,,Colon Adenocarcinoma,0.0,553.0,0.0,553.0,PFI,0.0,553.0,0.9101,,,True
+TCGA-AA-A01R,ok,COAD,True,True,4.7,1.0,,Colon Mucinous Adenocarcinoma,0.0,1065.0,1.0,608.0,PFI,1.0,608.0,0.7853,,,True
+TCGA-AA-3496,skipped_no_mpp,COAD,False,True,8.3,0.0,,Colon Adenocarcinoma,0.0,31.0,0.0,31.0,PFI,0.0,31.0,0.7004,,,False
+TCGA-AA-3713,skipped_no_mpp,COAD,False,True,6.8,1.0,,Colon Adenocarcinoma,0.0,579.0,0.0,579.0,PFI,0.0,579.0,0.7508,,,False
+TCGA-AA-3494,skipped_no_mpp,COAD,False,True,5.5,1.0,,Colon Adenocarcinoma,0.0,31.0,0.0,31.0,PFI,0.0,31.0,0.8646,,,False
+TCGA-A6-6141,ok,COAD,True,True,3.1,0.0,,Colon Adenocarcinoma,0.0,255.0,0.0,255.0,PFI,0.0,255.0,0.7243,,,True
+TCGA-A6-A565,ok,COAD,True,True,3.4,1.0,,Colon Mucinous Adenocarcinoma,1.0,494.0,1.0,301.0,PFI,1.0,301.0,0.5864,,,True
+TCGA-AY-4071,ok,COAD,True,True,6.3,0.0,,[Not Available],1.0,29.0,0.0,29.0,PFI,0.0,29.0,0.7281,,,True
+TCGA-AA-3939,ok,COAD,True,True,8.3,0.0,,Colon Adenocarcinoma,0.0,395.0,0.0,395.0,PFI,0.0,395.0,0.7138,,,True
+TCGA-AA-A010,ok,COAD,True,True,4.6,0.0,,Colon Adenocarcinoma,0.0,1064.0,0.0,1064.0,PFI,0.0,1064.0,0.6119,,,True
+TCGA-CM-4751,ok,COAD,True,True,6.2,1.0,,Colon Adenocarcinoma,0.0,822.0,0.0,822.0,PFI,0.0,822.0,0.6852,,,True
+TCGA-AY-A71X,ok,COAD,True,True,5.4,0.0,,Colon Adenocarcinoma,0.0,588.0,0.0,588.0,PFI,0.0,588.0,0.8424,,,True
+TCGA-D5-6898,ok,COAD,True,True,5.1,0.0,,Colon Adenocarcinoma,0.0,229.0,0.0,229.0,PFI,0.0,229.0,0.7443,,,True
+TCGA-AA-A01S,ok,COAD,True,True,4.7,1.0,,Colon Adenocarcinoma,0.0,31.0,0.0,31.0,PFI,0.0,31.0,0.918,,,True
+TCGA-AA-3979,ok,COAD,True,True,8.4,0.0,,Colon Adenocarcinoma,0.0,730.0,0.0,730.0,PFI,0.0,730.0,0.8063,,,True
+TCGA-AA-A00K,ok,COAD,True,True,7.9,0.0,,Colon Adenocarcinoma,0.0,549.0,0.0,549.0,PFI,0.0,549.0,0.7982,,,True
+TCGA-AA-3673,ok,COAD,True,True,5.3,0.0,,Colon Adenocarcinoma,0.0,1522.0,0.0,1522.0,PFI,0.0,1522.0,0.788,,,True
+TCGA-A6-5661,ok,COAD,True,True,8.0,0.0,,Colon Adenocarcinoma,0.0,1020.0,0.0,1020.0,PFI,0.0,1020.0,0.7771,,,True
+TCGA-F4-6460,ok,COAD,True,True,5.1,1.0,,Colon Adenocarcinoma,1.0,972.0,1.0,313.0,PFI,1.0,313.0,0.7696,,,True
+TCGA-F4-6459,ok,COAD,True,True,6.1,1.0,,Colon Adenocarcinoma,1.0,262.0,0.0,262.0,PFI,0.0,262.0,0.7145,,,True
+TCGA-CM-4747,ok,COAD,True,True,4.7,1.0,,Colon Adenocarcinoma,0.0,761.0,0.0,761.0,PFI,0.0,761.0,0.7833,,,True
+TCGA-CM-6679,ok,COAD,True,True,5.8,0.0,,Colon Adenocarcinoma,0.0,306.0,0.0,306.0,PFI,0.0,306.0,0.6281,,,True
+TCGA-QG-A5YW,ok,COAD,True,True,5.5,1.0,,Colon Mucinous Adenocarcinoma,0.0,896.0,0.0,896.0,PFI,0.0,896.0,0.7466,,,True
+TCGA-AA-A00Z,ok,COAD,True,True,7.0,0.0,,Colon Adenocarcinoma,0.0,669.0,0.0,669.0,PFI,0.0,669.0,0.7603,,,True
+TCGA-AA-3688,ok,COAD,True,True,8.0,1.0,,Colon Adenocarcinoma,0.0,578.0,0.0,578.0,PFI,0.0,578.0,0.8257,,,True
+TCGA-AZ-4681,ok,COAD,True,True,7.9,0.0,,Colon Adenocarcinoma,0.0,3247.0,0.0,3247.0,PFI,0.0,3247.0,0.904,,,True
+TCGA-F4-6856,ok,COAD,True,True,4.5,0.0,,Colon Mucinous Adenocarcinoma,0.0,1074.0,0.0,1074.0,PFI,0.0,1074.0,0.752,,,True
+TCGA-A6-6137,ok,COAD,True,True,5.5,1.0,,Colon Adenocarcinoma,0.0,824.0,0.0,824.0,PFI,0.0,824.0,0.6883,,,True
+TCGA-AD-6889,ok,COAD,True,True,7.6,0.0,,Colon Adenocarcinoma,1.0,2532.0,1.0,1516.0,PFI,1.0,1516.0,0.8713,,,True
+TCGA-D5-5541,ok,COAD,True,True,6.3,1.0,,Colon Adenocarcinoma,0.0,1701.0,0.0,1701.0,PFI,0.0,1701.0,0.7648,,,True
+TCGA-AA-3543,ok,COAD,True,True,8.4,0.0,,Colon Mucinous Adenocarcinoma,0.0,30.0,0.0,30.0,PFI,0.0,30.0,0.809,,,True
+TCGA-AA-3715,ok,COAD,True,True,7.7,0.0,,Colon Adenocarcinoma,1.0,579.0,1.0,153.0,PFI,1.0,153.0,0.7223,,,True
+TCGA-G4-6315,ok,COAD,True,True,6.6,1.0,,Colon Adenocarcinoma,0.0,1883.0,0.0,1883.0,PFI,0.0,1883.0,0.8102,,,True
+TCGA-AA-3854,ok,COAD,True,True,7.1,0.0,,Colon Mucinous Adenocarcinoma,0.0,1096.0,0.0,1096.0,PFI,0.0,1096.0,0.8672,,,True
+TCGA-A6-6652,ok,COAD,True,True,5.9,1.0,,Colon Adenocarcinoma,0.0,751.0,0.0,751.0,PFI,0.0,751.0,0.9147,,,True
+TCGA-AA-3553,ok,COAD,True,True,6.1,0.0,,Colon Adenocarcinoma,0.0,730.0,0.0,730.0,PFI,0.0,730.0,0.7409,,,True
+TCGA-AD-A5EK,ok,COAD,True,True,5.1,0.0,,Colon Adenocarcinoma,0.0,500.0,0.0,500.0,PFI,0.0,500.0,0.9682,,,True
+TCGA-NH-A6GC,ok,COAD,True,True,6.6,1.0,,Colon Mucinous Adenocarcinoma,0.0,389.0,0.0,389.0,PFI,0.0,389.0,0.8361,,,True
+TCGA-AA-A00E,ok,COAD,True,True,6.5,0.0,,Colon Adenocarcinoma,0.0,913.0,0.0,913.0,PFI,0.0,913.0,0.7108,,,True
+TCGA-AZ-4313,ok,COAD,True,True,5.1,0.0,,Colon Adenocarcinoma,0.0,2310.0,0.0,2310.0,PFI,0.0,2310.0,0.746,,,True
+TCGA-F4-6570,ok,COAD,True,True,7.8,0.0,,Colon Adenocarcinoma,1.0,188.0,0.0,188.0,PFI,0.0,188.0,0.6576,,,True
+TCGA-DM-A1DA,ok,COAD,True,True,7.1,1.0,,Colon Adenocarcinoma,1.0,228.0,0.0,228.0,PFI,0.0,228.0,0.8875,,,True
+TCGA-AA-3811,ok,COAD,True,True,8.4,1.0,,Colon Adenocarcinoma,1.0,306.0,1.0,306.0,PFI,1.0,306.0,0.6996,,,True
+TCGA-CM-4743,ok,COAD,True,True,6.9,0.0,,Colon Adenocarcinoma,0.0,701.0,0.0,701.0,PFI,0.0,701.0,0.5612,,,True
+TCGA-A6-4107,ok,COAD,True,True,5.7,1.0,,Colon Adenocarcinoma,0.0,987.0,0.0,987.0,PFI,0.0,987.0,0.7697,,,True
+TCGA-CM-6165,ok,COAD,True,True,7.4,0.0,,Colon Adenocarcinoma,0.0,488.0,0.0,488.0,PFI,0.0,488.0,0.8835,,,True
+TCGA-DM-A28G,ok,COAD,True,True,7.5,0.0,,Colon Adenocarcinoma,1.0,1849.0,0.0,1849.0,PFI,0.0,1849.0,0.9182,,,True
+TCGA-AA-3845,ok,COAD,True,True,8.6,0.0,,Colon Adenocarcinoma,1.0,0.0,1.0,0.0,PFI,1.0,0.0,0.7169,,,False
+TCGA-A6-2685,ok,COAD,True,True,4.8,0.0,,Colon Adenocarcinoma,0.0,1133.0,1.0,948.0,PFI,1.0,948.0,0.6328,,,True
+TCGA-CM-6169,ok,COAD,True,True,6.7,0.0,,Colon Adenocarcinoma,0.0,396.0,0.0,396.0,PFI,0.0,396.0,0.6415,,,True
+TCGA-G4-6309,ok,COAD,True,True,4.0,1.0,,Colon Adenocarcinoma,0.0,2600.0,1.0,2176.0,PFI,1.0,2176.0,0.9214,,,True
+TCGA-AD-6888,ok,COAD,True,True,7.3,1.0,,Colon Adenocarcinoma,1.0,472.0,1.0,343.0,PFI,1.0,343.0,0.7802,,,True
+TCGA-CK-4952,ok,COAD,True,True,4.8,1.0,,Colon Mucinous Adenocarcinoma,0.0,475.0,0.0,475.0,PFI,0.0,475.0,0.8372,,,True
+TCGA-AA-3534,ok,COAD,True,True,7.8,0.0,,Colon Adenocarcinoma,0.0,882.0,0.0,882.0,PFI,0.0,882.0,0.7352,,,True
+TCGA-AD-6963,ok,COAD,True,True,5.8,,,Colon Adenocarcinoma,0.0,834.0,0.0,834.0,PFI,0.0,834.0,0.6548,,,False
+TCGA-CM-5349,ok,COAD,True,True,6.8,0.0,,Colon Adenocarcinoma,0.0,915.0,0.0,915.0,PFI,0.0,915.0,0.7367,,,True
+TCGA-AZ-6606,ok,COAD,True,True,8.1,1.0,,Colon Adenocarcinoma,1.0,357.0,1.0,357.0,PFI,1.0,357.0,0.8824,,,True
+TCGA-AA-A02W,ok,COAD,True,True,7.3,0.0,,Colon Adenocarcinoma,0.0,1247.0,1.0,1005.0,PFI,1.0,1005.0,0.8361,,,True
+TCGA-CM-5348,ok,COAD,True,True,7.2,1.0,,Colon Adenocarcinoma,0.0,699.0,0.0,699.0,PFI,0.0,699.0,0.7174,,,True
+TCGA-G4-6626,ok,COAD,True,True,9.0,0.0,,Colon Adenocarcinoma,1.0,1422.0,0.0,1422.0,PFI,0.0,1422.0,0.7946,,,True
+TCGA-AA-3837,ok,COAD,True,True,6.7,0.0,,Colon Mucinous Adenocarcinoma,0.0,1186.0,0.0,1186.0,PFI,0.0,1186.0,0.6837,,,True
+TCGA-AA-3971,ok,COAD,True,True,5.8,1.0,,Colon Adenocarcinoma,0.0,489.0,0.0,489.0,PFI,0.0,489.0,0.7108,,,True
+TCGA-AA-A00W,ok,COAD,True,True,8.0,0.0,,Colon Adenocarcinoma,0.0,456.0,0.0,456.0,PFI,0.0,456.0,0.8929,,,True
+TCGA-A6-A566,ok,COAD,True,True,5.5,1.0,,Colon Mucinous Adenocarcinoma,1.0,758.0,1.0,257.0,PFI,1.0,257.0,0.5854,,,True
+TCGA-G4-6307,ok,COAD,True,True,3.7,1.0,,Colon Adenocarcinoma,0.0,1674.0,0.0,1674.0,PFI,0.0,1674.0,0.8348,,,True
+TCGA-AA-A01C,ok,COAD,True,True,7.5,1.0,,Colon Adenocarcinoma,0.0,457.0,0.0,457.0,PFI,0.0,457.0,0.7121,,,True
+TCGA-A6-2680,ok,COAD,True,True,7.2,0.0,,Colon Adenocarcinoma,0.0,1068.0,0.0,1068.0,PFI,0.0,1068.0,0.769,,,True
+TCGA-A6-6140,ok,COAD,True,True,6.2,0.0,,Colon Adenocarcinoma,0.0,734.0,0.0,734.0,PFI,0.0,734.0,0.8851,,,True
+TCGA-CM-6161,ok,COAD,True,True,3.6,0.0,,Colon Adenocarcinoma,0.0,457.0,0.0,457.0,PFI,0.0,457.0,0.8054,,,True
+TCGA-D5-6529,ok,COAD,True,True,6.9,0.0,,Colon Adenocarcinoma,0.0,614.0,1.0,386.0,PFI,1.0,386.0,0.6063,,,True
+TCGA-A6-2677,ok,COAD,True,True,6.8,1.0,,Colon Adenocarcinoma,1.0,740.0,0.0,740.0,PFI,0.0,740.0,0.8869,,,True
+TCGA-AA-3949,ok,COAD,True,True,8.7,1.0,,Colon Mucinous Adenocarcinoma,0.0,791.0,0.0,791.0,PFI,0.0,791.0,0.769,,,True
+TCGA-AA-A01K,ok,COAD,True,True,7.4,1.0,,Colon Adenocarcinoma,0.0,943.0,0.0,943.0,PFI,0.0,943.0,0.7778,,,True
+TCGA-A6-5659,ok,COAD,True,True,8.2,0.0,,Colon Adenocarcinoma,0.0,926.0,0.0,926.0,PFI,0.0,926.0,0.8,,,True
+TCGA-AA-A02H,ok,COAD,True,True,7.4,1.0,,Colon Adenocarcinoma,1.0,61.0,1.0,61.0,PFI,1.0,61.0,0.8631,,,True
+TCGA-AA-3518,ok,COAD,True,True,8.1,0.0,,Colon Adenocarcinoma,0.0,31.0,0.0,31.0,PFI,0.0,31.0,0.6668,,,True
+TCGA-F4-6569,ok,COAD,True,True,6.0,0.0,,Colon Adenocarcinoma,0.0,1087.0,0.0,1087.0,PFI,0.0,1087.0,0.6038,,,True
+TCGA-D5-6534,ok,COAD,True,True,6.2,0.0,,Colon Mucinous Adenocarcinoma,0.0,1316.0,0.0,1316.0,PFI,0.0,1316.0,0.5402,,,True
+TCGA-G4-6302,ok,COAD,True,True,9.0,0.0,,Colon Mucinous Adenocarcinoma,1.0,2047.0,0.0,2047.0,PFI,0.0,2047.0,0.6167,,,True
+TCGA-D5-7000,ok,COAD,True,True,7.9,0.0,,Colon Mucinous Adenocarcinoma,0.0,312.0,0.0,312.0,PFI,0.0,312.0,0.7947,,,True
+TCGA-CA-6716,ok,COAD,True,True,6.5,0.0,,Colon Adenocarcinoma,0.0,371.0,0.0,371.0,PFI,0.0,371.0,0.8988,,,True
+TCGA-AA-3696,ok,COAD,True,True,7.5,1.0,,Colon Adenocarcinoma,1.0,153.0,1.0,153.0,PFI,1.0,153.0,0.8929,,,True
+TCGA-DM-A28A,ok,COAD,True,True,7.8,1.0,,Colon Adenocarcinoma,1.0,805.0,0.0,805.0,PFI,0.0,805.0,0.9182,,,True
+TCGA-AA-3527,ok,COAD,True,True,9.0,0.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.8374,,,False
+TCGA-G4-6586,ok,COAD,True,True,7.3,0.0,,Colon Adenocarcinoma,0.0,1089.0,0.0,1089.0,PFI,0.0,1089.0,0.8531,,,True
+TCGA-AY-6196,ok,COAD,True,True,4.7,1.0,,Colon Mucinous Adenocarcinoma,0.0,6.0,0.0,6.0,PFI,0.0,6.0,0.5077,,,True
+TCGA-CK-4948,ok,COAD,True,True,4.5,1.0,,Colon Adenocarcinoma,0.0,4502.0,0.0,4502.0,PFI,0.0,4502.0,0.6854,,,True
+TCGA-D5-6927,ok,COAD,True,True,3.4,0.0,,Colon Adenocarcinoma,0.0,287.0,0.0,287.0,PFI,0.0,287.0,0.7466,,,True
+TCGA-A6-5660,ok,COAD,True,True,7.3,1.0,,Colon Adenocarcinoma,0.0,888.0,0.0,888.0,PFI,0.0,888.0,0.8604,,,True
+TCGA-NH-A5IV,ok,COAD,True,True,9.0,0.0,,Colon Adenocarcinoma,0.0,588.0,0.0,588.0,PFI,0.0,588.0,0.7855,,,True
+TCGA-AA-3966,ok,COAD,True,True,8.9,0.0,,Colon Mucinous Adenocarcinoma,0.0,61.0,0.0,61.0,PFI,0.0,61.0,0.7636,,,True
+TCGA-AA-3956,ok,COAD,True,True,6.5,0.0,,Colon Adenocarcinoma,0.0,1035.0,0.0,1035.0,PFI,0.0,1035.0,0.7555,,,True
+TCGA-A6-2682,ok,COAD,True,True,7.0,1.0,,Colon Adenocarcinoma,1.0,424.0,1.0,381.0,PFI,1.0,381.0,0.7927,,,True
+TCGA-AA-3664,ok,COAD,True,True,7.4,0.0,,Colon Adenocarcinoma,0.0,1643.0,0.0,1643.0,PFI,0.0,1643.0,0.9566,,,True
+TCGA-CA-6717,ok,COAD,True,True,5.7,0.0,,Colon Mucinous Adenocarcinoma,0.0,388.0,0.0,388.0,PFI,0.0,388.0,0.6109,,,True
+TCGA-AA-3712,skipped_no_mpp,COAD,False,True,6.5,1.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.7887,,,False
+TCGA-AZ-4308,ok,COAD,True,True,4.7,1.0,,Colon Adenocarcinoma,0.0,3324.0,0.0,3324.0,PFI,0.0,3324.0,0.8171,,,True
+TCGA-DM-A285,ok,COAD,True,True,7.1,1.0,,Colon Mucinous Adenocarcinoma,1.0,179.0,0.0,179.0,PFI,0.0,179.0,0.7305,,,True
+TCGA-A6-4105,ok,COAD,True,True,7.9,0.0,,Colon Adenocarcinoma,1.0,442.0,1.0,364.0,PFI,1.0,364.0,0.7533,,,True
+TCGA-SS-A7HO,ok,COAD,True,True,4.4,0.0,,Colon Adenocarcinoma,0.0,1829.0,1.0,506.0,PFI,1.0,506.0,0.7578,,,True
+TCGA-AA-3489,skipped_no_mpp,COAD,False,True,7.5,0.0,,Colon Adenocarcinoma,1.0,214.0,1.0,214.0,PFI,1.0,214.0,0.4634,,,False
+TCGA-CK-5915,ok,COAD,True,True,6.3,0.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.9667,,,False
+TCGA-NH-A50V,ok,COAD,True,True,6.9,1.0,,Colon Adenocarcinoma,0.0,588.0,0.0,588.0,PFI,0.0,588.0,0.7894,,,True
+TCGA-CM-5868,ok,COAD,True,True,5.9,1.0,,Colon Adenocarcinoma,0.0,518.0,0.0,518.0,PFI,0.0,518.0,0.7415,,,True
+TCGA-AA-A024,ok,COAD,True,True,8.1,0.0,,Colon Mucinous Adenocarcinoma,1.0,1188.0,0.0,1188.0,PFI,0.0,1188.0,0.8679,,,True
+TCGA-AA-3675,ok,COAD,True,True,8.4,0.0,,Colon Adenocarcinoma,0.0,1431.0,0.0,1431.0,PFI,0.0,1431.0,0.8835,,,True
+TCGA-DM-A0XD,ok,COAD,True,True,6.5,0.0,,Colon Adenocarcinoma,1.0,743.0,1.0,484.0,PFI,1.0,484.0,0.7887,,,True
+TCGA-CK-5916,ok,COAD,True,True,7.1,0.0,,Colon Adenocarcinoma,1.0,643.0,1.0,292.0,PFI,1.0,292.0,0.7022,,,True
+TCGA-A6-2686,ok,COAD,True,True,8.1,0.0,,Colon Adenocarcinoma,1.0,1126.0,0.0,1126.0,PFI,0.0,1126.0,0.6683,,,True
+TCGA-CM-5861,ok,COAD,True,True,6.3,0.0,,Colon Adenocarcinoma,0.0,457.0,1.0,335.0,PFI,1.0,335.0,0.8646,,,True
+TCGA-AZ-4315,ok,COAD,True,True,6.1,0.0,,Colon Adenocarcinoma,0.0,1776.0,0.0,1776.0,PFI,0.0,1776.0,0.79,,,True
+TCGA-DM-A28E,ok,COAD,True,True,7.2,0.0,,Colon Adenocarcinoma,0.0,3648.0,0.0,3648.0,PFI,0.0,3648.0,0.9195,,,True
+TCGA-AA-A029,ok,COAD,True,True,6.7,0.0,,Colon Adenocarcinoma,0.0,1581.0,0.0,1581.0,PFI,0.0,1581.0,0.8577,,,True
+TCGA-A6-5667,ok,COAD,True,True,4.0,1.0,,Colon Adenocarcinoma,0.0,887.0,0.0,887.0,PFI,0.0,887.0,0.8666,,,True
+TCGA-D5-6923,ok,COAD,True,True,5.7,0.0,,Colon Adenocarcinoma,0.0,378.0,0.0,378.0,PFI,0.0,378.0,0.7805,,,True
+TCGA-QG-A5Z2,ok,COAD,True,True,6.1,0.0,,Colon Adenocarcinoma,0.0,952.0,0.0,952.0,PFI,0.0,952.0,0.8806,,,True
+TCGA-D5-6930,ok,COAD,True,True,6.7,0.0,,Colon Mucinous Adenocarcinoma,0.0,406.0,0.0,406.0,PFI,0.0,406.0,0.6844,,,True
+TCGA-AZ-6600,ok,COAD,True,True,6.4,1.0,,Colon Adenocarcinoma,1.0,368.0,1.0,368.0,PFI,1.0,368.0,0.7366,,,True
+TCGA-AA-A01Q,ok,COAD,True,True,4.8,0.0,,Colon Adenocarcinoma,0.0,31.0,0.0,31.0,PFI,0.0,31.0,0.9295,,,True
+TCGA-AA-3685,ok,COAD,True,True,6.9,0.0,,Colon Adenocarcinoma,0.0,1127.0,0.0,1127.0,PFI,0.0,1127.0,0.7318,,,True
+TCGA-A6-5665,ok,COAD,True,True,8.4,0.0,,Colon Adenocarcinoma,0.0,671.0,1.0,529.0,PFI,1.0,529.0,0.8448,,,True
+TCGA-G4-6298,ok,COAD,True,True,9.0,1.0,,Colon Adenocarcinoma,1.0,715.0,1.0,291.0,PFI,1.0,291.0,0.7918,,,True
+TCGA-G4-6588,ok,COAD,True,True,5.8,0.0,,Colon Adenocarcinoma,0.0,796.0,0.0,796.0,PFI,0.0,796.0,0.7913,,,True
+TCGA-CM-6675,ok,COAD,True,True,3.5,1.0,,Colon Adenocarcinoma,0.0,397.0,1.0,337.0,PFI,1.0,337.0,0.9288,,,True
+TCGA-G4-6299,ok,COAD,True,True,6.9,1.0,,Colon Adenocarcinoma,0.0,2268.0,0.0,2268.0,PFI,0.0,2268.0,0.6996,,,True
+TCGA-AA-3819,ok,COAD,True,True,4.1,0.0,,Colon Adenocarcinoma,0.0,761.0,0.0,761.0,PFI,0.0,761.0,0.7609,,,True
+TCGA-CA-5797,ok,COAD,True,True,5.6,0.0,,Colon Adenocarcinoma,0.0,383.0,0.0,383.0,PFI,0.0,383.0,0.8122,,,True
+TCGA-F4-6855,ok,COAD,True,True,7.0,0.0,,Colon Adenocarcinoma,0.0,1442.0,0.0,1442.0,PFI,0.0,1442.0,0.726,,,True
+TCGA-AA-A00J,ok,COAD,True,True,8.0,1.0,,Colon Mucinous Adenocarcinoma,0.0,549.0,0.0,549.0,PFI,0.0,549.0,0.9329,,,True
+TCGA-CM-4752,ok,COAD,True,True,5.8,0.0,,Colon Adenocarcinoma,0.0,396.0,0.0,396.0,PFI,0.0,396.0,0.5893,,,True
+TCGA-QG-A5YV,ok,COAD,True,True,6.4,1.0,,Colon Adenocarcinoma,0.0,1301.0,0.0,1301.0,PFI,0.0,1301.0,0.8848,,,True
+TCGA-AU-3779,ok,COAD,True,True,8.0,0.0,,Colon Adenocarcinoma,0.0,441.0,0.0,441.0,PFI,0.0,441.0,0.7508,,,True
+TCGA-AZ-6603,ok,COAD,True,True,7.7,,,Colon Adenocarcinoma,1.0,899.0,0.0,899.0,PFI,0.0,899.0,0.7362,,,False
+TCGA-AA-3984,ok,COAD,True,True,6.1,0.0,,Colon Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.641,,,False
+TCGA-D5-6541,ok,COAD,True,True,4.9,0.0,,Colon Adenocarcinoma,0.0,474.0,0.0,474.0,PFI,0.0,474.0,0.6845,,,True
+TCGA-AA-A02J,ok,COAD,True,True,7.0,1.0,,Colon Adenocarcinoma,1.0,153.0,1.0,153.0,PFI,1.0,153.0,0.8835,,,True
+TCGA-DM-A28K,ok,COAD,True,True,7.5,0.0,,Colon Mucinous Adenocarcinoma,0.0,2988.0,0.0,2988.0,PFI,0.0,2988.0,0.8406,,,True
+TCGA-AA-3684,ok,COAD,True,True,6.5,1.0,,Colon Mucinous Adenocarcinoma,0.0,0.0,0.0,0.0,PFI,0.0,0.0,0.6632,,,False
+TCGA-CM-6164,ok,COAD,True,True,4.6,0.0,,Colon Adenocarcinoma,0.0,883.0,0.0,883.0,PFI,0.0,883.0,0.6806,,,True
+TCGA-CM-4748,ok,COAD,True,True,5.3,1.0,,Colon Mucinous Adenocarcinoma,0.0,792.0,0.0,792.0,PFI,0.0,792.0,0.7527,,,True
+TCGA-AA-3831,ok,COAD,True,True,6.6,0.0,,Colon Adenocarcinoma,0.0,547.0,0.0,547.0,PFI,0.0,547.0,0.771,,,True
+TCGA-DM-A0XF,ok,COAD,True,True,6.8,1.0,,[Discrepancy],1.0,1162.0,0.0,1162.0,PFI,0.0,1162.0,0.7395,,,True
+TCGA-D5-5538,ok,COAD,True,True,6.0,1.0,,Colon Adenocarcinoma,1.0,1661.0,1.0,1007.0,PFI,1.0,1007.0,0.6791,,,True
+TCGA-AA-A00Q,ok,COAD,True,True,6.6,1.0,,Colon Adenocarcinoma,0.0,1278.0,0.0,1278.0,PFI,0.0,1278.0,0.7034,,,True
+TCGA-A6-6138,ok,COAD,True,True,6.1,0.0,,Colon Adenocarcinoma,0.0,685.0,0.0,685.0,PFI,0.0,685.0,0.7069,,,True
+TCGA-D5-6924,ok,COAD,True,True,6.8,0.0,,Colon Adenocarcinoma,0.0,435.0,0.0,435.0,PFI,0.0,435.0,0.6632,,,True
+TCGA-D5-6539,ok,COAD,True,True,4.5,,,Colon Adenocarcinoma,0.0,380.0,0.0,380.0,PFI,0.0,380.0,0.684,,,False
+TCGA-AA-3833,ok,COAD,True,True,6.3,0.0,,Colon Adenocarcinoma,0.0,485.0,0.0,485.0,PFI,0.0,485.0,0.5097,,,True
+TCGA-CK-6751,ok,COAD,True,True,8.8,0.0,,Colon Mucinous Adenocarcinoma,0.0,3780.0,0.0,3780.0,PFI,0.0,3780.0,0.7702,,,True
+TCGA-AM-5821,ok,COAD,True,True,6.8,0.0,,Colon Adenocarcinoma,0.0,28.0,0.0,28.0,PFI,0.0,28.0,0.6289,,,True
+TCGA-AA-3521,ok,COAD,True,True,8.7,0.0,,Colon Adenocarcinoma,0.0,,0.0,,PFI,0.0,,0.8137,,,False
+TCGA-QL-A97D,ok,COAD,True,True,8.4,0.0,,Colon Adenocarcinoma,0.0,666.0,0.0,666.0,PFI,0.0,666.0,0.7752,,,True
+TCGA-AA-A01V,ok,COAD,True,True,5.9,0.0,,Colon Adenocarcinoma,0.0,31.0,0.0,31.0,PFI,0.0,31.0,0.7913,,,True
+TCGA-AA-3856,ok,COAD,True,True,5.9,0.0,,Colon Adenocarcinoma,0.0,30.0,0.0,30.0,PFI,0.0,30.0,0.7825,,,True
+TCGA-AA-A01X,ok,COAD,True,True,8.0,1.0,,Colon Adenocarcinoma,0.0,791.0,1.0,791.0,PFI,1.0,791.0,0.836,,,True
+TCGA-AZ-6607,ok,COAD,True,True,6.9,1.0,,Colon Adenocarcinoma,1.0,97.0,1.0,97.0,PFI,1.0,97.0,0.6945,,,True
+TCGA-DM-A0X9,ok,COAD,True,True,7.1,0.0,,Colon Adenocarcinoma,0.0,3641.0,0.0,3641.0,PFI,0.0,3641.0,0.8374,,,True
+TCGA-AA-A01I,ok,COAD,True,True,7.6,0.0,,Colon Adenocarcinoma,0.0,943.0,0.0,943.0,PFI,0.0,943.0,0.7331,,,True
+TCGA-A6-6654,ok,COAD,True,True,6.5,1.0,,Colon Adenocarcinoma,0.0,726.0,0.0,726.0,PFI,0.0,726.0,0.5196,,,True
+TCGA-AZ-6605,ok,COAD,True,True,7.7,1.0,,Colon Adenocarcinoma,1.0,159.0,0.0,159.0,PFI,0.0,159.0,0.6114,,,True
+TCGA-AA-3851,ok,COAD,True,True,7.4,0.0,,Colon Adenocarcinoma,0.0,1006.0,0.0,1006.0,PFI,0.0,1006.0,0.7233,,,True
+TCGA-F4-6809,ok,COAD,True,True,5.2,1.0,,Colon Adenocarcinoma,1.0,403.0,1.0,403.0,PFI,1.0,403.0,0.7033,,,True
+TCGA-AZ-4682,ok,COAD,True,True,6.1,1.0,,Colon Adenocarcinoma,1.0,680.0,1.0,680.0,PFI,1.0,680.0,0.8671,,,True
+TCGA-AA-3975,ok,COAD,True,True,8.0,0.0,,Colon Adenocarcinoma,0.0,1036.0,0.0,1036.0,PFI,0.0,1036.0,0.8022,,,True
+TCGA-G4-6295,ok,COAD,True,True,7.0,0.0,,Colon Adenocarcinoma,0.0,254.0,0.0,254.0,PFI,0.0,254.0,0.8042,,,True
+TCGA-CK-4950,ok,COAD,True,True,6.8,1.0,,Colon Mucinous Adenocarcinoma,0.0,2599.0,0.0,2599.0,PFI,0.0,2599.0,0.6376,,,True
+TCGA-CM-6170,ok,COAD,True,True,7.3,0.0,,Colon Adenocarcinoma,0.0,457.0,0.0,457.0,PFI,0.0,457.0,0.7895,,,True
+TCGA-AA-3875,ok,COAD,True,True,7.8,0.0,,Colon Adenocarcinoma,0.0,549.0,0.0,549.0,PFI,0.0,549.0,0.576,,,True
+TCGA-AA-3982,ok,COAD,True,True,7.5,1.0,,Colon Adenocarcinoma,0.0,822.0,0.0,822.0,PFI,0.0,822.0,0.5632,,,True
+TCGA-D5-6932,ok,COAD,True,True,6.9,0.0,,Colon Adenocarcinoma,0.0,346.0,0.0,346.0,PFI,0.0,346.0,0.7758,,,True
+TCGA-A6-3808,ok,COAD,True,True,7.3,0.0,,Colon Adenocarcinoma,0.0,1014.0,0.0,1014.0,PFI,0.0,1014.0,0.7019,,,True
+TCGA-A6-5657,ok,COAD,True,True,6.5,1.0,,Colon Adenocarcinoma,0.0,962.0,0.0,962.0,PFI,0.0,962.0,0.647,,,True
+TCGA-DM-A1D7,ok,COAD,True,True,8.2,0.0,,[Discrepancy],1.0,405.0,1.0,80.0,PFI,1.0,80.0,0.8295,,,True
+TCGA-AA-3510,skipped_no_mpp,COAD,False,True,7.0,0.0,,Colon Adenocarcinoma,0.0,1946.0,0.0,1946.0,PFI,0.0,1946.0,0.8091,,,False
+TCGA-G4-6293,ok,COAD,True,True,4.9,1.0,,Colon Adenocarcinoma,0.0,4051.0,0.0,4051.0,PFI,0.0,4051.0,0.7764,,,True
+TCGA-D5-6931,ok,COAD,True,True,7.7,1.0,,Colon Adenocarcinoma,0.0,365.0,0.0,365.0,PFI,0.0,365.0,0.7901,,,True
+TCGA-CM-6162,ok,COAD,True,True,4.8,1.0,,Colon Mucinous Adenocarcinoma,0.0,365.0,0.0,365.0,PFI,0.0,365.0,0.5884,,,True
+TCGA-AA-A03F,ok,COAD,True,True,9.0,1.0,,Colon Mucinous Adenocarcinoma,1.0,549.0,1.0,549.0,PFI,1.0,549.0,0.8455,,,True
+TCGA-AA-3855,ok,COAD,True,True,7.2,0.0,,Colon Adenocarcinoma,0.0,975.0,0.0,975.0,PFI,0.0,975.0,0.6905,,,True
+TCGA-AA-A00O,ok,COAD,True,True,8.3,1.0,,Colon Adenocarcinoma,0.0,822.0,0.0,822.0,PFI,0.0,822.0,0.7934,,,True
+TCGA-AA-3976,ok,COAD,True,True,7.0,1.0,,Colon Adenocarcinoma,0.0,791.0,0.0,791.0,PFI,0.0,791.0,0.8022,,,True
+TCGA-AA-3529,ok,COAD,True,True,7.8,1.0,,Colon Adenocarcinoma,1.0,0.0,1.0,0.0,PFI,1.0,0.0,0.6945,,,False
+TCGA-AA-A01P,ok,COAD,True,True,8.0,1.0,,Colon Adenocarcinoma,1.0,1158.0,1.0,762.0,PFI,1.0,762.0,0.6147,,,True
+TCGA-AA-3506,skipped_no_mpp,COAD,False,True,7.7,0.0,,Colon Adenocarcinoma,0.0,1765.0,0.0,1765.0,PFI,0.0,1765.0,0.7979,,,False
+TCGA-AA-3530,ok,COAD,True,True,8.0,0.0,,Colon Adenocarcinoma,0.0,580.0,0.0,580.0,PFI,0.0,580.0,0.8619,,,True
+TCGA-G4-6320,ok,COAD,True,True,7.3,1.0,,Colon Adenocarcinoma,0.0,804.0,0.0,804.0,PFI,0.0,804.0,0.7965,,,True
+TCGA-AA-3544,ok,COAD,True,True,6.8,0.0,,Colon Adenocarcinoma,0.0,426.0,0.0,426.0,PFI,0.0,426.0,0.7673,,,True
+TCGA-AA-3519,ok,COAD,True,True,6.3,1.0,,Colon Adenocarcinoma,0.0,276.0,0.0,276.0,PFI,0.0,276.0,0.7721,,,True
+TCGA-AA-3818,ok,COAD,True,True,7.8,0.0,,Colon Adenocarcinoma,1.0,30.0,1.0,30.0,PFI,1.0,30.0,0.9281,,,True
+TCGA-G4-6306,ok,COAD,True,True,7.1,,,Colon Adenocarcinoma,0.0,1359.0,0.0,1359.0,PFI,0.0,1359.0,0.8287,,,False
+TCGA-AA-A02Y,ok,COAD,True,True,7.3,0.0,,Colon Adenocarcinoma,0.0,1216.0,0.0,1216.0,PFI,0.0,1216.0,0.8835,,,True
+TCGA-AY-A69D,ok,COAD,True,True,5.5,0.0,,Colon Adenocarcinoma,0.0,543.0,0.0,543.0,PFI,0.0,543.0,0.751,,,True
+TCGA-D5-6530,ok,COAD,True,True,5.3,0.0,,Colon Adenocarcinoma,0.0,621.0,0.0,621.0,PFI,0.0,621.0,0.7916,,,True
+TCGA-G4-6627,ok,COAD,True,True,8.4,0.0,,Colon Adenocarcinoma,0.0,2275.0,1.0,1003.0,PFI,1.0,1003.0,0.6509,,,True
+TCGA-WS-AB45,ok,COAD,True,True,5.2,0.0,,Colon Mucinous Adenocarcinoma,0.0,2130.0,0.0,2130.0,PFI,0.0,2130.0,0.2093,,,True
+TCGA-AA-3532,ok,COAD,True,True,6.3,0.0,,Colon Adenocarcinoma,0.0,882.0,0.0,882.0,PFI,0.0,882.0,0.6397,,,True
+TCGA-A6-3807,ok,COAD,True,True,5.3,1.0,,Colon Adenocarcinoma,0.0,1054.0,0.0,1054.0,PFI,0.0,1054.0,0.679,,,True
+TCGA-AA-3552,ok,COAD,True,True,8.5,1.0,,Colon Adenocarcinoma,1.0,396.0,1.0,122.0,PFI,1.0,122.0,0.7236,,,True
+TCGA-CK-4947,ok,COAD,True,True,4.6,1.0,,Colon Adenocarcinoma,0.0,534.0,1.0,21.0,PFI,1.0,21.0,0.7223,,,True
+TCGA-AA-A02R,ok,COAD,True,True,8.4,0.0,,Colon Adenocarcinoma,1.0,670.0,1.0,670.0,PFI,1.0,670.0,0.8679,,,True
+TCGA-AA-3680,ok,COAD,True,True,6.7,1.0,,Colon Adenocarcinoma,1.0,335.0,1.0,335.0,PFI,1.0,335.0,0.7975,,,True
+TCGA-DM-A1D8,ok,COAD,True,True,5.0,,,Colon Adenocarcinoma,1.0,383.0,0.0,383.0,PFI,0.0,383.0,0.8736,,,False
+TCGA-AA-A01G,ok,COAD,True,True,6.3,0.0,,Colon Mucinous Adenocarcinoma,0.0,365.0,0.0,365.0,PFI,0.0,365.0,0.656,,,True
+TCGA-G4-6311,ok,COAD,True,True,8.0,1.0,,Colon Adenocarcinoma,0.0,1199.0,0.0,1199.0,PFI,0.0,1199.0,0.7042,,,True
+TCGA-A6-6650,ok,COAD,True,True,6.9,0.0,,Colon Adenocarcinoma,0.0,627.0,0.0,627.0,PFI,0.0,627.0,0.775,,,True
+TCGA-AD-6965,ok,COAD,True,True,6.2,1.0,,Colon Adenocarcinoma,0.0,805.0,1.0,648.0,PFI,1.0,648.0,0.8692,,,True
+TCGA-AA-3950,ok,COAD,True,True,7.9,0.0,,Colon Mucinous Adenocarcinoma,0.0,730.0,0.0,730.0,PFI,0.0,730.0,0.6508,,,True
+TCGA-4T-AA8H,ok,COAD,True,True,4.2,0.0,,Colon Mucinous Adenocarcinoma,0.0,385.0,0.0,385.0,PFI,0.0,385.0,0.8917,,,True
