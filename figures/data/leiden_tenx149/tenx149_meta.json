@@ -1,0 +1,12 @@
+{
+  "cancer": "COAD",
+  "sample": "TENX149",
+  "n_spots": 3620,
+  "gt_resolution": 0.3,
+  "gt_n_clusters": 6,
+  "ari_scores": {
+    "ePathST-E": 0.5816559961666018,
+    "ePathST": 0.6621270765537066,
+    "H-Optimus-0": 0.6861501583661261
+  }
+}

@@ -1,0 +1,12 @@
+model,params_M,rel_size,avg_pcc,slides,patients,tiles,tile_note,access,source,evidence
+GigaPath,1135,216.19×,0.3646,"171,189",">30,000",1.38 B,256×256 px tiles,Private,Providence Health (28 cancer centers),"exact; Xu et al., Nature 2024"
+H-Optimus-0,1134,216.00×,0.3913,">500,000",n/r,n/r†,—,Private,"Bioptimus (4,000+ clinical centers†)",slides: model card + GenBio-PathFM Table B9; tiles/centers: press only
+GenBio-PathFM,1133,215.94×,0.3924,≈177 k,n/r,≈400 M,curated set per stage,Public,"HistAI, TCGA, GTEx, REG",GenBio-PathFM preprint Tables B8/B9
+UNI2-h,681,129.71×,0.3851,">350,000",n/r,>200 M,—,Private,Mass General Brigham,model card (via search) + GenBio-PathFM Table B9
+Virchow2,632,120.38×,0.3757,3.1 M,"225,401",n/r,5×–40× mixed magnification,Private,Globally diverse institutions,Virchow2 arXiv 2408.00738
+CONCH v1.5,307,58.48×,0.3473,100 k (via UNI),n/r,>100 M (via UNI),+1.17 M image–caption pairs,Private,UNI slides (MGB) + caption pairs,"model card: ViT-L/16 restored from UNI, 1.17 M pairs; UNI size from Kaiko paper + Table B9"
+Kaiko ViT-B/16,86,16.38×,0.3485,29 k,n/r,online sampling,"random crops, no fixed set",Public,TCGA (FFPE + frozen),Kaiko arXiv 2404.15217
+CTransPath,27.5,5.24×,0.3246,≈32 k,n/r,≈15 M,—,Public,TCGA + PAIP,Virchow2 paper ('15M tiles from 32K WSIs'); original paper not opened
+ResNet50,25.5,4.86×,0.3164,—,—,1.28 M images,"ImageNet-1k, natural images",Public,ImageNet-1k (no pathology),HEST repo: timm/resnet50.tv_in1k; ImageNet-1k size from general knowledge
+ePathST-E (ours),3.39,0.65×,0.3438,363,363,"564,312",224 px @ 0.5 µm/px,Public,CPTAC (distilled from H-Optimus-0),"project manifests; 291 training patients / 450,965 training patches"
+ePathST (ours),5.25,1.00×,0.3687,363 (+≤20 HEST),363,"564,312 (+HEST spots)",224 px @ 0.5 µm/px,Public,CPTAC + HEST train samples (graph),project manifests; graph trained on the benchmark's training samples

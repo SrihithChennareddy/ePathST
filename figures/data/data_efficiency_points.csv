@@ -1,0 +1,11 @@
+name,pcc,slides,tiles,access,slide_dx,slide_dy,slide_ha,tile_dx,tile_dy,tile_ha,in_trend
+GigaPath,0.3646,171189,1384860229.0,Private,-7,0,right,-7,-9,right,True
+H-Optimus-0,0.3913,500000,,Private,0,10,center,,,,True
+GenBio-PathFM,0.3924,177000,400000000.0,Public,-7,4,right,-7,6,right,False
+UNI2-h,0.3851,350000,200000000.0,Private,-7,-1,right,7,-11,left,True
+Virchow2,0.3757,3100000.0,,Private,-7,-2,right,,,,True
+CONCH v1.5,0.3473,100000,100000000.0,Private,7,-1,left,7,-10,left,True
+Kaiko ViT-B/16,0.3485,29000,,Public,-7,6,right,,,,True
+CTransPath,0.3246,32220,15000000.0,Public,7,-9,left,7,-3,left,True
+ePathST-E (ours),0.3438,363,564312,Ours,8,-11,left,8,-11,left,False
+ePathST (ours),0.3687,363,564312,Ours,8,5,left,8,5,left,False

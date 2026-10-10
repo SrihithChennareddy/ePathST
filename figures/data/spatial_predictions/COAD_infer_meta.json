@@ -1,0 +1,7 @@
+{
+  "cancer": "COAD",
+  "sample": "TENX148",
+  "gene": "CEACAM6",
+  "r_a8_sample": 0.7856440753051198,
+  "r_hoptimus_sample": 0.38876776353573533
+}

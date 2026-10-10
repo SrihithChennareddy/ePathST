@@ -1,0 +1,12 @@
+label,gflops_per_patch,pcc,ours,dx,dy,text,ha,va
+GenBio-PathFM,1366.96,0.3924,False,0,5.5,,center,bottom
+GigaPath,456.64,0.3646,False,5,-4,Prov-GigaPath,,
+H-Optimus-0,591.9324,0.3913,False,-4,5.5,,right,bottom
+UNI2-h,370.94,0.3851,False,3.5,-3.5,,,
+Virchow2,344.16,0.3757,False,-4,5,,right,bottom
+CONCH v1.5,538.7,0.3473,False,4,-6,,,
+Kaiko ViT-B/16,33.73,0.3485,False,-4,5,,right,
+CTransPath,4.5,0.3246,False,4,3,,,
+ResNet50,4.1,0.3164,False,4,-5.5,,,
+ePathST_CNN,1.1035,0.3438,True,0.5,-7,ePathST-E,left,top
+ePathST_CNNGNN,1.1104,0.3687,True,0.5,6.5,ePathST,left,bottom
