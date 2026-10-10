@@ -1,0 +1,4 @@
+cancer,head,n_test_folds,train_slides_per_fold_min,train_slides_per_fold_max,n_seeds
+BRCA,IDC,4,2,2,2
+COAD,COAD,2,1,2,2
+KIRC,CCRCC,6,17,17,2

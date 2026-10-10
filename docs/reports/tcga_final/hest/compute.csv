@@ -1,0 +1,4 @@
+model,patch_px,GMACs_per_patch,tool
+student (distilled ConvNeXt V2-Atto),224,0.55173376,"fvcore (counts MACs, not FLOPs)"
+H-Optimus-0 teacher,224,295.966176768,"fvcore (counts MACs, not FLOPs)"
+ResNet-50 (old repo's own comparator),224,4.111512576,"fvcore (counts MACs, not FLOPs)"

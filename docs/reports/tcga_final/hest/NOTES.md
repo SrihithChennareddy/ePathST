@@ -1,0 +1,5 @@
+# Step 9 notes
+
+9.3 scale ablation: the only on-disk local/meso/macro/union/scale-aware ablation grid (experimental_runs/*_job88050_official_hest_ablation_grid and the earlier full A0-A9 grid referenced in docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md) is the same untraceable-to-the-current-pipeline run as the old paper numbers (trained on the ~200-slide cohort, not the official benchmark folds now on disk). Per the guide's fallback: dropped from the main text; the GNN is described as one system (P).
+
+9.4 secondary table: the on-disk official_hest_benchmark run (job 84871) only benchmarked 2 encoders under the HEST linear-probe protocol (PCA-256 + Ridge): distilled_convnextv2_atto (ePathST-E, mean PCC 0.3144 across IDC/COAD/CCRCC -- matches the repo's cited value) and genbio_pathfm. The full 9-foundation-model comparison table is not available from any on-disk artifact without either citing HEST's own published numbers externally or running a new benchmark, neither of which fits 'no training, reading outputs only' -- not fabricated here.
