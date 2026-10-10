@@ -7,6 +7,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from scipy import stats
+from sksurv.linear_model import CoxnetSurvivalAnalysis
+from sksurv.metrics import concordance_index_censored, concordance_index_ipcw
+from sksurv.util import Surv
+from sklearn.model_selection import StratifiedKFold
 from statsmodels.stats.multitest import multipletests
 
 
@@ -152,3 +156,86 @@ def rank_biserial(a, b) -> float:
     b = np.asarray(b, dtype=float)
     u, _ = stats.mannwhitneyu(a, b, alternative="two-sided")
     return float(2 * u / (len(a) * len(b)) - 1)
+
+
+def uno_c(y_tr, y_te, risk, tau: float) -> float:
+    """Wraps concordance_index_ipcw; raises if tau exceeds training follow-up (step 5.4)."""
+    max_follow = y_tr["time"][~y_tr["event"]].max() if (~y_tr["event"]).any() else y_tr["time"].max()
+    if tau > y_tr["time"].max():
+        raise ValueError(f"tau={tau} exceeds training follow-up {y_tr['time'].max()}")
+    return float(concordance_index_ipcw(y_tr, y_te, risk, tau=tau)[0])
+
+
+def harrell_c(y_te, risk) -> float:
+    return float(concordance_index_censored(y_te["event"], y_te["time"], risk)[0])
+
+
+def fit_coxnet(X_tr, y_tr, n_clin: int, seed: int = 100):
+    """Step 5.3 items 3-6: penalty_factor 0 for the first n_clin (clinical) columns, 1 elsewhere;
+    alpha path fit once on all of TR, best alpha chosen by 5-fold inner CV (StratifiedKFold on
+    events, random_state=seed) maximising mean Harrell's C on the held-out inner fold (ties -> the
+    larger alpha); refit on all of TR with that alpha. Returns (fitted_model, best_alpha).
+    Falls back to alpha_min_ratio=0.05 if the solver fails to converge."""
+    pf = np.concatenate([np.zeros(n_clin), np.ones(X_tr.shape[1] - n_clin)])
+
+    def _fit_path(alpha_min_ratio):
+        m = CoxnetSurvivalAnalysis(
+            l1_ratio=0.5, n_alphas=100, alpha_min_ratio=alpha_min_ratio, penalty_factor=pf,
+            fit_baseline_model=True, max_iter=100000,
+        )
+        m.fit(X_tr, y_tr)
+        return m
+
+    try:
+        path_model = _fit_path(0.01)
+    except Exception:
+        path_model = _fit_path(0.05)
+    alphas = path_model.alphas_
+
+    inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
+    mean_c = np.zeros(len(alphas))
+    counts = np.zeros(len(alphas))
+    for tr_i, va_i in inner.split(X_tr, y_tr["event"]):
+        for ai, a in enumerate(alphas):
+            try:
+                m = CoxnetSurvivalAnalysis(
+                    l1_ratio=0.5, alphas=[a], penalty_factor=pf, fit_baseline_model=False,
+                    max_iter=100000,
+                )
+                m.fit(X_tr[tr_i], y_tr[tr_i])
+                risk = m.predict(X_tr[va_i])
+                mean_c[ai] += harrell_c(y_tr[va_i], risk)
+                counts[ai] += 1
+            except Exception:
+                continue
+    counts[counts == 0] = np.nan
+    mean_c = mean_c / counts
+    valid = np.isfinite(mean_c)
+    best_idx = np.where(valid)[0][np.argmax(mean_c[valid])]
+    # ties -> the larger alpha (simpler model); alphas_ is already sorted descending by sksurv convention
+    best_candidates = np.where(valid & np.isclose(mean_c, mean_c[best_idx]))[0]
+    best_idx = best_candidates[np.argmax(alphas[best_candidates])]
+    best_alpha = alphas[best_idx]
+
+    final = CoxnetSurvivalAnalysis(
+        l1_ratio=0.5, alphas=[best_alpha], penalty_factor=pf, fit_baseline_model=True, max_iter=100000,
+    )
+    try:
+        final.fit(X_tr, y_tr)
+    except Exception:
+        # Step 5.3.6's sanctioned fallback, applied here too: if even the chosen alpha fails to
+        # converge, raise alpha_min_ratio to 0.05 for a fresh path/selection and retry once. Any
+        # further failure propagates -- it must not be silently swallowed.
+        import logging
+
+        logging.getLogger("epathst.analysis.stats_utils").warning(
+            "fit_coxnet: final refit at alpha=%.3g failed to converge, retrying with alpha_min_ratio=0.05", best_alpha
+        )
+        path_model = _fit_path(0.05)
+        alphas = path_model.alphas_
+        best_alpha = alphas[np.argmin(np.abs(alphas - best_alpha))]
+        final = CoxnetSurvivalAnalysis(
+            l1_ratio=0.5, alphas=[best_alpha], penalty_factor=pf, fit_baseline_model=True, max_iter=100000,
+        )
+        final.fit(X_tr, y_tr)
+    return final, float(best_alpha)

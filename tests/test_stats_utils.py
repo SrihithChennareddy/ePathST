@@ -97,3 +97,46 @@ def test_rank_biserial_all_a_greater_than_b():
     a = np.array([10.0, 11.0, 12.0])
     b = np.array([1.0, 2.0, 3.0])
     assert su.rank_biserial(a, b) == 1.0
+
+
+def test_fit_coxnet_selects_true_genes_most_of_20_repeats():
+    from sksurv.util import Surv
+
+    n_genes = 20
+    hits = 0
+    for rep in range(20):
+        rng = np.random.default_rng(rep)
+        n = 300
+        X_genes = rng.normal(size=(n, n_genes))
+        clin = rng.normal(size=(n, 2))
+        beta = np.zeros(n_genes)
+        beta[0], beta[1] = 1.2, -1.0
+        risk_true = X_genes @ beta
+        time = rng.exponential(scale=np.exp(-risk_true / 2) * 5)
+        cens_time = rng.exponential(scale=8, size=n)
+        event = time < cens_time
+        obs_time = np.minimum(time, cens_time)
+        y = Surv.from_arrays(event=event, time=obs_time)
+        X = np.column_stack([clin, X_genes])
+        model, _ = su.fit_coxnet(X, y, n_clin=2, seed=100 + rep)
+        coefs = model.coef_.ravel()[2:]
+        if coefs[0] != 0 and coefs[1] != 0:
+            hits += 1
+    assert hits >= 14  # "most of 20"
+
+
+def test_uno_c_toy_data_scikit_survival_docs():
+    # from the sksurv concordance_index_ipcw docstring example
+    from sksurv.util import Surv
+
+    y_tr = Surv.from_arrays(
+        event=[True, True, True, False, False, True],
+        time=[1, 5, 6, 7, 8, 9],
+    )
+    y_te = Surv.from_arrays(
+        event=[True, False, True, True, False, True],
+        time=[2, 4, 6, 8, 10, 12],
+    )
+    risk = [5, 2, 4, 3, 1, 6]
+    c = su.uno_c(y_tr, y_te, risk, tau=9.0)
+    assert 0.5 <= c <= 1.0
