@@ -1,6 +1,14 @@
 #!/usr/bin/env python
-"""Runs the locked H-optimus-0-distilled ConvNeXt V2-Atto and the ImageNet baseline (A1) on every HEST
-patch, caching 320-D node features with full spot_id<->patch<->embedding integrity checks."""
+"""Student feature extraction for every HEST patch, cached per sample.
+
+Stage 09 of the ePathST pipeline: runs the locked H-optimus-0-distilled ConvNeXt V2-Atto
+("distilled") and the ImageNet baseline A1 ("imagenet") over the patches from
+08_prepare_hest_metadata.py and caches 320-D node features per spot under student_embeddings/,
+which 10_run_patient_cv.py reads.
+
+Each cached file is checked for exact spot_id <-> patch <-> embedding alignment against the
+sample's expression index, so features cannot be attached to the wrong spot.
+"""
 from __future__ import annotations
 
 import argparse
@@ -13,13 +21,19 @@ import torch
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from epathst.data.feature_cache import assert_full_alignment, cache_features, extract_student_features
+from epathst.data.feature_cache import (
+    assert_full_alignment,
+    cache_features,
+    extract_student_features,
+)
 from epathst.models.student import ConvNeXtV2AttoStudent, load_locked_encoder
 from epathst.utils import RunEnvironment, load_config, resolve_run_paths
 
 
 def load_expression_index(sample_id: str, hest_root: Path, hest_samples: pd.DataFrame):
+    """Return the spot ids (obs_names) of a sample's expression matrix as strings."""
     import anndata as ad
+
     row = hest_samples[hest_samples["sample_id"] == sample_id].iloc[0]
     adata = ad.read_h5ad(row["expression_path"])
     return adata.obs_names.astype(str)
@@ -29,8 +43,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/base.yaml")
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--seed", type=int, default=0,
-                     help="which locked-encoder seed to use as the primary distilled features")
+    ap.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="which locked-encoder seed to use as the primary distilled features",
+    )
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
@@ -39,11 +57,12 @@ def main():
     hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
     patch_shard_dir = paths["work_dir"] / "hest_patches"
 
-    # load both encoders
     distilled_checkpoint = paths["student_checkpoints"] / f"locked_encoder_seed{args.seed}.pt"
     encoders = {
         "distilled": load_locked_encoder(
-            torch.load(distilled_checkpoint, map_location=args.device)["encoder_state_dict"], args.device),
+            torch.load(distilled_checkpoint, map_location=args.device)["encoder_state_dict"],
+            args.device,
+        ),
         "imagenet": ConvNeXtV2AttoStudent(pretrained="imagenet").to(args.device).eval(),
     }
     checkpoint_sources = {
@@ -56,28 +75,42 @@ def main():
         for feat_name, encoder in encoders.items():
             out_dir = paths["student_embeddings"] / feat_name
             out_dir.mkdir(parents=True, exist_ok=True)
-            for sample_id, group in tqdm(spot_manifest.groupby("sample_id"), desc=f"HEST features ({feat_name})"):
+            for sample_id, group in tqdm(
+                spot_manifest.groupby("sample_id"), desc=f"HEST features ({feat_name})"
+            ):
                 out_path = out_dir / f"{sample_id}.h5"
                 if out_path.exists():
-                    continue  # resumability: a wall-clock cutoff mid-run should not redo already-cached samples
+                    continue  # resume: skip samples cached before a wall-clock cutoff
                 with h5py.File(patch_shard_dir / f"{sample_id}.h5", "r") as f:
                     shard_pids = f["patch_id"][:].astype(str)
                     shard_patches = f["patches"][:]
+                # Put manifest rows in shard patch order so coordinates match the features.
                 group = group.set_index("spot_id").loc[shard_pids].reset_index()
 
-                # run inference, cache features
                 feats = extract_student_features(encoder, shard_patches, args.device)
                 coords = group[["x_um", "y_um"]].values
                 cache_features(
-                    out_path, shard_pids.tolist(), feats, coords, encoder_name=feat_name,
-                    checkpoint_source=checkpoint_sources[feat_name], sample_id=sample_id,
+                    out_path,
+                    shard_pids.tolist(),
+                    feats,
+                    coords,
+                    encoder_name=feat_name,
+                    checkpoint_source=checkpoint_sources[feat_name],
+                    sample_id=sample_id,
                 )
 
-                # verify alignment against expression index
-                expr_idx = load_expression_index(sample_id, Path(cfg["paths"]["hest_root"]), hest_samples)
-                assert_full_alignment(shard_pids.tolist(), feats, coords, pd.DataFrame(index=expr_idx))
+                # Integrity gate: spot ids, patches, embeddings must match the expression index.
+                expr_idx = load_expression_index(
+                    sample_id, Path(cfg["paths"]["hest_root"]), hest_samples
+                )
+                assert_full_alignment(
+                    shard_pids.tolist(), feats, coords, pd.DataFrame(index=expr_idx)
+                )
 
-        print(f"[09_extract_student_features_hest] wrote cached features under {paths['student_embeddings']}")
+        print(
+            f"[09_extract_student_features_hest] wrote cached features under "
+            f"{paths['student_embeddings']}"
+        )
 
 
 if __name__ == "__main__":

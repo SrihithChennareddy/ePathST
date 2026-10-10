@@ -1,7 +1,9 @@
 #!/usr/bin/env python
-"""Model efficiency report: parameter counts, compression ratio, FLOPs/MACs,
-stored embedding size. Teacher and student costs are reported separately --
-teacher inference is a one-time distillation cost, not a per-run cost."""
+"""Efficiency report for the locked student: parameters, FLOPs/MACs, stored embedding size, and
+compression ratio against the H-optimus-0 teacher.
+
+Teacher and student costs are reported separately because teacher inference is a one-time
+distillation cost, not a per-run cost."""
 from __future__ import annotations
 
 import argparse
@@ -33,7 +35,6 @@ def main():
 
     report = {}
     with RunEnvironment("14_model_efficiency", paths["logs"] / "14_model_efficiency_env.json"):
-        # load locked student checkpoint
         checkpoint = torch.load(
             paths["student_checkpoints"] / f"locked_encoder_seed{args.seed}.pt",
             map_location=args.device,
@@ -47,7 +48,7 @@ def main():
             "stored_embedding_bytes_per_patch": embedding_bytes,
         }
 
-        # best-effort teacher param count
+        # The teacher is optional here: if it cannot load, report params as unmeasured, no guess.
         try:
             teacher = HOptimusTeacher(cfg, device=args.device)
             teacher_params = {

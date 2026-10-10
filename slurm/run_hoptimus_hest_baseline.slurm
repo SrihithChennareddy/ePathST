@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=genbio_hest_baseline
+#SBATCH --job-name=hoptimus_hest_baseline
 #SBATCH --account=pn_alyu012826n
 #SBATCH --partition=b40x4-long
 #SBATCH --nodes=1
@@ -8,11 +8,11 @@
 #SBATCH --mem=160G
 #SBATCH --gres=gpu:nvidia_rtx_pro_6000_blackwell:1
 #SBATCH --time=24:00:00
-#SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_genbio_baseline_%j.out
-#SBATCH --error=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_genbio_baseline_%j.err
+#SBATCH --output=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_hoptimus_baseline_%j.out
+#SBATCH --error=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_hoptimus_baseline_%j.err
 
 # Standalone frozen-H-Optimus-0 patch-only baseline for the HEST
-# IDC/COAD/CCRCC cohorts (src/scripts/run_genbio_hest_baseline.py). Runs fully
+# IDC/COAD/CCRCC cohorts (src/scripts/run_hoptimus_hest_baseline.py). Runs fully
 # independently of, and in parallel with, the CNN/GNN experiment job
 # (run_hest_downstream_full.slurm, job 84327/84331 as of submission) --
 # its own separate GPU allocation, no job dependency, and it only READS
@@ -38,7 +38,7 @@
 # Runs its built-in 1-sample-per-cancer smoke test first (WSI/ST alignment,
 # 1536-D embedding shape, cache reload, HVG/PROGENy spot-ID alignment, one
 # downstream-head forward/backward pass) before the full 3-cancer run --
-# see src/scripts/run_genbio_hest_baseline.py's run_smoke_test(). A smoke-test
+# see src/scripts/run_hoptimus_hest_baseline.py's run_smoke_test(). A smoke-test
 # assertion failure aborts the job immediately (set -e) rather than wasting
 # the 24h budget on a broken run.
 
@@ -49,6 +49,6 @@ module load pytorch/2.7.1
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 log "=== H-Optimus-0 HEST baseline (IDC/COAD/CCRCC), seed=0 fold=0 ==="
-python3 src/scripts/run_genbio_hest_baseline.py --config configs/base.yaml --seed 0 --fold 0
+python3 src/scripts/run_hoptimus_hest_baseline.py --config configs/base.yaml --seed 0 --fold 0
 
 log "=== DONE ==="

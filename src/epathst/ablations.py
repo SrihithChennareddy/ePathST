@@ -1,48 +1,116 @@
-"""Defines the A0-A9 ablation grid (feature_source/graph_source/backend triples, see ABLATION_GRID) so
-the CV driver loops over every ablation with identical folds/training/eval, plus per-ablation graph/edge/MLP-width helpers."""
+"""Defines the A0-A9 ablation grid and the per-ablation graph, edge-feature and MLP-width helpers.
+
+ABLATION_GRID lists feature_source/graph_source/backend triples so the CV driver loops over every
+ablation with identical folds, training and evaluation.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 import numpy as np
 
-from epathst.graph import builder as graph_builder, destruction
+from epathst.graph import builder as graph_builder
+from epathst.graph import destruction
 
 
 @dataclass
 class AblationSpec:
     name: str
     feature_source: str  # imagenet | distilled
-    graph_source: str    # none | random | shuffled | local | multiscale
-    backend: str          # none | pna_union | scale_aware | gatv2
-    priority: str          # primary | secondary
+    graph_source: str  # none | random | shuffled | local | multiscale
+    backend: str  # none | pna_union | scale_aware | gatv2
+    priority: str  # primary | secondary
     description: str
 
 
 ABLATION_GRID = [
-    # --- primary block: run these first ---
-    # A1/A2 must load features from separate caches (feature_cache.load_cached_features(expected_encoder_name=...)) and train separate patch heads, or A1 silently reuses A2's features and becomes byte-identical to it (a real bug this project hit once; see feature_cache.py).
-    AblationSpec("A1_imagenet_patch", "imagenet", "none", "none", "primary",
-                 "ImageNet ConvNeXt, no distillation, patch-only"),
-    AblationSpec("A2_distilled_patch", "distilled", "none", "none", "primary",
-                 "H-Optimus-0-distilled ConvNeXt, patch-only (=y_patch, the anchor)"),
-    AblationSpec("A5_shuffled_graph", "distilled", "shuffled", "pna_union", "primary",
-                 "degree-preserving rewire -- CRITICAL negative control (Gate 3)"),
-    AblationSpec("A6_local_pna", "distilled", "local", "pna_union", "primary",
-                 "real LOCAL-only physical graph, union-PNA backend"),
-    AblationSpec("A7_multiscale_pna", "distilled", "multiscale", "pna_union", "primary",
-                 "real local+meso+macro union graph, one PNA sees all edges"),
-    AblationSpec("A8_scale_aware_pna", "distilled", "multiscale", "scale_aware", "primary",
-                 "PROPOSED FINAL MODEL: three per-scale PNA branches + learned softmax gate"),
-    # --- secondary block ---
-    AblationSpec("A0_mean_expression", "none", "none", "none", "secondary",
-                 "predict training gene means -- sanity floor"),
-    AblationSpec("A3_matched_mlp", "distilled", "none", "none", "secondary",
-                 "parameter-matched MLP, same features, no neighbors"),
-    AblationSpec("A4_random_graph", "distilled", "random", "pna_union", "secondary",
-                 "same nodes/edge count, uniform random edges, union-PNA backend"),
-    AblationSpec("A9_gatv2_multiscale", "distilled", "multiscale", "gatv2", "secondary",
-                 "architecture control: same union multiscale graph, GATv2 instead of PNA"),
+    # primary block: run these first
+    # A1/A2 must load features from separate caches
+    # (feature_cache.load_cached_features(expected_encoder_name=...)) and train separate patch
+    # heads. Otherwise A1 silently reuses A2's features and becomes byte-identical to it (a real
+    # bug this project hit once; see feature_cache.py).
+    AblationSpec(
+        "A1_imagenet_patch",
+        "imagenet",
+        "none",
+        "none",
+        "primary",
+        "ImageNet ConvNeXt, no distillation, patch-only",
+    ),
+    AblationSpec(
+        "A2_distilled_patch",
+        "distilled",
+        "none",
+        "none",
+        "primary",
+        "H-Optimus-0-distilled ConvNeXt, patch-only (=y_patch, the anchor)",
+    ),
+    AblationSpec(
+        "A5_shuffled_graph",
+        "distilled",
+        "shuffled",
+        "pna_union",
+        "primary",
+        "degree-preserving rewire -- CRITICAL negative control (Gate 3)",
+    ),
+    AblationSpec(
+        "A6_local_pna",
+        "distilled",
+        "local",
+        "pna_union",
+        "primary",
+        "real LOCAL-only physical graph, union-PNA backend",
+    ),
+    AblationSpec(
+        "A7_multiscale_pna",
+        "distilled",
+        "multiscale",
+        "pna_union",
+        "primary",
+        "real local+meso+macro union graph, one PNA sees all edges",
+    ),
+    AblationSpec(
+        "A8_scale_aware_pna",
+        "distilled",
+        "multiscale",
+        "scale_aware",
+        "primary",
+        "PROPOSED FINAL MODEL: three per-scale PNA branches + learned softmax gate",
+    ),
+    # secondary block
+    AblationSpec(
+        "A0_mean_expression",
+        "none",
+        "none",
+        "none",
+        "secondary",
+        "predict training gene means -- sanity floor",
+    ),
+    AblationSpec(
+        "A3_matched_mlp",
+        "distilled",
+        "none",
+        "none",
+        "secondary",
+        "parameter-matched MLP, same features, no neighbors",
+    ),
+    AblationSpec(
+        "A4_random_graph",
+        "distilled",
+        "random",
+        "pna_union",
+        "secondary",
+        "same nodes/edge count, uniform random edges, union-PNA backend",
+    ),
+    AblationSpec(
+        "A9_gatv2_multiscale",
+        "distilled",
+        "multiscale",
+        "gatv2",
+        "secondary",
+        "architecture control: same union multiscale graph, GATv2 instead of PNA",
+    ),
 ]
 
 PRIMARY_ABLATIONS = [a for a in ABLATION_GRID if a.priority == "primary"]
@@ -52,6 +120,10 @@ SECONDARY_ABLATIONS = [a for a in ABLATION_GRID if a.priority == "secondary"]
 def build_graph_for_ablation(
     coords_um: np.ndarray, graph_source: str, cfg: dict, seed: int
 ) -> dict:
+    """Edge dict for one section under `graph_source`.
+
+    random/shuffled start from the multiscale graph, so their edge count matches the real one.
+    """
     g = cfg["graph"]
     if graph_source == "multiscale":
         edges = graph_builder.build_multiscale_edges(
@@ -82,7 +154,7 @@ def build_graph_for_ablation(
             edge_index = destruction.random_graph(base["edge_index"], n, seed)
         else:
             edge_index = destruction.degree_preserving_rewire(base["edge_index"], seed)
-        # random/shuffled edges have no meaningful physical distance -> zero-fill edge features
+        # random/shuffled edges have no physical distance: zero-fill distance, one constant scale
         edges = {
             "edge_index": edge_index,
             "distance_um": np.zeros(edge_index.shape[1], dtype=np.float32),
@@ -100,7 +172,10 @@ def build_graph_for_ablation(
 
 
 def edge_features_for_ablation(edges: dict, graph_source: str, cfg: dict) -> np.ndarray:
-    """20-D union edge feature (distance + RBF + scale one-hot) for the pna_union/gatv2 backends; A8 (scale-aware) doesn't call this -- it uses scale_aware_edge_data instead."""
+    """20-D union edge feature (distance + RBF + scale one-hot) for the pna_union/gatv2 backends.
+
+    A8 (scale-aware) does not call this; it uses scale_aware_edge_data.
+    """
     g = cfg["graph"]
     if graph_source in ("multiscale", "local", "random", "shuffled"):
         return graph_builder.union_edge_features(
@@ -113,7 +188,12 @@ SCALE_TO_INT = {"local": 0, "meso": 1, "macro": 2}
 
 
 def scale_aware_edge_data(edges: dict, cfg: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """A8 (scale-aware) helper: returns (edge_index, edge_attr, edge_scale) -- union edge_index, 17-D per-scale features (no one-hot, edge_scale carries that), and an int array (0=local,1=meso,2=macro) that ScaleAwareGraphCorrectionModel.forward uses to route each edge to its branch."""
+    """A8 (scale-aware) helper: returns (edge_index, edge_attr, edge_scale).
+
+    edge_index is the union graph; edge_attr is the 17-D per-scale feature (no one-hot, edge_scale
+    carries that); edge_scale is an int array (0=local, 1=meso, 2=macro) that
+    ScaleAwareGraphCorrectionModel.forward uses to route each edge to its branch.
+    """
     g = cfg["graph"]
     edge_attr = graph_builder.per_scale_edge_features(
         edges["distance_um"], g["macro_radius_um"], g["n_rbf"], g["rbf_gamma"]
@@ -123,6 +203,9 @@ def scale_aware_edge_data(edges: dict, cfg: dict) -> tuple[np.ndarray, np.ndarra
 
 
 def matched_mlp_hidden_dim(pna_param_count: int, in_dim: int, out_dim: int) -> int:
-    """A3: picks an MLP hidden width so its parameter count roughly matches the real PNA model, solving in_dim*h + h + h*out_dim + out_dim ~= pna_param_count for h."""
+    """A3: pick an MLP hidden width whose parameter count roughly matches the real PNA model.
+
+    Solves in_dim*h + h + h*out_dim + out_dim ~= pna_param_count for h, with a floor of 8.
+    """
     h = max(8, int(round((pna_param_count - out_dim) / max(1, in_dim + out_dim + 1))))
     return h

@@ -1,17 +1,22 @@
-"""Evaluates whether distillation worked, on completely unseen CPTAC test patients; all
-metrics computed overall and per cancer type (BRCA/COAD/CCRCC), with bootstrap confidence intervals."""
+"""Evaluates student-teacher agreement after distillation on completely unseen CPTAC test patients.
+
+All metrics are computed overall and per cancer type (BRCA/COAD/CCRCC), with bootstrap CIs.
+"""
+
 from __future__ import annotations
 
 import numpy as np
 
 
 def cosine_similarity_distribution(student_proj: np.ndarray, teacher_emb: np.ndarray) -> np.ndarray:
+    """Per-patch cosine similarity between (N, D) student and teacher embeddings."""
     s = student_proj / np.clip(np.linalg.norm(student_proj, axis=1, keepdims=True), 1e-8, None)
     t = teacher_emb / np.clip(np.linalg.norm(teacher_emb, axis=1, keepdims=True), 1e-8, None)
     return np.sum(s * t, axis=1)
 
 
 def bootstrap_ci_1d(values: np.ndarray, n_iter: int = 10000, seed: int = 0, ci=(2.5, 97.5)) -> dict:
+    """Percentile bootstrap CI of the mean, resampling patches; also reports mean, median and n."""
     rng = np.random.RandomState(seed)
     n = len(values)
     boots = np.array([values[rng.randint(0, n, size=n)].mean() for _ in range(n_iter)])
@@ -31,7 +36,11 @@ def retrieval_overlap_at_k(
     max_query: int = 2000,
     seed: int = 0,
 ) -> dict:
-    """For each test patch, compares teacher/student-space nearest neighbors and reports overlap@K, using a random subsample (max_query) against the full test set as the search pool -- exact brute-force cosine kNN, capped for tractability."""
+    """Overlap@K between teacher-space and student-space nearest neighbors of each test patch.
+
+    Queries are a random subsample (`max_query`) searched against the full test set; exact
+    brute-force cosine kNN, with queries capped for tractability.
+    """
     from sklearn.neighbors import NearestNeighbors
 
     s = student_proj / np.clip(np.linalg.norm(student_proj, axis=1, keepdims=True), 1e-8, None)
@@ -59,7 +68,10 @@ def retrieval_overlap_at_k(
 
 
 def linear_probe_sanity(student_proj: np.ndarray, labels: np.ndarray, seed: int = 0) -> dict:
-    """Linear-probe sanity test (e.g. cancer-type classification from the student's projected embedding, 5-fold CV accuracy) -- a sanity signal only, not primary evidence."""
+    """Linear-probe sanity check, e.g. cancer type from the student's projected embedding.
+
+    Reports 5-fold CV accuracy; a sanity signal only, not primary evidence.
+    """
     from sklearn.linear_model import LogisticRegression
     from sklearn.model_selection import cross_val_score
 
@@ -75,6 +87,7 @@ def linear_probe_sanity(student_proj: np.ndarray, labels: np.ndarray, seed: int 
 def umap_embedding(features: np.ndarray, seed: int = 0):
     """UMAP for visualization only, never as primary proof."""
     import umap
+
     reducer = umap.UMAP(n_components=2, random_state=seed)
     return reducer.fit_transform(features)
 
@@ -82,7 +95,10 @@ def umap_embedding(features: np.ndarray, seed: int = 0):
 def evaluate_distillation(
     student_proj: np.ndarray, teacher_emb: np.ndarray, cancer_types: np.ndarray, cfg: dict
 ) -> dict:
-    """Runs the full distillation-eval battery overall + per cancer type."""
+    """Run the distillation metrics overall and per cancer type.
+
+    Retrieval overlap is computed only for groups with at least 20 patches.
+    """
     out = {}
     groups = {"overall": np.ones(len(cancer_types), dtype=bool)}
     for c in np.unique(cancer_types):

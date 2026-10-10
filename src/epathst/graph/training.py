@@ -1,5 +1,9 @@
-"""Residual-graph-model training loop; one shared train/eval/predict path for three interchangeable
-backends (pna_union/scale_aware/gatv2, see models/graph_model.py) -- one graph per patient, 1-4 per optimizer step."""
+"""Training, validation and prediction for the residual graph model, shared by all three backends.
+
+Backends are pna_union, scale_aware and gatv2 (see models/graph_model.py). Only the graph
+correction is optimized, on one graph per patient, 1-4 graphs per optimizer step.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,7 +33,11 @@ def make_pyg_data(
     patient_id: str,
     edge_scale: np.ndarray | None = None,
 ) -> Data:
-    """`edge_scale` (optional): (E,) int array {0,1,2}={local,meso,macro}, required only for backend="scale_aware"."""
+    """Pack one patient's graph into a PyG Data object.
+
+    `edge_scale` is an optional (E,) int array, 0/1/2 = local/meso/macro; only the "scale_aware"
+    backend needs it.
+    """
     kwargs = {}
     if edge_scale is not None:
         kwargs["edge_scale"] = torch.tensor(edge_scale, dtype=torch.long)
@@ -53,7 +61,10 @@ def _build_correction_model(
     gene_dim: int,
     pathway_dim: int,
 ):
-    """Constructs the right graph_correction module for `backend`; degree histogram(s) are computed from `train_graphs` only, never val/test."""
+    """Build the graph_correction module for `backend`.
+
+    Degree histogram(s) come from `train_graphs` only, never val/test.
+    """
     if backend == "pna_union":
         deg = compute_degree_histogram(
             [g.edge_index for g in train_graphs], [g.num_nodes for g in train_graphs]
@@ -62,10 +73,12 @@ def _build_correction_model(
     if backend == "gatv2":
         return GATv2CorrectionModel(in_dim, cfg, edge_dim, gene_dim, pathway_dim)
     if backend == "scale_aware":
+
         def _deg_for_scale(s: int):
             eis = [g.edge_index[:, g.edge_scale == s] for g in train_graphs]
             ns = [g.num_nodes for g in train_graphs]
             return compute_degree_histogram(eis, ns)
+
         deg_local, deg_meso, deg_macro = _deg_for_scale(0), _deg_for_scale(1), _deg_for_scale(2)
         return ScaleAwareGraphCorrectionModel(
             in_dim, cfg, deg_local, deg_meso, deg_macro, edge_dim, gene_dim, pathway_dim
@@ -90,11 +103,16 @@ def train_graph_model(
     graphs_per_step: int = 4,
     backend: str = "pna_union",
 ) -> dict:
+    """Train the graph correction on top of `patch_head`, checkpointing on best validation loss.
+
+    Stops early after `early_stop_patience` epochs without improvement. Returns the checkpoint
+    path, best_epoch, best_val_loss and backend.
+    """
     seed_everything(seed)
     p = cfg["pna"]
+    # an empty edge_attr (no edges) falls back to the 20-D union feature width
     edge_dim = train_graphs[0].edge_attr.shape[1] if train_graphs[0].edge_attr.numel() else 20
 
-    # build model
     in_dim = train_graphs[0].x.shape[1]
     gene_dim = train_graphs[0].y_gene.shape[1]
     pathway_dim = train_graphs[0].y_pathway.shape[1]
@@ -103,7 +121,8 @@ def train_graph_model(
     )
     model = ResidualGraphPredictor(patch_head, graph_corr).to(device)
 
-    # zero-residual must hold before any graph training step (see graph_model.assert_zero_residual_at_init)
+    # the graph correction must add zero residual before any training step
+    # (graph_model.assert_zero_residual_at_init)
     probe = Batch.from_data_list([train_graphs[0]]).to(device)
     assert_zero_residual_at_init(model, probe.x, *_forward_args(probe, backend))
 
@@ -115,13 +134,12 @@ def train_graph_model(
     history = []
     rng = np.random.RandomState(seed)
 
-    # train loop
     for epoch in range(p["max_epochs"]):
         model.train()
         order = rng.permutation(len(train_graphs))
         epoch_losses = []
         for start in range(0, len(order), graphs_per_step):
-            batch_idx = order[start:start + graphs_per_step]
+            batch_idx = order[start : start + graphs_per_step]
             batch = Batch.from_data_list([train_graphs[i] for i in batch_idx]).to(device)
             opt.zero_grad(set_to_none=True)
             out = model(batch.x, *_forward_args(batch, backend))
@@ -136,7 +154,7 @@ def train_graph_model(
             {"epoch": epoch, "train_loss": float(np.mean(epoch_losses)), "val_loss": val_loss}
         )
 
-        # checkpoint on improvement, else count toward early stop
+        # model selection uses validation loss only
         if val_loss < best_val:
             best_val, best_epoch, patience_ctr = val_loss, epoch, 0
             torch.save(
@@ -154,7 +172,6 @@ def train_graph_model(
         if patience_ctr >= p["early_stop_patience"]:
             break
 
-    # save history
     save_json(
         {
             "history": history,
@@ -176,6 +193,7 @@ def train_graph_model(
 def _eval_loss(
     model, graphs: list[Data], cfg: dict, device: str, backend: str = "pna_union"
 ) -> float:
+    """Mean per-graph loss over `graphs` (one graph per forward pass); NaN if empty."""
     model.eval()
     losses = []
     for g in graphs:
@@ -189,10 +207,12 @@ def _eval_loss(
 
 
 @torch.no_grad()
-def predict_graph_model(
-    model, graphs: list[Data], device: str, backend: str = "pna_union"
-) -> dict:
-    """Returns gene/pathway final+patch-only predictions concatenated in `graphs` iteration order; callers must reorder their own id/target arrays to match, or predictions silently misalign with targets."""
+def predict_graph_model(model, graphs: list[Data], device: str, backend: str = "pna_union") -> dict:
+    """Gene/pathway predictions (final and patch-only), concatenated in `graphs` iteration order.
+
+    Callers must reorder their own id/target arrays to match, or predictions silently misalign with
+    targets. The scale_aware backend also returns `scale_weights`.
+    """
     model.eval()
     out = {
         "patient_id": [],
@@ -214,7 +234,6 @@ def predict_graph_model(
         if "scale_weights" in pred:
             scale_weights.append(pred["scale_weights"].cpu().numpy())
 
-    # stack per-graph blocks
     for k in ("gene_pred", "pathway_pred", "gene_patch_only", "pathway_patch_only"):
         out[k] = np.concatenate(out[k], axis=0)
     out["patient_id"] = np.array(out["patient_id"])

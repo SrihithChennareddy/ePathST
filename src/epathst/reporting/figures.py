@@ -1,10 +1,15 @@
-"""The 8 project figures; every figure function takes already-computed data (never re-derives results),
-and example-selection functions take an explicit `criterion` string so examples are never picked because they look good."""
+"""The 8 project figures, each drawn from already-computed data.
+
+Figure functions never re-derive results. Example selection takes an explicit `criterion` string,
+so examples are never picked because they look good.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,8 +32,9 @@ def fig1_pipeline_diagram(out_path: Path) -> None:
         ax.add_patch(box)
         ax.text(i * 2 + 0.8, 0.5, s, ha="center", va="center", fontsize=8)
         if i < len(stages) - 1:
-            ax.annotate("", xy=(i * 2 + 2, 0.5), xytext=(i * 2 + 1.6, 0.5),
-                        arrowprops=dict(arrowstyle="->"))
+            ax.annotate(
+                "", xy=(i * 2 + 2, 0.5), xytext=(i * 2 + 1.6, 0.5), arrowprops=dict(arrowstyle="->")
+            )
     ax.set_xlim(-0.5, len(stages) * 2)
     ax.set_ylim(-0.5, 1.5)
     ax.axis("off")
@@ -131,6 +137,9 @@ def fig8_spatial_maps(
     selection_criterion: str,
     out_path: Path,
 ) -> None:
+    """Ground-truth vs predicted spatial map of one gene; the selection criterion is printed on
+    the figure so the example choice is auditable.
+    """
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
     sc0 = axes[0].scatter(coords_um[:, 0], coords_um[:, 1], c=y_true, s=8, cmap="viridis")
     axes[0].set_title(f"{gene_name} -- ground truth")
@@ -147,7 +156,11 @@ def fig8_spatial_maps(
 
 
 def representative_gene_selection(per_gene_r: pd.Series, criterion: str = "median") -> str:
-    """Predetermined, documented example selection (never cherry-picked): median-performing gene by default, also supports 'best'/'worst'/'top_quartile_median'."""
+    """Predetermined, documented example selection (never cherry-picked).
+
+    Defaults to the median-performing gene; also supports 'best', 'worst' and
+    'top_quartile_median'. Returns None when there is no valid gene.
+    """
     s = per_gene_r.dropna().sort_values()
     if len(s) == 0:
         return None

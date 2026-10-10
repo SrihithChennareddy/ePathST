@@ -1,5 +1,9 @@
-"""Fair teacher-vs-student comparison: raw 1536-D H-Optimus-0 embedding reduced via training-fold-only
-PCA to 256-D (matches student's 320->256 projection) so both feed identical Ridge/MLP/PNA heads."""
+"""Fair teacher-vs-student comparison at matched embedding width, with training-fold-only PCA.
+
+The raw 1536-D H-Optimus-0 embedding is reduced to 256-D (matching the student's 320->256
+projection) so both encoders feed identical Ridge/MLP/PNA heads.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -8,14 +12,18 @@ from sklearn.linear_model import Ridge
 
 
 class TrainOnlyPCA:
-    """Fits sklearn PCA on TRAIN-patient rows only, transforms train/val/test identically; tracks fit spot_ids so leakage can be asserted (same convention as expression.TrainOnlyStandardizer)."""
+    """sklearn PCA fit on TRAIN-patient rows only, applied identically to train/val/test.
+
+    Fit spot_ids are tracked so leakage can be asserted (same convention as
+    expression.TrainOnlyStandardizer).
+    """
 
     def __init__(self, n_components: int = 256, random_state: int = 0):
         self.pca = PCA(n_components=n_components, random_state=random_state)
         self._fit_ids: set = set()
 
     def fit(self, X_train: np.ndarray, ids=None) -> "TrainOnlyPCA":
-        # train only -- fitting on pooled train+test would leak test-set structure into the basis
+        # train only: fitting on pooled train+test would leak test-set structure into the basis
         self.pca.fit(X_train)
         if ids is not None:
             self._fit_ids = set(ids)
@@ -26,9 +34,9 @@ class TrainOnlyPCA:
 
     def assert_no_leakage(self, other_ids) -> None:
         overlap = self._fit_ids & set(other_ids)
-        assert not overlap, (
-            f"PCA was fit using {len(overlap)} ids that also appear in this eval/test set"
-        )
+        assert (
+            not overlap
+        ), f"PCA was fit using {len(overlap)} ids that also appear in this eval/test set"
 
     @property
     def explained_variance_ratio_sum(self) -> float:
@@ -36,7 +44,9 @@ class TrainOnlyPCA:
 
 
 def fit_ridge_baseline(X_train: np.ndarray, y_train: np.ndarray, alpha: float = 1.0) -> Ridge:
-    """Simplest of the three comparison heads: Ridge regression directly on the (PCA-reduced or student) embedding, fit on training patients only."""
+    """Simplest of the three comparison heads: Ridge on the PCA-reduced or student embedding,
+    fit on training patients only.
+    """
     model = Ridge(alpha=alpha)
     model.fit(X_train, y_train)
     return model
@@ -51,7 +61,11 @@ def hoptimus_pca_comparison_report(
     student_pna_r: float,
     pca_explained_variance: float,
 ) -> dict:
-    """Assembles the three-head x two-encoder comparison table plus the retention question it answers: how much of the 1.1B-parameter teacher survives in the ~3.4M-parameter student?"""
+    """Three-head x two-encoder comparison table with retention = student r / H-Optimus r.
+
+    Retention answers how much of the 1.1B-parameter teacher survives in the ~3.4M-parameter
+    student; it is NaN when the H-Optimus r is zero.
+    """
     return {
         "pca_explained_variance_ratio": pca_explained_variance,
         "ridge": {

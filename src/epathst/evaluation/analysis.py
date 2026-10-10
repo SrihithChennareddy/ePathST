@@ -1,5 +1,9 @@
-"""Additional scientific analyses: multiscale contribution, spatial-autocorrelation-vs-graph-improvement,
-per-pathway, per-cancer -- nothing here assumes an outcome ahead of time; results are reported as found."""
+"""Secondary analyses of graph benefit: multiscale contribution, spatial autocorrelation,
+per-pathway and per-cancer breakdowns.
+
+Nothing here assumes an outcome ahead of time; results are reported as found.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -25,7 +29,10 @@ def ground_truth_morans_i_per_gene(
     col_names: list[str],
     k: int = 6,
 ) -> pd.DataFrame:
-    """Moran's I of ground-truth expression per patient's own coordinates, then averaged across patients per gene -- required since Moran's I isn't comparable across differently-scaled/sized tissue sections."""
+    """Moran's I of ground-truth expression on each patient's own coordinates, averaged across
+    patients per gene. Per-patient computation is required because Moran's I is not comparable
+    across tissue sections of different scale or size.
+    """
     rows = []
     for pid in sorted(set(patient_ids)):
         mask = patient_ids == pid
@@ -42,7 +49,11 @@ def ground_truth_morans_i_per_gene(
 def spatial_benefit_vs_autocorrelation(
     delta_by_gene: pd.DataFrame, morans_i_by_gene: pd.DataFrame
 ) -> dict:
-    """Corr(delta_g, MoranI_g); hypothesis that genes with stronger spatial organization benefit more from explicit graph modeling is reported, not assumed."""
+    """Corr(delta_g, MoranI_g). The hypothesis that genes with stronger spatial organization
+    benefit more from graph modeling is tested and reported, not assumed.
+
+    Returns NaN correlation and p-value with fewer than 5 genes.
+    """
     if delta_by_gene.index.name == "column":
         merged = delta_by_gene.merge(morans_i_by_gene, left_index=True, right_on="column")
     else:
@@ -56,14 +67,16 @@ def spatial_benefit_vs_autocorrelation(
 
 
 def per_pathway_delta(r_patch_by_pathway: pd.Series, r_graph_by_pathway: pd.Series) -> pd.DataFrame:
-    """Which pathways benefit most from graph context -- no prior assumption of winners."""
+    """Per-pathway delta = r_graph - r_patch, sorted descending; no prior assumption of winners."""
     df = pd.DataFrame({"r_patch": r_patch_by_pathway, "r_graph": r_graph_by_pathway}).dropna()
     df["delta"] = df["r_graph"] - df["r_patch"]
     return df.sort_values("delta", ascending=False)
 
 
 def per_cancer_consistency(results_by_cancer: dict[str, dict]) -> pd.DataFrame:
-    """Tabulates the primary metric per cancer to check whether spatial benefit is consistent or cancer-dependent."""
+    """Tabulate the primary metric per cancer to check whether spatial benefit is consistent or
+    cancer-dependent.
+    """
     rows = []
     for cancer, res in results_by_cancer.items():
         rows.append({"cancer": cancer, **res})

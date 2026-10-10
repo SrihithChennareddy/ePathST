@@ -38,7 +38,7 @@
 # --seeds 0 1 2 for the real V2 Phase 18 full patient-level experiment once
 # there is a multi-job or longer-wall-clock budget for it.
 #
-# Steps 1-9 (CPTAC/GenBio distillation) are NOT touched or rerun here --
+# Steps 1-9 (CPTAC distillation) are NOT touched or rerun here --
 # this job only re-locks the encoder from whatever is currently the best
 # CPTAC-distilled checkpoint (a fast repackaging step, not retraining) and
 # then runs Phase-2 HEST steps 8-12.
@@ -85,7 +85,7 @@ python3 src/scripts/12_primary_hypothesis_test.py --config "$CONFIG" --max-folds
   log "Step 12 failed or incomplete -- non-fatal, results/cv_ablation_metrics.csv is still valid, rerun once fixed"
 
 log "=== snapshotting results to experimental_runs/ for later comparison ==="
-python3 src/scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4-long \
+python3 src/scripts/tools/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4-long \
   --gpu "1x RTX PRO 6000 Blackwell" --label hest_downstream_full_3cancer --stage "end of 24h job" || \
   log "snapshot failed -- non-fatal"
 

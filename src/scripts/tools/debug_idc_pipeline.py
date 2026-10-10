@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-"""Standalone diagnostic reproducing and verifying the fix for a real
-target/prediction misalignment bug in src/scripts/10_run_patient_cv.py's
-run_ablation() (affected graph ablations A4-A9); uses the actual
-epathst.evaluation.metrics implementation rather than a reimplementation. Writes
+"""Regression check for the target/prediction misalignment bug in run_ablation() of
+src/scripts/10_run_patient_cv.py, which affected graph ablations A4-A9.
+
+Scores with the real epathst.evaluation.metrics rather than a reimplementation and writes
 results/debug_idc_pipeline/T1_alignment_bug.json."""
 from __future__ import annotations
 
@@ -23,60 +23,53 @@ def _fake_cfg():
 
 
 def t1_alignment_bug():
-    """Reproduces the exact shape of src/scripts/10_run_patient_cv.py's
-    run_ablation(): ids_test spans multiple patients NOT already grouped by
-    patient (matching the real pipeline's fold-pooling order, which is
-    grouped by SAMPLE, not necessarily by PATIENT when the same patient can
-    contribute multiple samples/sections -- see load_fold_expression's
-    docstring), gene_pred is produced in per-patient-GROUPED order (exactly
-    what predict_graph_model does), and y_gene_test stays in the original
-    order (exactly what the pre-fix code did)."""
+    """Reproduce the pre-fix misalignment of run_ablation() on synthetic data and check the fix.
+
+    ids_test spans several patients and is not grouped by patient: fold pooling follows sample
+    order, and one patient can contribute several samples/sections (see load_fold_expression).
+    The predictions come back in per-patient-grouped order, as from predict_graph_model, while
+    the pre-fix code left y_gene_test in the original order.
+    """
     rng = np.random.RandomState(0)
     n_patients, spots_per_patient, n_genes = 6, 12, 20
 
-    # Build a patient order that is NOT already grouped (interleaved),
-    # matching the real risk: multiple samples/sections per patient pooled
-    # via pd.concat in sample order, not patient order.
+    # Interleave patients so rows are not pre-grouped, as when several samples per patient are
+    # pooled with pd.concat in sample order rather than patient order.
     patient_seq = []
     blocks = [[f"P{p}"] * spots_per_patient for p in range(n_patients)]
-    # interleave two patients' spots to break any accidental pre-grouping
     for i in range(0, n_patients, 2):
         interleaved = []
         a, b = blocks[i], blocks[i + 1] if i + 1 < n_patients else []
         for x, y in zip(a, b):
             interleaved += [x, y]
-        interleaved += a[len(interleaved) // 2:] if len(a) > len(interleaved) // 2 else []
+        interleaved += a[len(interleaved) // 2 :] if len(a) > len(interleaved) // 2 else []
         patient_seq += interleaved
     ids_test_original = np.array([f"{p}::spot{j}" for j, p in enumerate(patient_seq)])
     pids_original = np.array(patient_seq)
     n = len(ids_test_original)
 
-    # Ground truth: a smooth per-patient signal so a real model should
-    # recover it near-perfectly if predictions == truth.
+    # Random ground truth; predictions below are a near-copy, so a correctly aligned pipeline
+    # must score R close to 1.
     y_true = rng.randn(n, n_genes).astype(np.float32)
 
-    # Simulate a residual graph model with a REAL (nonzero) but topology-
-    # agnostic learned correction so this isn't the degenerate all-zero-delta
-    # case -- predictions are a slightly noisy copy of truth, in
-    # PER-PATIENT-GROUPED order (matching predict_graph_model's actual
-    # concatenation order).
+    # Truth plus small noise (a nonzero correction, not the degenerate all-zero-delta case),
+    # permuted into per-patient-grouped order like predict_graph_model's output.
     unique_patients = np.unique(pids_original)
     order = np.concatenate([np.where(pids_original == p)[0] for p in unique_patients])
     y_pred_grouped = (y_true[order] + 0.01 * rng.randn(n, n_genes)).astype(np.float32)
 
     cancer_placeholder = np.array(["IDC"] * n)
 
-    # --- BEFORE FIX: exact pre-fix src/scripts/10_run_patient_cv.py behavior --
-    # ids_test reassigned to grouped order (as the pre-fix code did)...
+    # Before the fix: ids_test was reassigned to grouped order...
     ids_test_buggy = ids_test_original[order]
     pids_buggy = np.array([s.split("::")[0] for s in ids_test_buggy])
-    # ...but y_gene_test/y_path_test (here: y_true) were NEVER reordered.
+    # ...but y_gene_test/y_path_test (y_true here) were never reordered to match.
     gene_cols = [str(i) for i in range(n_genes)]
     m_before = evaluate_predictions(
         y_true, y_pred_grouped, pids_buggy, cancer_placeholder, gene_cols, _fake_cfg()
     )["overall"]
 
-    # --- AFTER FIX: reorder y_true with the SAME `order` used for predictions ---
+    # After the fix: y_true is reordered with the same `order` as the predictions.
     y_true_fixed = y_true[order]
     m_after = evaluate_predictions(
         y_true_fixed, y_pred_grouped, pids_buggy, cancer_placeholder, gene_cols, _fake_cfg()
@@ -92,15 +85,14 @@ def t1_alignment_bug():
         "after_fix_fisher_z_mean_patient_R": m_after["fisher_z_mean_patient_R"],
         "expected_after_fix": "close to 1.0 (near-perfect self-recovery)",
         "bug_confirmed": bool(
-            m_before["fisher_z_mean_patient_R"] < 0.9
-            and m_after["fisher_z_mean_patient_R"] > 0.95
+            m_before["fisher_z_mean_patient_R"] < 0.9 and m_after["fisher_z_mean_patient_R"] > 0.95
         ),
     }
     print(json.dumps(result, indent=2))
     assert result["after_fix_fisher_z_mean_patient_R"] > 0.95, "fix verification FAILED"
-    assert result["before_fix_fisher_z_mean_patient_R"] < 0.9, (
-        "bug reproduction FAILED (should have been misaligned)"
-    )
+    assert (
+        result["before_fix_fisher_z_mean_patient_R"] < 0.9
+    ), "bug reproduction FAILED (should have been misaligned)"
     return result
 
 

@@ -41,7 +41,7 @@ paths:
   # only 150GB used, so both the ephemeral work_dir and the persistent
   # artifacts below live there instead.
   work_dir: /lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/${experiment_name}_work
-  # Reusable, expensive artifacts (Step 4's cached GenBio-PathFM teacher
+  # Reusable, expensive artifacts (Step 4's cached H-Optimus-0 teacher
   # embeddings, Step 9's locked ConvNeXt V2-Atto encoder) persist here,
   # independent of any one run's work_dir -- see epathst.utils.resolve_run_paths.
   persist_dir: /lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/${experiment_name}
@@ -139,7 +139,7 @@ distillation:
 # ---------------------------------------------------------------- Step 7 --
 baselines:
   S0_imagenet_no_distill: true
-  S1_genbio_distilled: true
+  S1_hoptimus_distilled: true
   S2_random_init_distilled: true
 
 # --------------------------------------------------------- Steps 10-12 ---
@@ -264,10 +264,10 @@ evaluation:
   gene_r_thresholds: [0.0, 0.2, 0.3]
 
 # --------------------------------------------------------- Step 24 -------
-# V2 Phase 21: fair GenBio-vs-student comparison via training-fold-only
+# V2 Phase 21: fair H-Optimus-0-vs-student comparison via training-fold-only
 # PCA (replaces V1's ambiguous raw-4608-D-into-a-mismatched-head
 # approach). Run only after the A0-A9 student model matrix is locked.
-genbio_fair_comparison:
+hoptimus_comparison:
   pca_n_components: 256
   ridge_alpha: 1.0
 
@@ -283,3 +283,62 @@ primary_gates:
   gate1_distillation: {better: A2_distilled_patch, worse: A1_imagenet_patch}
   gate2_spatial_context: {better: A8_scale_aware_pna, worse: A2_distilled_patch}
   gate3_true_topology: {better: A8_scale_aware_pna, worse: A5_shuffled_graph}
+
+# --------------------------------------------------------- Step 24+ ------
+# External clinical validation on TCGA (STS 2026 final-paper addition,
+# scripts 24-31). Separate cohort from the HEST-1k patient_cv experiment
+# above -- this measures whether ePathST's predictions correlate with real
+# bulk RNA-seq and clinical outcomes on an entirely unseen data source.
+#
+# Storage is deliberately split, NOT all under one root:
+#   - WSIs (`slides`) and WSI-derived patches (`patches`) are pixel data,
+#     trivially re-downloadable/re-extractable from GDC at any time -- these
+#     live ONLY in scratch (`paths.scratch_dir`). They must NEVER be copied
+#     or symlinked into the YurovskyGroup project space.
+#   - Manifests, clinical pulls, RNA-seq (small TSVs), and -- most
+#     importantly -- the spatial gene-expression PREDICTIONS produced by
+#     running the frozen ePathST/H-Optimus-0 encoders over the WSIs are the
+#     actually expensive, irreplaceable outputs of this pipeline. Those live
+#     in YurovskyGroup-nvwulf (`paths.persist_dir`), same as every other
+#     persisted artifact in this project (teacher_embeddings,
+#     student_checkpoints, the HEST patient_cv results above).
+# If scratch's 30-day purge wipes the slides/patches mid-pipeline, that's
+# an acceptable re-download, not a data-loss event -- unlike the HEST-bench
+# splits incident this policy is designed to avoid repeating.
+tcga:
+  projects: [TCGA-BRCA, TCGA-KIRC, TCGA-COAD]
+  cohort_size: max                 # use every case with slide + RNA-seq + cBioPortal clinical, not a fixed subsample
+  gdc_api: https://api.gdc.cancer.gov
+  gdc_data: https://api.gdc.cancer.gov/data
+  cbioportal_api: https://www.cbioportal.org/api
+  cbioportal_study_by_project:
+    TCGA-BRCA: brca_tcga_pan_can_atlas_2018
+    TCGA-KIRC: kirc_tcga_pan_can_atlas_2018
+    TCGA-COAD: coadread_tcga_pan_can_atlas_2018   # COAD+READ combined upstream -- filter to COAD-only cases via the GDC project_id join
+  slide_type: Diagnostic Slide     # FFPE only, NOT Tissue Slide (frozen) -- matches HEST-1k's own FFPE convention
+  slide_format: SVS
+  rnaseq_workflow: STAR - Counts
+  target_genes:
+    TCGA-BRCA: [ERBB2, ESR1, PGR, MKI67]
+    TCGA-KIRC: [CA9]
+    TCGA-COAD: [KRAS, MLH1, MSH2, MSH6, PMS2]
+  clinical_fields: [OS_STATUS, OS_MONTHS, AJCC_PATHOLOGIC_TUMOR_STAGE, AGE]
+  survival:
+    split: median                  # median-split high/low predicted score per target gene
+    cox_covariates: [AJCC_PATHOLOGIC_TUMOR_STAGE, AGE]
+  paths:
+    # Metadata + model outputs -- permanent, small, YurovskyGroup project space.
+    persist_dir: /lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/tcga
+    manifests: manifests
+    rnaseq: rnaseq                 # raw STAR-Counts TSV, one subdir per project -- small, kept with metadata not pixel data
+    clinical: clinical             # cBioPortal pulls, one CSV per project
+    predictions: predictions       # the actual deliverable: per-spot/per-patient ePathST + H-Optimus-0 gene-expression predictions
+    results: results
+    figures: figures
+    logs: logs
+    # Raw WSI pixel data -- scratch ONLY, never copied/symlinked into persist_dir.
+    # Re-downloadable/re-extractable from GDC at any time, so the 30-day
+    # scratch purge is an acceptable re-run, not a data-loss risk.
+    scratch_dir: /lustre/nvwulf/scratch/schennareddy/TCGA
+    slides: slides                 # raw SVS, one subdir per project -- SCRATCH ONLY
+    patches: patches               # extracted patches (same patch_px/target_mpp as `patching` above) -- SCRATCH ONLY

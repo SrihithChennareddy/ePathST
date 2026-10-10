@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Captures a point-in-time snapshot of the current run's results/ into
-experimental_runs/<run_id>/ for later cross-run comparison -- never
-fabricates numbers, only copies what the run has actually produced and
-records which files were present/absent so a partial snapshot is never
-mistaken for a complete one."""
+"""Copies the current run's results/ and figures/ into experimental_runs/<run_id>/ and appends a
+row to experimental_runs/INDEX.csv, for later cross-run comparison.
+
+Only files the run actually produced are copied, and the manifest lists which were present, so a
+partial snapshot is never mistaken for a complete one."""
 from __future__ import annotations
 
 import argparse
@@ -19,23 +19,21 @@ from epathst.utils import load_config, resolve_run_paths
 
 
 def _headline_metric(results_dir: Path) -> str:
-    """Best-effort single number to show in INDEX.csv at a glance --
-    prefers the primary hypothesis test, then the final results table's
-    multiscale-PNA row, then distillation cosine similarity, in that
-    priority order (most-downstream evidence first). Returns 'N/A' if none
-    of these exist yet (e.g. a snapshot taken during CPTAC distillation,
-    before any HEST results exist)."""
+    """One-line headline number for INDEX.csv, taking the most downstream evidence available.
+
+    Priority: primary hypothesis test, A7 row of the final results table, distillation
+    cosine similarity, then the distillation training summary. Returns 'N/A' if none exist yet
+    (e.g. a snapshot taken during CPTAC distillation, before any HEST results).
+    """
     primary = results_dir / "primary_hypothesis_test.json"
     if primary.exists():
         d = json.loads(primary.read_text())
-        # script 12 nests results as {"pooled": {"<gate_name>": {"bootstrap": {...}}, ...},
-        # "per_cancer": {...}} -- there is no top-level "bootstrap" key. Pick gate2 (spatial
-        # context, the flagship comparison) as the headline, falling back to whichever gate exists.
+        # 12_primary_hypothesis_test.py nests results as {"pooled": {<gate>: {"bootstrap": ...}},
+        # "per_cancer": ...}; there is no top-level "bootstrap" key. Headline is gate 2 (spatial
+        # context, the flagship comparison), falling back to whichever gate exists.
         pooled = d.get("pooled", {})
         gate_priority = ("gate2_spatial_context", "gate3_true_topology", "gate1_distillation")
-        gate_name = next(
-            (g for g in gate_priority if g in pooled), next(iter(pooled), None)
-        )
+        gate_name = next((g for g in gate_priority if g in pooled), next(iter(pooled), None))
         b = pooled.get(gate_name, {}).get("bootstrap", {}) if gate_name else {}
         if b.get("mean_delta") is not None:
             return (
@@ -46,6 +44,7 @@ def _headline_metric(results_dir: Path) -> str:
     table = results_dir / "final_results_table.csv"
     if table.exists():
         import pandas as pd
+
         df = pd.read_csv(table)
         row = df[df["model"] == "A7_multiscale_pna"]
         if len(row):
@@ -97,7 +96,6 @@ def main():
     out_dir = Path(__file__).resolve().parents[3] / "experimental_runs" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # copy results/figures
     copied = {}
     for src_name, dst_name in [("results", "results"), ("figures", "figures")]:
         src = paths[src_name]
@@ -110,7 +108,6 @@ def main():
         else:
             copied[dst_name] = []
 
-    # snapshot config
     config_snapshot_path = out_dir / "config_used.json"
     config_json = Path(args.config).with_suffix(".json")
     if config_json.exists():
@@ -124,13 +121,13 @@ def main():
         "gpu": args.gpu or None,
         "stage": args.stage or None,
         "source_work_dir": str(paths["work_dir"]),
-        # not exact, informational only
+        # Approximate, informational only.
         "source_persist_dir": str(paths["work_dir"].parent),
         "files_captured": copied,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
-    # write notes
+    # Never overwrite notes already written by hand.
     notes_path = out_dir / "notes.md"
     if not notes_path.exists():
         notes_path.write_text(
@@ -140,19 +137,35 @@ def main():
 
     headline = _headline_metric(out_dir / "results") if (out_dir / "results").exists() else "N/A"
 
-    # append to index
     index_path = Path(__file__).resolve().parents[3] / "experimental_runs" / "INDEX.csv"
     is_new = not index_path.exists()
     with open(index_path, "a", newline="") as f:
         writer = csv.writer(f)
         if is_new:
-            writer.writerow([
-                "run_id", "date", "job_id", "partition", "gpu", "stage_reached",
-                "headline_metric", "notes",
-            ])
-        writer.writerow([
-            run_id, today, args.job_id, args.partition, args.gpu, args.stage, headline, "",
-        ])
+            writer.writerow(
+                [
+                    "run_id",
+                    "date",
+                    "job_id",
+                    "partition",
+                    "gpu",
+                    "stage_reached",
+                    "headline_metric",
+                    "notes",
+                ]
+            )
+        writer.writerow(
+            [
+                run_id,
+                today,
+                args.job_id,
+                args.partition,
+                args.gpu,
+                args.stage,
+                headline,
+                "",
+            ]
+        )
 
     print(f"[snapshot_experiment] captured {run_id} -> {out_dir}")
     print(f"[snapshot_experiment] results files: {copied['results']}")

@@ -1,5 +1,9 @@
-"""Selects one high-quality CPTAC WSI per patient via hard exclusions plus a deterministic
-composite quality score from a thumbnail and a sample of ~20x tissue tiles."""
+"""Selects one CPTAC WSI per patient via hard exclusions and a deterministic quality score.
+
+Quality metrics come from a thumbnail plus a sample of ~20x tissue tiles. One slide per patient
+keeps the manifest patient-unique, which the patient-level CPTAC split relies on (see splits.py).
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -31,11 +35,15 @@ class WSIQualityRecord:
     extra: dict = field(default_factory=dict)
 
 
-# ---------------------------------------------------------------- tissue --
 def tissue_mask_from_thumbnail(
-    thumb_rgb: np.ndarray, sat_thresh: int = 15, val_thresh: int = 235,
+    thumb_rgb: np.ndarray,
+    sat_thresh: int = 15,
+    val_thresh: int = 235,
 ) -> np.ndarray:
-    """HSV saturation/value tissue mask (glass is low-sat/near-white, tissue is saturated/darker); reused for tile sampling and patch masking."""
+    """Boolean tissue mask from HSV saturation/value (glass is low-saturation and near-white).
+
+    Also used for tile sampling and patch masking in wsi_patches.py and hest_prep.py.
+    """
     arr = thumb_rgb.astype(np.float32) / 255.0
     maxc = arr.max(axis=-1)
     minc = arr.min(axis=-1)
@@ -46,14 +54,18 @@ def tissue_mask_from_thumbnail(
 
 
 def focus_score_laplacian(tile_gray: np.ndarray) -> float:
-    """Variance of Laplacian: standard, cheap focus/blur metric (higher = sharper)."""
+    """Variance of the Laplacian, a cheap focus/blur metric (higher = sharper)."""
     from scipy.ndimage import laplace
+
     lap = laplace(tile_gray.astype(np.float32))
     return float(lap.var())
 
 
 def artifact_fraction_tile(tile_rgb: np.ndarray) -> float:
-    """Deterministic heuristic (not a learned detector) flagging pen marks, folds/tears, and air bubbles via saturation/brightness outliers."""
+    """Fraction of pixels flagged as pen marks, folds/tears or air bubbles.
+
+    Deterministic saturation/brightness outlier heuristic, not a learned detector.
+    """
     hsv_sat = _rgb_to_sat(tile_rgb)
     pen_like = hsv_sat > 200  # oversaturated ink
     very_dark = tile_rgb.mean(axis=-1) < 20
@@ -70,29 +82,36 @@ def _rgb_to_sat(rgb: np.ndarray) -> np.ndarray:
 
 
 def stain_outlier_score(
-    tile_rgbs: list[np.ndarray], reference_mean: np.ndarray | None = None,
+    tile_rgbs: list[np.ndarray],
+    reference_mean: np.ndarray | None = None,
 ) -> float:
-    """Mean-color distance from a reference stain centroid, normalized to [0,1]; with no reference, uses this WSI's own tile-mean so it reflects intra-slide consistency, not absolute H&E hue."""
+    """Mean-color distance of tiles from a reference stain centroid, normalized to [0, 1].
+
+    Without a reference the WSI's own tile mean is used, so the score measures intra-slide
+    consistency, not absolute H&E hue.
+    """
     means = np.stack([t.reshape(-1, 3).mean(axis=0) for t in tile_rgbs])
     ref = reference_mean if reference_mean is not None else means.mean(axis=0)
     dist = np.linalg.norm(means - ref[None, :], axis=1)
-    scale = 60.0  # empirical normalization: ~60 RGB-units treated as a strong outlier
+    scale = 60.0  # empirical: ~60 RGB units counts as a strong outlier
     return float(np.clip(dist.mean() / scale, 0.0, 1.0))
 
 
 def compute_wsi_qc(wsi_path: str, cfg: dict, reader) -> dict:
-    """`reader` is duck-typed (get_thumbnail/read_region_20x/mpp/dimensions), passed in rather than importing openslide here so this module stays testable without it -- see wsi_patches.OpenSlideReader."""
-    # global tissue/stain QC from the thumbnail
+    """Tissue, focus, artifact and stain QC metrics for one slide.
+
+    `reader` is duck-typed (get_thumbnail, read_region_20x, sample_tissue_tile_coords, mpp,
+    dimensions) so this module does not import openslide; see wsi_patches.OpenSlideReader.
+    """
     thumb = reader.get_thumbnail(cfg["wsi_selection"]["thumbnail_max_dim"])
     tissue_mask = tissue_mask_from_thumbnail(thumb)
     tissue_fraction = float(tissue_mask.mean())
 
     mpp = reader.mpp
     width, height = reader.dimensions
-    px_area_mm2 = (mpp or 0.25) ** 2 * 1e-6  # um^2 -> mm^2 per level-0 pixel
+    px_area_mm2 = (mpp or 0.25) ** 2 * 1e-6  # um^2 -> mm^2 per level-0 px; 0.25 um/px if unknown
     tissue_area_mm2 = tissue_fraction * width * height * px_area_mm2
 
-    # sample and read tissue tiles for focus/artifact QC
     tile_px = cfg["wsi_selection"]["qc_tile_px"]
     n_tiles = cfg["wsi_selection"]["n_qc_tiles"]
     coords = reader.sample_tissue_tile_coords(tissue_mask, n_tiles, tile_px)
@@ -104,7 +123,8 @@ def compute_wsi_qc(wsi_path: str, cfg: dict, reader) -> dict:
         focus_score = float(np.median(focus_vals))
         blurry_fraction = (
             float((focus_vals < np.percentile(focus_vals, 20)).mean())
-            if len(focus_vals) > 4 else 0.0
+            if len(focus_vals) > 4
+            else 0.0
         )
         artifact_fraction = float(artifact_vals.mean())
         stain_score = stain_outlier_score(tiles)
@@ -129,7 +149,7 @@ def compute_wsi_qc(wsi_path: str, cfg: dict, reader) -> dict:
 
 
 def apply_hard_filters(rec: dict, cfg: dict) -> tuple[bool, str | None]:
-    """Hard exclusions checked in order. Returns (excluded, reason)."""
+    """Hard exclusions, checked in order; returns (excluded, first_matching_reason)."""
     hf = cfg["wsi_selection"]["hard_filters"]
     if rec.get("is_he") is False:
         return True, "not_HE"
@@ -154,7 +174,11 @@ def apply_hard_filters(rec: dict, cfg: dict) -> tuple[bool, str | None]:
 
 
 def compute_q_score(rec: dict, cfg: dict, cohort_stats: dict) -> float:
-    """Q = 0.35*usable_tissue + 0.25*focus + 0.20*artifact_free + 0.10*stain_quality + 0.10*representativeness, each min-max normalized against the cohort; representativeness rewards a typical (not extreme) tissue fraction for the cancer type."""
+    """Q = 0.35*usable_tissue + 0.25*focus + 0.20*artifact_free + 0.10*stain_quality
+    + 0.10*representativeness (weights from cfg), each term min-max normalized against the cohort.
+
+    Representativeness rewards a typical (not extreme) tissue fraction for the cancer type.
+    """
     w = cfg["wsi_selection"]["quality_weights"]
 
     def norm(key, value, higher_is_better=True):
@@ -184,14 +208,15 @@ def compute_q_score(rec: dict, cfg: dict, cohort_stats: dict) -> float:
 
 
 def compute_cohort_stats(records: list[dict]) -> dict:
+    """Per-metric (min, max) ranges and median tissue fraction used to normalize Q."""
+
     def rng(key):
         vals = np.array([r[key] for r in records if np.isfinite(r.get(key, np.nan))])
         return (float(vals.min()), float(vals.max())) if len(vals) else (0.0, 1.0)
 
-    tf = np.array([
-        r["tissue_fraction"] for r in records
-        if np.isfinite(r.get("tissue_fraction", np.nan))
-    ])
+    tf = np.array(
+        [r["tissue_fraction"] for r in records if np.isfinite(r.get("tissue_fraction", np.nan))]
+    )
     return {
         "tissue_area_mm2": rng("tissue_area_mm2"),
         "focus_score": rng("focus_score"),
@@ -202,8 +227,10 @@ def compute_cohort_stats(records: list[dict]) -> dict:
 
 
 def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list[dict], dict]:
-    """Applies hard filters, computes cohort-relative Q per cancer type, then selects the max-Q WSI per patient; returns (selected_records, report)."""
-    # hard exclusions
+    """Apply hard filters, score Q within each cancer type, keep the max-Q WSI per patient.
+
+    Returns (selected_records, report).
+    """
     for r in all_records:
         excluded, reason = apply_hard_filters(r, cfg)
         r["excluded"], r["exclusion_reason"] = excluded, reason
@@ -213,13 +240,12 @@ def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list
     for r in kept:
         by_cancer.setdefault(r["cancer_type"], []).append(r)
 
-    # cohort-relative Q score per cancer type
+    # Q is normalized within a cancer type, so scores are not comparable across types.
     for cancer, recs in by_cancer.items():
         stats = compute_cohort_stats(recs)
         for r in recs:
             r["qc_score"] = compute_q_score(r, cfg, stats)
 
-    # best WSI per patient
     selected = []
     by_patient: dict[str, list[dict]] = {}
     for r in kept:
@@ -227,15 +253,13 @@ def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list
     for pid, cands in by_patient.items():
         cands_sorted = sorted(cands, key=lambda r: r["qc_score"], reverse=True)
         best = cands_sorted[0]
-        best["selection_reason"] = (
-            "highest_qc_score" if len(cands_sorted) > 1 else "only_candidate"
-        )
+        best["selection_reason"] = "highest_qc_score" if len(cands_sorted) > 1 else "only_candidate"
         selected.append(best)
 
     n_before_cap = len(selected)
     target_n = cfg["wsi_selection"].get("target_n_patients")
     if target_n and n_before_cap > target_n:
-        # Cap to target_n, proportionally per cancer, so no cancer type is squeezed out by another's higher average Q.
+        # Cap proportionally per cancer so no type is squeezed out by another's higher average Q.
         by_cancer_selected: dict[str, list[dict]] = {}
         for r in selected:
             by_cancer_selected.setdefault(r["cancer_type"], []).append(r)
@@ -248,7 +272,6 @@ def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list
             capped.extend(recs_sorted[:cancer_target])
         selected = capped
 
-    # summary report
     exclusion_counts: dict[str, int] = {}
     for r in all_records:
         if r["excluded"]:
@@ -276,8 +299,22 @@ def select_one_wsi_per_patient(all_records: list[dict], cfg: dict) -> tuple[list
 
 
 def to_manifest_rows(selected: list[dict]) -> list[dict]:
-    """Maps a selected-record dict to the manifests/cptac_selected_wsi.csv schema."""
-    cols = ["patient_id", "cancer_type", "wsi_id", "wsi_path", "specimen_type", "mpp",
-            "width", "height", "tissue_area_mm2", "tissue_fraction", "focus_score",
-            "artifact_fraction", "stain_score", "qc_score", "selection_reason"]
+    """Project selected records onto the manifests/cptac_selected_wsi.csv columns."""
+    cols = [
+        "patient_id",
+        "cancer_type",
+        "wsi_id",
+        "wsi_path",
+        "specimen_type",
+        "mpp",
+        "width",
+        "height",
+        "tissue_area_mm2",
+        "tissue_fraction",
+        "focus_score",
+        "artifact_fraction",
+        "stain_score",
+        "qc_score",
+        "selection_reason",
+    ]
     return [{c: r.get(c) for c in cols} for r in selected]

@@ -139,7 +139,7 @@
   },
   "baselines": {
     "S0_imagenet_no_distill": true,
-    "S1_genbio_distilled": true,
+    "S1_hoptimus_distilled": true,
     "S2_random_init_distilled": true
   },
   "hest": {
@@ -257,7 +257,7 @@
       0.3
     ]
   },
-  "genbio_fair_comparison": {
+  "hoptimus_comparison": {
     "pca_n_components": 256,
     "ridge_alpha": 1.0
   },
@@ -273,6 +273,69 @@
     "gate3_true_topology": {
       "better": "A8_scale_aware_pna",
       "worse": "A5_shuffled_graph"
+    }
+  },
+  "tcga": {
+    "projects": [
+      "TCGA-BRCA",
+      "TCGA-KIRC",
+      "TCGA-COAD"
+    ],
+    "cohort_size": "max",
+    "gdc_api": "https://api.gdc.cancer.gov",
+    "gdc_data": "https://api.gdc.cancer.gov/data",
+    "cbioportal_api": "https://www.cbioportal.org/api",
+    "cbioportal_study_by_project": {
+      "TCGA-BRCA": "brca_tcga_pan_can_atlas_2018",
+      "TCGA-KIRC": "kirc_tcga_pan_can_atlas_2018",
+      "TCGA-COAD": "coadread_tcga_pan_can_atlas_2018"
+    },
+    "slide_type": "Diagnostic Slide",
+    "slide_format": "SVS",
+    "rnaseq_workflow": "STAR - Counts",
+    "target_genes": {
+      "TCGA-BRCA": [
+        "ERBB2",
+        "ESR1",
+        "PGR",
+        "MKI67"
+      ],
+      "TCGA-KIRC": [
+        "CA9"
+      ],
+      "TCGA-COAD": [
+        "KRAS",
+        "MLH1",
+        "MSH2",
+        "MSH6",
+        "PMS2"
+      ]
+    },
+    "clinical_fields": [
+      "OS_STATUS",
+      "OS_MONTHS",
+      "AJCC_PATHOLOGIC_TUMOR_STAGE",
+      "AGE"
+    ],
+    "survival": {
+      "split": "median",
+      "cox_covariates": [
+        "AJCC_PATHOLOGIC_TUMOR_STAGE",
+        "AGE"
+      ]
+    },
+    "paths": {
+      "persist_dir": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/tcga",
+      "manifests": "manifests",
+      "rnaseq": "rnaseq",
+      "clinical": "clinical",
+      "predictions": "predictions",
+      "results": "results",
+      "figures": "figures",
+      "logs": "logs",
+      "scratch_dir": "/lustre/nvwulf/scratch/schennareddy/TCGA",
+      "slides": "slides",
+      "patches": "patches"
     }
   }
 }

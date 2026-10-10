@@ -1,5 +1,11 @@
-"""HEST molecular preprocessing: per-slide normalize+log1p, train-fold-only standardization, and leakage-free per-fold HVG1000/HVG50 selection (nested: G_50 subset G_1000).
-Adapted from STS_PoC/PoC_5/crcspatial/expression.py, generalized for multiple cancer types/ST platforms."""
+"""HEST expression preprocessing: per-slide normalize+log1p, standardization, per-fold HVG
+selection.
+
+Standardization statistics and HVGs are fit on training spots only, so val/test expression never
+leaks into scaling or gene selection; G_50 is nested in G_1000. Adapted from
+STS_PoC/PoC_5/crcspatial/expression.py and generalized to multiple cancer types and ST platforms.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -8,15 +14,24 @@ import scanpy as sc
 
 
 def normalize_log1p_slide(adata, target_sum: float = 1e4) -> None:
-    """In-place per-slide normalize_total + log1p (never across the pooled cohort -- slides differ in technology/sequencing depth)."""
+    """In-place normalize_total + log1p, applied per slide and never to the pooled cohort.
+
+    Slides differ in technology and sequencing depth.
+    """
     sc.pp.normalize_total(adata, target_sum=target_sum)
     sc.pp.log1p(adata)
 
 
 def ensure_gene_symbol_index(adata):
-    """Remaps Ensembl-indexed slides (`ENSG...` with a `SYMBOL` column) to gene-symbol index since everything downstream is symbol-keyed; always finishes with var_names_make_unique() since some real COAD slides (TENX128/154/155/156) have naturally duplicate symbols that would otherwise crash decoupler's MLM."""
+    """Re-index Ensembl-indexed slides (`ENSG...` plus a `SYMBOL` column) by gene symbol.
+
+    Everything downstream is symbol-keyed. Always ends with var_names_make_unique(): some real
+    COAD slides (TENX128/154/155/156) have naturally duplicate symbols that would otherwise crash
+    decoupler's MLM.
+    """
     is_ensembl_indexed = (
-        adata.var.index.size and str(adata.var.index[0]).startswith("ENSG")
+        adata.var.index.size
+        and str(adata.var.index[0]).startswith("ENSG")
         and "SYMBOL" in adata.var.columns
     )
     if is_ensembl_indexed:
@@ -29,7 +44,10 @@ def ensure_gene_symbol_index(adata):
 
 
 class TrainOnlyStandardizer:
-    """Fits mu/sigma on training spots only, applies identically to val/test; tracks fit ids so leakage can be asserted via `assert_no_leakage`."""
+    """Per-gene mu/sigma fit on training spots only and applied unchanged to val/test.
+
+    Fit ids are recorded so `assert_no_leakage` can check that no eval spot was used in the fit.
+    """
 
     def __init__(self, eps: float = 1e-8):
         self.eps = eps
@@ -56,16 +74,26 @@ class TrainOnlyStandardizer:
 
 
 def cross_platform_gene_intersection(genes_by_slide: dict[str, set[str]]) -> list[str]:
-    """Common genes across slides/platforms as a deterministic, lexicographically sorted list -- gene order must never change silently between calls."""
+    """Genes shared by every slide/platform, as a lexicographically sorted list.
+
+    Gene order must never change silently between calls.
+    """
     common = set.intersection(*genes_by_slide.values()) if genes_by_slide else set()
     return sorted(common)
 
 
 def select_hvg_for_fold(
-    train_expr: pd.DataFrame, common_genes: list[str], n_hvg1000: int, n_hvg50: int,
+    train_expr: pd.DataFrame,
+    common_genes: list[str],
+    n_hvg1000: int,
+    n_hvg50: int,
     min_variance: float = 1e-8,
 ) -> dict:
-    """Ranks `common_genes` by TRAINING-only variance, drops near-zero-variance genes, and takes top n_hvg1000 as G_1000 and its top n_hvg50 as G_50 (nested: one 1000-output model serves both); never called with val/test expression."""
+    """Rank `common_genes` by TRAINING-only variance and select G_1000 and G_50.
+
+    Near-zero-variance genes are dropped first. G_1000 is the top n_hvg1000 and G_50 the top
+    n_hvg50 of G_1000, so one 1000-output model serves both. Never call with val/test expression.
+    """
     var = train_expr[common_genes].var(axis=0, skipna=True)
     usable = var[var >= min_variance].sort_values(ascending=False)
     hvg1000 = usable.index[:n_hvg1000].tolist()

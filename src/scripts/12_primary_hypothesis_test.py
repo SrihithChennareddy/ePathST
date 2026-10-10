@@ -1,6 +1,11 @@
 #!/usr/bin/env python
-"""Aggregates cv_ablation_metrics.csv, verifies completeness, runs the 3 primary gates (A2>A1
-distillation, A8>A2 spatial context, A8>A5 true topology/negative control), pooled + per cancer."""
+"""Paired bootstrap and sign-flip tests on cv_ablation_metrics.csv for the three primary gates.
+Gates: A2>A1 (distillation), A8>A2 (spatial context), A8>A5 (true topology vs shuffled graph).
+
+Reads the output of src/scripts/10_run_patient_cv.py and refuses to compute any statistic unless
+every expected (cancer, fold, seed, ablation) run is present. Each gate is reported pooled and per
+cancer, plus a set of secondary A8 comparisons. The resampling unit is the (cancer, fold, seed)
+cell, which is coarser than individual patients."""
 from __future__ import annotations
 
 import argparse
@@ -19,25 +24,35 @@ from epathst.utils import load_config, resolve_run_paths, save_json
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/base.yaml")
-    ap.add_argument("--skip-completeness-check", action="store_true",
-                     help="only for partial/debug runs -- the real pipeline must never skip this")
-    ap.add_argument("--max-folds-per-cancer", type=int, default=None,
-                     help="must match whatever value src/scripts/10_run_patient_cv.py was run with, so the "
-                          "completeness gate compares against the same (trimmed) design it actually ran")
-    ap.add_argument("--seeds", type=int, nargs="+", default=None,
-                     help="must match whatever value src/scripts/10_run_patient_cv.py was run with")
+    ap.add_argument(
+        "--skip-completeness-check",
+        action="store_true",
+        help="only for partial/debug runs -- the real pipeline must never skip this",
+    )
+    ap.add_argument(
+        "--max-folds-per-cancer",
+        type=int,
+        default=None,
+        help="must match whatever value src/scripts/10_run_patient_cv.py was run with, so the "
+        "completeness gate compares against the same (trimmed) design it actually ran",
+    )
+    ap.add_argument(
+        "--seeds",
+        type=int,
+        nargs="+",
+        default=None,
+        help="must match whatever value src/scripts/10_run_patient_cv.py was run with",
+    )
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
     if args.seeds is not None:
         cfg["cross_validation"]["seeds"] = args.seeds
 
-    # load aggregated metrics
     df = pd.read_csv(paths["results"] / "cv_ablation_metrics.csv")
     stats_cfg = cfg["statistics"]
 
-    # completeness gate
-    # refuse to compute any statistic over a run set that doesn't match what the CV design calls for
+    # Completeness gate: never compute statistics over a run set that differs from the CV design.
     if not args.skip_completeness_check:
         hest_samples = pd.read_csv(paths["manifests"] / "hest_samples.csv")
         patients_by_cancer = {
@@ -47,46 +62,61 @@ def main():
         cv_grid = build_cv_grid(patients_by_cancer, cfg)
         if args.max_folds_per_cancer is not None:
             for info in cv_grid["per_cancer"].values():
-                info["folds"] = info["folds"][:args.max_folds_per_cancer]
-            cv_grid["pooled"]["folds"] = cv_grid["pooled"]["folds"][:args.max_folds_per_cancer]
+                info["folds"] = info["folds"][: args.max_folds_per_cancer]
+            cv_grid["pooled"]["folds"] = cv_grid["pooled"]["folds"][: args.max_folds_per_cancer]
         ablation_names = sorted(df["ablation"].unique())
         expected = expected_run_keys(cv_grid, ablation_names, unit="per_cancer")
         completed = set(zip(df["cancer"], df["fold"], df["seed"], df["ablation"]))
         assert_run_completeness(expected, completed, context="12_primary_hypothesis_test")
 
     def patient_scores(ablation: str, cancer: str | None = None) -> dict:
-        # per-(fold,seed) Fisher-z patient-macro R; these cells are the bootstrap resampling unit here, coarser than true per-patient R_p (see the known-limitation note below)
+        # Per-(fold, seed) Fisher-z patient-macro R. These cells are the bootstrap unit, coarser
+        # than per-patient R_p (see the known-limitation note at the end of main).
         sub = df[df["ablation"] == ablation]
         if cancer is not None:
             sub = sub[sub["cancer"] == cancer]
-        return {f"{r.cancer}_f{r.fold}_s{r.seed}": r.fisher_z_mean_patient_R for r in sub.itertuples()}
+        return {
+            f"{r.cancer}_f{r.fold}_s{r.seed}": r.fisher_z_mean_patient_R for r in sub.itertuples()
+        }
 
     def gate_test(better: str, worse: str, cancer: str | None = None) -> dict:
         ra, rb = patient_scores(better, cancer), patient_scores(worse, cancer)
         common = sorted(set(ra) & set(rb))
         if not common:
-            return {"n_units": 0, "note": "no overlapping (cancer,fold,seed) cells for this comparison yet"}
+            return {
+                "n_units": 0,
+                "note": "no overlapping (cancer,fold,seed) cells for this comparison yet",
+            }
         deltas = np.array([ra[c] - rb[c] for c in common])
         bootstrap = patient_bootstrap_ci(
             deltas, n_iterations=stats_cfg["n_bootstrap"], ci=tuple(stats_cfg["ci"])
         )
         sign_flip = paired_sign_flip_test(deltas, n_iterations=stats_cfg["n_bootstrap"])
-        return {"better": better, "worse": worse, "units": common, "bootstrap": bootstrap,
-                "sign_flip_test": sign_flip, "supported_ci_above_zero": bool(bootstrap["ci_low"] > 0.0)}
+        return {
+            "better": better,
+            "worse": worse,
+            "units": common,
+            "bootstrap": bootstrap,
+            "sign_flip_test": sign_flip,
+            "supported_ci_above_zero": bool(bootstrap["ci_low"] > 0.0),
+        }
 
     gates_cfg = cfg["primary_gates"]
-    gate_names = {"gate1_distillation": "Gate 1: Distillation (A2 > A1)",
-                  "gate2_spatial_context": "Gate 2: Spatial context (A8 > A2)",
-                  # A5 is the degree-preserving shuffled-graph negative control (see epathst.ablations)
-                  "gate3_true_topology": "Gate 3: True topology (A8 > A5, THE decisive test)"}
+    gate_names = {
+        "gate1_distillation": "Gate 1: Distillation (A2 > A1)",
+        "gate2_spatial_context": "Gate 2: Spatial context (A8 > A2)",
+        # A5 is the degree-preserving shuffled-graph negative control (see epathst.ablations)
+        "gate3_true_topology": "Gate 3: True topology (A8 > A5, THE decisive test)",
+    }
 
-    # run the 3 primary gates, pooled + per cancer
     results = {"pooled": {}, "per_cancer": {}}
     for gate_key, spec in gates_cfg.items():
         results["pooled"][gate_key] = gate_test(spec["better"], spec["worse"])
         supported = results["pooled"][gate_key].get("supported_ci_above_zero")
-        print(f"[12_primary_hypothesis_test] {gate_names.get(gate_key, gate_key)} (pooled): "
-              f"{'SUPPORTED' if supported else 'NOT SUPPORTED'}")
+        print(
+            f"[12_primary_hypothesis_test] {gate_names.get(gate_key, gate_key)} (pooled): "
+            f"{'SUPPORTED' if supported else 'NOT SUPPORTED'}"
+        )
         for cancer in cfg["cancers"]["hest"]:
             results["per_cancer"].setdefault(cancer, {})[gate_key] = gate_test(
                 spec["better"], spec["worse"], cancer
@@ -94,7 +124,7 @@ def main():
 
     save_json(results, paths["results"] / "primary_hypothesis_test.json")
 
-    # run secondary comparisons (V2 Phase 22 only reprioritizes the 3 gates above, doesn't remove these)
+    # Secondary comparisons: V2 Phase 22 reprioritized the 3 gates above but kept these.
     secondary = {}
     for name, (a, b) in {
         "scale_aware_vs_local": ("A8_scale_aware_pna", "A6_local_pna"),
@@ -105,12 +135,17 @@ def main():
     }.items():
         secondary[name] = gate_test(a, b)
     save_json(secondary, paths["results"] / "secondary_hypothesis_tests.json")
-    print(f"[12_primary_hypothesis_test] wrote primary_hypothesis_test.json (3 gates x pooled+per-cancer) "
-          f"and secondary_hypothesis_tests.json ({list(secondary)})")
+    print(
+        f"[12_primary_hypothesis_test] wrote primary_hypothesis_test.json (3 gates x "
+        "pooled+per-cancer) "
+        f"and secondary_hypothesis_tests.json ({list(secondary)})"
+    )
 
-    print("\n[12_primary_hypothesis_test] KNOWN LIMITATION: bootstrap resampling unit here is "
-          "(cancer, fold, seed) cells, not individual patients -- a stricter implementation would "
-          "plumb per-patient R_p values through to this script and bootstrap over patients directly.")
+    print(
+        "\n[12_primary_hypothesis_test] KNOWN LIMITATION: bootstrap resampling unit here is "
+        "(cancer, fold, seed) cells, not individual patients -- a stricter implementation would "
+        "plumb per-patient R_p values through to this script and bootstrap over patients directly."
+    )
 
 
 if __name__ == "__main__":

@@ -17,3 +17,8 @@ experimental_runs/*/results/genbio_gene_metrics.csv
 experimental_runs/*/results/per_cancer/*.json
 experimental_runs/*/results/official_hest_benchmark/official_hest_benchmark_full.json
 docs/reports/style_references/
+
+# scratch scripts and outputs from interactive debugging
+.tmp_*
+slurm/scratch/
+figures/output/

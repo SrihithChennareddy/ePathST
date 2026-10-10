@@ -1,8 +1,9 @@
 #!/usr/bin/env python
-"""Final scientific interpretation: answers each required question strictly
-from files already written by scripts 06/12/13/14/17, classifies each as
-SUPPORTED / PARTIALLY_SUPPORTED / NOT_SUPPORTED, and writes
-results/final_scientific_interpretation.md."""
+"""Classifies each required scientific question as SUPPORTED, PARTIALLY_SUPPORTED or NOT_SUPPORTED.
+Answers come only from result files already on disk (scripts 06, 12 and 14); a missing input gives
+NOT_SUPPORTED rather than a guess.
+
+Writes results/final_scientific_interpretation.md and a matching .json."""
 from __future__ import annotations
 
 import argparse
@@ -47,50 +48,72 @@ def main():
     if s0 is not None and s1 is not None:
         conclusions.append(classify_distillation_improvement(s0, s1, s1 - s0))
     else:
-        conclusions.append(Conclusion(
-            "Did GenBio distillation improve the 3.7M CNN over ImageNet init?",
-            "distillation_evaluation.json missing S0/S1 results -- rerun scripts 05-06",
-            "NOT_SUPPORTED", {},
-        ))
+        conclusions.append(
+            Conclusion(
+                "Did H-Optimus-0 distillation improve the student CNN over ImageNet init?",
+                "distillation_evaluation.json missing S0/S1 results -- rerun scripts 05-06",
+                "NOT_SUPPORTED",
+                {},
+            )
+        )
 
     if s1 is not None:
         conclusions.append(classify_representation_fidelity(s1))
     else:
-        conclusions.append(Conclusion(
-            "How closely did the student reproduce GenBio representations?",
-            "not yet measured", "NOT_SUPPORTED", {},
-        ))
+        conclusions.append(
+            Conclusion(
+                "How closely did the student reproduce H-Optimus-0 representations?",
+                "not yet measured",
+                "NOT_SUPPORTED",
+                {},
+            )
+        )
 
     if "compression" in efficiency:
         compression = efficiency["compression"]
-        conclusions.append(Conclusion(
-            "What was the exact compute difference?",
-            f"{compression['compression_ratio_x']:.1f}x parameter compression "
-            f"({efficiency['teacher']['total_parameters']:,} -> "
-            f"{efficiency['student']['total_parameters']:,})",
-            "SUPPORTED", compression,
-        ))
+        conclusions.append(
+            Conclusion(
+                "What was the exact compute difference?",
+                f"{compression['compression_ratio_x']:.1f}x parameter compression "
+                f"({efficiency['teacher']['total_parameters']:,} -> "
+                f"{efficiency['student']['total_parameters']:,})",
+                "SUPPORTED",
+                compression,
+            )
+        )
     else:
-        conclusions.append(Conclusion(
-            "What was the exact compute difference?", "efficiency accounting not yet run",
-            "NOT_SUPPORTED", {},
-        ))
+        conclusions.append(
+            Conclusion(
+                "What was the exact compute difference?",
+                "efficiency accounting not yet run",
+                "NOT_SUPPORTED",
+                {},
+            )
+        )
 
     if primary is not None:
         conclusions.append(classify_real_vs_shuffled(primary))
     else:
-        conclusions.append(Conclusion(
-            "Did the real graph outperform the degree-preserving shuffled graph?",
-            "primary_hypothesis_test.json missing -- rerun script 12", "NOT_SUPPORTED", {},
-        ))
+        conclusions.append(
+            Conclusion(
+                "Did the real graph outperform the degree-preserving shuffled graph?",
+                "primary_hypothesis_test.json missing -- rerun script 12",
+                "NOT_SUPPORTED",
+                {},
+            )
+        )
 
     if "multiscale_vs_local" in secondary:
         conclusions.append(classify_multiscale_vs_local(secondary["multiscale_vs_local"]))
     else:
-        conclusions.append(Conclusion(
-            "Did multiscale context outperform purely local context?",
-            "secondary_hypothesis_tests.json missing -- rerun script 12", "NOT_SUPPORTED", {},
-        ))
+        conclusions.append(
+            Conclusion(
+                "Did multiscale context outperform purely local context?",
+                "secondary_hypothesis_tests.json missing -- rerun script 12",
+                "NOT_SUPPORTED",
+                {},
+            )
+        )
 
     report_md = build_final_report(conclusions)
     out_path = paths["results"] / "final_scientific_interpretation.md"

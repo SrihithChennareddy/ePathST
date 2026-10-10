@@ -1,5 +1,9 @@
-"""Evaluation metrics: patient-level Fisher-z aggregated Pearson (the primary metric -- patients, not
-spots, are the independent statistical unit), plus Spearman, MSE/MAE, threshold fractions, Moran's I."""
+"""Patient-level evaluation metrics; the primary metric is Fisher-z aggregated Pearson.
+
+Patients, not spots, are the independent statistical unit. Secondary metrics are Spearman, MSE/MAE,
+fraction of columns above r thresholds, and Moran's I.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -8,6 +12,7 @@ from scipy.stats import spearmanr
 
 
 def _safe_pearson(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Pearson r on non-NaN pairs; NaN with fewer than 3 pairs or a constant input."""
     valid = ~(np.isnan(y_true) | np.isnan(y_pred))
     if valid.sum() < 3 or np.nanstd(y_true[valid]) < 1e-12 or np.nanstd(y_pred[valid]) < 1e-12:
         return np.nan
@@ -21,6 +26,7 @@ def per_patient_per_column_pearson(
     col_names: list[str],
     min_regions: int,
 ) -> pd.DataFrame:
+    """Pearson r, MSE and MAE per (patient, column); patients under `min_regions` are skipped."""
     rows = []
     for pid in sorted(set(patient_ids)):
         mask = patient_ids == pid
@@ -31,19 +37,24 @@ def per_patient_per_column_pearson(
             r = _safe_pearson(yt[:, j], yp[:, j])
             mse = float(np.nanmean((yt[:, j] - yp[:, j]) ** 2))
             mae = float(np.nanmean(np.abs(yt[:, j] - yp[:, j])))
-            rows.append({
-                "patient_id": pid,
-                "column": col,
-                "r": r,
-                "mse": mse,
-                "mae": mae,
-                "n": int(mask.sum()),
-            })
+            rows.append(
+                {
+                    "patient_id": pid,
+                    "column": col,
+                    "r": r,
+                    "mse": mse,
+                    "mae": mae,
+                    "n": int(mask.sum()),
+                }
+            )
     return pd.DataFrame(rows)
 
 
 def patient_macro_fisher_z(per_patient_per_col: pd.DataFrame) -> pd.DataFrame:
-    """R_p = tanh(mean_g(atanh(r_pg))) -- the fundamental independent observations for every downstream statistical test."""
+    """R_p = tanh(mean_g(atanh(r_pg))), with r clipped to +-0.999999 before atanh.
+
+    These per-patient values are the independent observations for every downstream test.
+    """
     df = per_patient_per_col.dropna(subset=["r"]).copy()
     df["r_clipped"] = df["r"].clip(-0.999999, 0.999999)
     df["z"] = np.arctanh(df["r_clipped"])
@@ -53,7 +64,10 @@ def patient_macro_fisher_z(per_patient_per_col: pd.DataFrame) -> pd.DataFrame:
 
 
 def target_summary(per_patient_per_col: pd.DataFrame, thresholds=(0.0, 0.2, 0.3)) -> dict:
-    """Fisher-z mean + median patient-level correlation, plus %{gene: r > threshold} on the per-gene pooled-across-patients mean r."""
+    """Fisher-z mean and median patient-level R, plus the fraction of columns with r > threshold.
+
+    The threshold fractions use each column's mean r pooled across patients.
+    """
     per_col = per_patient_per_col.dropna(subset=["r"]).groupby("column")["r"].mean()
     macro = patient_macro_fisher_z(per_patient_per_col)
     out = {
@@ -74,6 +88,7 @@ def spearman_per_column(
     col_names: list[str],
     min_regions: int,
 ) -> pd.DataFrame:
+    """Spearman rho per (patient, column); same patient filter as the Pearson table."""
     rows = []
     for pid in sorted(set(patient_ids)):
         mask = patient_ids == pid
@@ -90,7 +105,10 @@ def spearman_per_column(
 
 
 def morans_i(values: np.ndarray, coords_um: np.ndarray, k: int = 6) -> float:
-    """Moran's I of a single spatial field via a k-NN binary weight matrix."""
+    """Moran's I of one spatial field with a k-NN binary weight matrix.
+
+    NaNs are mean-imputed; returns NaN with fewer than k + 1 valid values.
+    """
     from scipy.spatial import cKDTree
 
     n = len(values)
@@ -100,19 +118,17 @@ def morans_i(values: np.ndarray, coords_um: np.ndarray, k: int = 6) -> float:
     v = values.copy()
     v[~valid] = np.nanmean(values)
 
-    # k-NN neighbor graph
     tree = cKDTree(coords_um)
     _, idx = tree.query(coords_um, k=k + 1)
     neighbors = idx[:, 1:]
 
-    # accumulate weighted cross-products
     x = v - v.mean()
     num, w_sum = 0.0, 0.0
     for i in range(n):
         for j in neighbors[i]:
             num += x[i] * x[j]
             w_sum += 1.0
-    denom = (x ** 2).sum()
+    denom = (x**2).sum()
     if denom < 1e-12 or w_sum < 1e-12:
         return np.nan
     return float((n / w_sum) * (num / denom))
@@ -126,11 +142,12 @@ def evaluate_predictions(
     col_names: list[str],
     cfg: dict,
 ) -> dict:
-    """Overall + per-cancer patient-level Pearson/Spearman/MSE/MAE summary for one target block (HVG50, HVG1000, or pathways)."""
+    """Overall and per-cancer patient-level Pearson/Spearman/MSE/MAE summary for one target block
+    (HVG50, HVG1000, or pathways).
+    """
     min_regions = cfg["evaluation"]["min_regions_per_patient"]
     thresholds = tuple(cfg["evaluation"]["gene_r_thresholds"])
     out = {}
-    # overall + per-cancer subgroups
     groups = {"overall": np.ones(len(patient_ids), dtype=bool)}
     for c in np.unique(cancer_types):
         groups[c] = cancer_types == c

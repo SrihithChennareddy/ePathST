@@ -1,11 +1,15 @@
-"""Graph-destruction controls for ablations A4 (random) and A5 (degree-preserving shuffle) plus the
-dose-response sweep; all preserve total edge count, so any effect is attributable to topology, not degree."""
+"""Graph-destruction controls: A4 (random graph), A5 (degree-preserving shuffle), dose-response.
+
+All preserve the total edge count, so any effect is attributable to topology, not degree.
+"""
+
 from __future__ import annotations
 
 import numpy as np
 
 
 def _undirected_pairs(edge_index: np.ndarray) -> np.ndarray:
+    """One (i, j) row with i < j per undirected edge; assumes both directions are present."""
     src, dst = edge_index[0], edge_index[1]
     mask = src < dst
     return np.stack([src[mask], dst[mask]], axis=1)
@@ -18,7 +22,7 @@ def _symmetrize(pairs: np.ndarray) -> np.ndarray:
 
 
 def random_graph(edge_index: np.ndarray, n_nodes: int, seed: int) -> np.ndarray:
-    """A4: same node/edge count, edges placed uniformly at random -- no physical-distance information used."""
+    """A4: same node and edge count, edges placed uniformly at random (no distance information)."""
     rng = np.random.RandomState(seed)
     n_edges = _undirected_pairs(edge_index).shape[0]
     max_possible = n_nodes * (n_nodes - 1) // 2
@@ -37,7 +41,9 @@ def random_graph(edge_index: np.ndarray, n_nodes: int, seed: int) -> np.ndarray:
 def degree_preserving_rewire(
     edge_index: np.ndarray, seed: int, n_swap_multiplier: int = 10
 ) -> np.ndarray:
-    """A5, the critical negative control: double-edge-swap rewiring that exactly preserves every node's degree while destroying real physical adjacency."""
+    """A5, the critical negative control: double-edge-swap rewiring that keeps every node's degree
+    exactly while destroying real physical adjacency.
+    """
     rng = np.random.RandomState(seed)
     pairs = _undirected_pairs(edge_index)
     edge_set = {tuple(p) for p in pairs}
@@ -77,13 +83,17 @@ def partial_edge_replacement(
     distance_um: np.ndarray | None = None,
     placeholder_distance: float = 0.0,
 ) -> dict:
-    """Dose-response sweep: replaces `fraction` of real edges with random ones, keeping total edge count fixed (fraction in {0, 0.25, 0.5, 0.75, 1.0})."""
+    """Dose-response sweep: replace `fraction` of real edges with random ones at fixed edge count.
+
+    `fraction` is one of {0, 0.25, 0.5, 0.75, 1.0}. Returns edge_index and distance_um (None if no
+    distances were given); replacement edges get `placeholder_distance`.
+    """
     rng = np.random.RandomState(seed)
     real_pairs = _undirected_pairs(edge_index)
     n_edges = len(real_pairs)
     n_replace = int(round(fraction * n_edges))
 
-    # remember real distances so kept edges can carry them into the output
+    # real distances, so kept edges carry them into the output
     real_dist_by_pair = {}
     if distance_um is not None:
         src, dst = edge_index[0], edge_index[1]
@@ -92,14 +102,15 @@ def partial_edge_replacement(
             real_dist_by_pair[(int(i), int(j))] = float(d)
 
     if n_replace == 0:
-        return {"edge_index": edge_index.copy(),
-                "distance_um": distance_um.copy() if distance_um is not None else None}
+        return {
+            "edge_index": edge_index.copy(),
+            "distance_um": distance_um.copy() if distance_um is not None else None,
+        }
 
-    # drop a random subset of real edges, keep the rest
     keep_idx = rng.choice(n_edges, size=n_edges - n_replace, replace=False)
     kept = {tuple(p) for p in real_pairs[keep_idx]}
 
-    # top back up to the original edge count with random replacement edges
+    # top up with random edges to restore the original edge count
     max_possible = n_nodes * (n_nodes - 1) // 2
     target_total = min(n_edges, len(kept) + max_possible - len(kept))
     while len(kept) < target_total:
@@ -111,11 +122,16 @@ def partial_edge_replacement(
     pairs = np.array(sorted(kept), dtype=np.int64)
     out_edge_index = _symmetrize(pairs)
 
-    # look up distance for kept real edges; placeholder for replacement edges
+    # kept real edges keep their distance; replacement edges get the placeholder
     out_distance = None
     if distance_um is not None:
-        out_distance = np.array([
-            real_dist_by_pair.get((min(int(i), int(j)), max(int(i), int(j))), placeholder_distance)
-            for i, j in zip(out_edge_index[0], out_edge_index[1])
-        ], dtype=np.float32)
+        out_distance = np.array(
+            [
+                real_dist_by_pair.get(
+                    (min(int(i), int(j)), max(int(i), int(j))), placeholder_distance
+                )
+                for i, j in zip(out_edge_index[0], out_edge_index[1])
+            ],
+            dtype=np.float32,
+        )
     return {"edge_index": out_edge_index, "distance_um": out_distance}

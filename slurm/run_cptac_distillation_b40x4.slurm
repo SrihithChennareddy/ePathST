@@ -51,7 +51,7 @@
 #      workers each holding a multi-hundred-MB DICOM WSI pyramid +
 #      decompressed tile buffers spike well past a default few-GB limit).
 #   2. job 83815 (resubmitted after the truncation-bug fix, see
-#      docs/RUN_STATUS.md) requested --mem=220G (sized for a node that
+#      docs/reports/RUN_STATUS.md) requested --mem=220G (sized for a node that
 #      had ~468GB truly free at 83721/83723's fix time) but got pinned via
 #      --nodelist to b40x4-11, which only had ~47GB actually allocatable
 #      at THAT submission time -- sat PENDING(Resources) indefinitely
@@ -85,7 +85,7 @@ log "=== Step 3: CPTAC patient split (x3 seeds) ==="
 python3 src/scripts/03_cptac_patient_split.py --config "$CONFIG"
 
 log "=== Step 4: H-Optimus-0 teacher embedding (single GPU) ==="
-python3 src/scripts/04_run_teacher_genbio.py --config "$CONFIG" --device cuda --shard-index 0 --num-shards 1
+python3 src/scripts/04_run_teacher_hoptimus.py --config "$CONFIG" --device cuda --shard-index 0 --num-shards 1
 
 ELAPSED=$((SECONDS - JOB_START))
 REMAINING=$((WALL_CLOCK_SECONDS - ELAPSED - RESERVE_SECONDS))
@@ -102,7 +102,7 @@ log "=== Step 9: lock student, strip teacher-projection head, save to persist_di
 python3 src/scripts/07_lock_student.py --config "$CONFIG" --device cuda --mode A
 
 log "=== snapshotting results to experimental_runs/ for later comparison ==="
-python3 src/scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4 \
+python3 src/scripts/tools/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4 \
   --gpu "1x RTX PRO 6000 Blackwell" --label cptac_distill_b40x4 --stage "end of 8h job"
 
 log "=== DONE (total elapsed: $((SECONDS - JOB_START))s) ==="

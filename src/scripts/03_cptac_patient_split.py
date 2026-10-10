@@ -1,6 +1,10 @@
 #!/usr/bin/env python
-"""Patient-level 80/10/10 CPTAC split for each seed, stratified by
-cancer type, with leakage assertions against the patch manifest."""
+"""Patient-level 80/10/10 train/val/test split of the CPTAC cohort, one per seed.
+
+Stage 03 of the ePathST pipeline: splits are stratified by cancer type and grouped by patient, and
+checked against the patch manifest so no patient's patches land in two splits. Writes
+manifests/cptac_split_seed{seed}.csv, read by distillation training (05) and evaluation (06).
+"""
 from __future__ import annotations
 
 import argparse
@@ -25,8 +29,9 @@ def main():
     patch_manifest = pd.read_csv(paths["manifests"] / "cptac_patch_manifest.csv")
 
     for seed in cfg["seeds"]:
-        split_df = cptac_patient_split(selected, cfg, seed)  # stratified 80/10/10 split
-        assert_no_patch_leakage(patch_manifest, split_df)  # leakage check
+        split_df = cptac_patient_split(selected, cfg, seed)
+        # Leakage gate: no patient may contribute patches to more than one split.
+        assert_no_patch_leakage(patch_manifest, split_df)
 
         out_path = paths["manifests"] / f"cptac_split_seed{seed}.csv"
         split_df.to_csv(out_path, index=False)

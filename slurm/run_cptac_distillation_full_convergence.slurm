@@ -91,7 +91,7 @@ log "=== Step 3: CPTAC patient split (x3 seeds) ==="
 python3 src/scripts/03_cptac_patient_split.py --config "$CONFIG"
 
 log "=== Step 4: H-Optimus-0 teacher embedding (only NEW patches not already cached) ==="
-python3 src/scripts/04_run_teacher_genbio.py --config "$CONFIG" --device cuda --shard-index 0 --num-shards 1
+python3 src/scripts/04_run_teacher_hoptimus.py --config "$CONFIG" --device cuda --shard-index 0 --num-shards 1
 
 ELAPSED=$((SECONDS - JOB_START))
 REMAINING=$((WALL_CLOCK_SECONDS - ELAPSED - RESERVE_SECONDS))
@@ -108,7 +108,7 @@ log "=== Step 9: lock student, strip teacher-projection head, save to persist_di
 python3 src/scripts/07_lock_student.py --config "$CONFIG" --device cuda --mode A
 
 log "=== snapshotting results to experimental_runs/ for later comparison ==="
-python3 src/scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4-long \
+python3 src/scripts/tools/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4-long \
   --gpu "1x RTX PRO 6000 Blackwell" --label cptac_distill_full_convergence --stage "end of 24h job (target 50-100 epochs)"
 
 log "=== DONE (total elapsed: $((SECONDS - JOB_START))s) ==="

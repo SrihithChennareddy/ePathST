@@ -15,7 +15,7 @@
 # design: 5-fold patient-level CV x 3 cancers (IDC/COAD/CCRCC) x seed 0,
 # full A0-A9 ablation grid (A1 restored, target-misalignment bug fixed,
 # pathway_loss_weight=0.2), using the validated implementation exactly as
-# locked after the diagnostic pass (docs/RUN_STATUS.md + this session's
+# locked after the diagnostic pass (docs/reports/RUN_STATUS.md + this session's
 # commit "Fix A1 feature-mixup, graph-ablation target misalignment,
 # pathway_loss_weight=0; add official HEST-Benchmark reproduction").
 #
@@ -24,7 +24,7 @@
 # if compute allows after this primary result is in -- not required for
 # every ablation.
 #
-# Reuses all existing caches (patches, distilled+imagenet+genbio features,
+# Reuses all existing caches (patches, distilled+imagenet+teacher features,
 # locked encoder checkpoint) -- only Step 10 (full 5-fold grid) + Step 12
 # (gates) need to run.
 
@@ -43,7 +43,7 @@ log "=== Step 12: primary hypothesis test (3 gates, per-cancer + pooled) ==="
 python3 src/scripts/12_primary_hypothesis_test.py --config "$CONFIG" --seeds 0
 
 log "=== snapshotting results to experimental_runs/ ==="
-python3 src/scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4-long \
+python3 src/scripts/tools/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition b40x4-long \
   --gpu "1x RTX PRO 6000 Blackwell" --label final_5fold_3cancer_seed0 \
   --stage "LOCKED final 5-fold x 3-cancer x seed-0 primary experiment, post-diagnostic-fix" || \
   log "snapshot failed -- non-fatal, results/cv_ablation_metrics.csv is still the source of truth"

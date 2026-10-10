@@ -1,11 +1,9 @@
 #!/usr/bin/env python
-"""Assembles results/final/ -- the single consolidated, submission-ready
-output directory for the LOCKED final 5-fold x 3-cancer x seed-0
-experiment (job 84871, 2026-08-31), by pure aggregation over files scripts
-10/12/17/19 and the GenBio baseline already wrote to disk (no re-fitting,
-estimation, or extrapolation). Per the FINAL STOP RULE, every number here
-is either a real measured result or explicitly labeled NOT MEASURED /
-PARTIAL / SEPARATE PROTOCOL -- never silently omitted or fabricated."""
+"""Assembles results/final/, the consolidated output of the locked 5-fold x 3-cancer x seed-0
+experiment (job 84871, 2026-08-31), by pure aggregation of files written by scripts 10/12/17/19
+and the H-Optimus-0 baseline.
+Nothing is re-fitted or extrapolated: every number is a measured result or is labeled
+NOT MEASURED / PARTIAL / SEPARATE PROTOCOL, never omitted or fabricated."""
 from __future__ import annotations
 
 import json
@@ -36,7 +34,12 @@ def bootstrap_row(vals: np.ndarray, n_boot: int) -> dict:
         mean = float(vals.mean()) if len(vals) else float("nan")
         return {"mean": mean, "ci_low": float("nan"), "ci_high": float("nan"), "n": len(vals)}
     ci = patient_bootstrap_ci(vals, n_iterations=n_boot)
-    return {"mean": ci["mean_delta"], "ci_low": ci["ci_low"], "ci_high": ci["ci_high"], "n": len(vals)}
+    return {
+        "mean": ci["mean_delta"],
+        "ci_low": ci["ci_low"],
+        "ci_high": ci["ci_high"],
+        "n": len(vals),
+    }
 
 
 def main():
@@ -57,14 +60,20 @@ def main():
     for model in MODEL_ORDER:
         sub = df[df["ablation"] == model]
         row = {
-            "model": model, "priority": MODEL_PRIORITY[model], "description": MODEL_DESC[model],
+            "model": model,
+            "priority": MODEL_PRIORITY[model],
+            "description": MODEL_DESC[model],
         }
         for tgt, col in TARGETS:
             b = bootstrap_row(sub[col].values, n_boot)
-            row.update({
-                f"{tgt}_R_mean": b["mean"], f"{tgt}_R_ci_low": b["ci_low"],
-                f"{tgt}_R_ci_high": b["ci_high"], f"{tgt}_n_cells": b["n"],
-            })
+            row.update(
+                {
+                    f"{tgt}_R_mean": b["mean"],
+                    f"{tgt}_R_ci_low": b["ci_low"],
+                    f"{tgt}_R_ci_high": b["ci_high"],
+                    f"{tgt}_n_cells": b["n"],
+                }
+            )
         macro_rows.append(row)
     macro_df = pd.DataFrame(macro_rows)
     macro_df.to_csv(out_dir / "tables" / "model_comparison_macro.csv", index=False)
@@ -77,10 +86,14 @@ def main():
             row = {"cancer": cancer, "model": model}
             for tgt, col in TARGETS:
                 b = bootstrap_row(sub[col].values, n_boot)
-                row.update({
-                    f"{tgt}_R_mean": b["mean"], f"{tgt}_R_ci_low": b["ci_low"],
-                    f"{tgt}_R_ci_high": b["ci_high"], f"{tgt}_n_folds": b["n"],
-                })
+                row.update(
+                    {
+                        f"{tgt}_R_mean": b["mean"],
+                        f"{tgt}_R_ci_low": b["ci_low"],
+                        f"{tgt}_R_ci_high": b["ci_high"],
+                        f"{tgt}_n_folds": b["n"],
+                    }
+                )
             per_cancer_rows.append(row)
     per_cancer_df = pd.DataFrame(per_cancer_rows)
     per_cancer_df.to_csv(out_dir / "tables" / "model_comparison_per_cancer.csv", index=False)
@@ -95,29 +108,40 @@ def main():
     gate_rows = []
     for gate_key, spec in cfg["primary_gates"].items():
         g = primary["pooled"][gate_key]
-        gate_rows.append({
-            "gate": gate_key, "label": gate_labels[gate_key], "scope": "pooled (3 cancers)",
-            "better": spec["better"], "worse": spec["worse"],
-            "mean_delta_R": g["bootstrap"]["mean_delta"], "ci_low": g["bootstrap"]["ci_low"],
-            "ci_high": g["bootstrap"]["ci_high"],
-            "cohens_d": g["bootstrap"]["effect_size_cohens_d"],
-            "p_value_one_sided": g["sign_flip_test"]["p_value_one_sided"],
-            "n_units": len(g["units"]),
-            "verdict": "SUPPORTED" if g["supported_ci_above_zero"] else "NOT SUPPORTED",
-        })
+        gate_rows.append(
+            {
+                "gate": gate_key,
+                "label": gate_labels[gate_key],
+                "scope": "pooled (3 cancers)",
+                "better": spec["better"],
+                "worse": spec["worse"],
+                "mean_delta_R": g["bootstrap"]["mean_delta"],
+                "ci_low": g["bootstrap"]["ci_low"],
+                "ci_high": g["bootstrap"]["ci_high"],
+                "cohens_d": g["bootstrap"]["effect_size_cohens_d"],
+                "p_value_one_sided": g["sign_flip_test"]["p_value_one_sided"],
+                "n_units": len(g["units"]),
+                "verdict": "SUPPORTED" if g["supported_ci_above_zero"] else "NOT SUPPORTED",
+            }
+        )
         for cancer in cancers:
             gc = primary["per_cancer"][cancer][gate_key]
-            gate_rows.append({
-                "gate": gate_key, "label": gate_labels[gate_key], "scope": cancer,
-                "better": spec["better"], "worse": spec["worse"],
-                "mean_delta_R": gc["bootstrap"]["mean_delta"],
-                "ci_low": gc["bootstrap"]["ci_low"],
-                "ci_high": gc["bootstrap"]["ci_high"],
-                "cohens_d": gc["bootstrap"]["effect_size_cohens_d"],
-                "p_value_one_sided": gc["sign_flip_test"]["p_value_one_sided"],
-                "n_units": len(gc["units"]),
-                "verdict": "SUPPORTED" if gc["supported_ci_above_zero"] else "NOT SUPPORTED",
-            })
+            gate_rows.append(
+                {
+                    "gate": gate_key,
+                    "label": gate_labels[gate_key],
+                    "scope": cancer,
+                    "better": spec["better"],
+                    "worse": spec["worse"],
+                    "mean_delta_R": gc["bootstrap"]["mean_delta"],
+                    "ci_low": gc["bootstrap"]["ci_low"],
+                    "ci_high": gc["bootstrap"]["ci_high"],
+                    "cohens_d": gc["bootstrap"]["effect_size_cohens_d"],
+                    "p_value_one_sided": gc["sign_flip_test"]["p_value_one_sided"],
+                    "n_units": len(gc["units"]),
+                    "verdict": "SUPPORTED" if gc["supported_ci_above_zero"] else "NOT SUPPORTED",
+                }
+            )
     gate_df = pd.DataFrame(gate_rows)
     gate_df.to_csv(out_dir / "tables" / "gate_summary.csv", index=False)
 
@@ -125,33 +149,47 @@ def main():
     secondary = json.loads((results / "secondary_hypothesis_tests.json").read_text())
     sec_rows = []
     for name, g in secondary.items():
-        sec_rows.append({
-            "comparison": name, "better": g.get("better"), "worse": g.get("worse"),
-            "mean_delta_R": g.get("bootstrap", {}).get("mean_delta"),
-            "ci_low": g.get("bootstrap", {}).get("ci_low"),
-            "ci_high": g.get("bootstrap", {}).get("ci_high"),
-            "p_value_one_sided": g.get("sign_flip_test", {}).get("p_value_one_sided"),
-            "n_units": len(g.get("units", [])),
-            "verdict": "SUPPORTED" if g.get("supported_ci_above_zero") else "NOT SUPPORTED",
-        })
+        sec_rows.append(
+            {
+                "comparison": name,
+                "better": g.get("better"),
+                "worse": g.get("worse"),
+                "mean_delta_R": g.get("bootstrap", {}).get("mean_delta"),
+                "ci_low": g.get("bootstrap", {}).get("ci_low"),
+                "ci_high": g.get("bootstrap", {}).get("ci_high"),
+                "p_value_one_sided": g.get("sign_flip_test", {}).get("p_value_one_sided"),
+                "n_units": len(g.get("units", [])),
+                "verdict": "SUPPORTED" if g.get("supported_ci_above_zero") else "NOT SUPPORTED",
+            }
+        )
     pd.DataFrame(sec_rows).to_csv(out_dir / "tables" / "secondary_comparisons.csv", index=False)
 
     # -- E) pathway/PROGENy-only view --
     pathway_rows = [
         {
-            "scope": "macro", "model": r["model"], "R_mean": r["pathway_R_mean"],
-            "ci_low": r["pathway_R_ci_low"], "ci_high": r["pathway_R_ci_high"],
+            "scope": "macro",
+            "model": r["model"],
+            "R_mean": r["pathway_R_mean"],
+            "ci_low": r["pathway_R_ci_low"],
+            "ci_high": r["pathway_R_ci_high"],
             "n": r["pathway_n_cells"],
         }
         for r in macro_rows
     ]
     for r in per_cancer_rows:
-        pathway_rows.append({
-            "scope": r["cancer"], "model": r["model"], "R_mean": r["pathway_R_mean"],
-            "ci_low": r["pathway_R_ci_low"], "ci_high": r["pathway_R_ci_high"],
-            "n": r["pathway_n_folds"],
-        })
-    pd.DataFrame(pathway_rows).to_csv(out_dir / "tables" / "pathway_progeny_results.csv", index=False)
+        pathway_rows.append(
+            {
+                "scope": r["cancer"],
+                "model": r["model"],
+                "R_mean": r["pathway_R_mean"],
+                "ci_low": r["pathway_R_ci_low"],
+                "ci_high": r["pathway_R_ci_high"],
+                "n": r["pathway_n_folds"],
+            }
+        )
+    pd.DataFrame(pathway_rows).to_csv(
+        out_dir / "tables" / "pathway_progeny_results.csv", index=False
+    )
 
     # -- F) official HEST-Benchmark (separate protocol, copied verbatim, never mixed with A-G) --
     official_src = results / "official_hest_benchmark" / "official_hest_benchmark_summary.csv"
@@ -159,18 +197,20 @@ def main():
     if len(official_df):
         official_df.to_csv(out_dir / "tables" / "official_hest_benchmark.csv", index=False)
 
-    # -- G) GenBio embedding -> MLP baseline B1 (PARTIAL: fold0/seed0 only, not full 5-fold).
-    # src/scripts/run_genbio_hest_baseline.py's default --head is a trained MLP on the raw 4608-D
-    # GenBio embedding (no PCA, no Ridge) -- --head ridge is an available but unused alternative.
-    genbio_src = results / "genbio_baseline" / "genbio_summary.csv"
-    genbio_df = pd.read_csv(genbio_src) if genbio_src.exists() else pd.DataFrame()
-    if len(genbio_df):
-        genbio_status = (
+    # -- G) H-Optimus-0 embedding -> MLP baseline B1 (PARTIAL: fold0/seed0 only, not full 5-fold).
+    # run_hoptimus_hest_baseline.py defaults to an MLP on the raw 1536-D embedding (no PCA, no
+    # Ridge); --head ridge exists but was not used.
+    baseline_src = results / "hoptimus0_baseline" / "hoptimus0_summary.csv"
+    baseline_df = pd.read_csv(baseline_src) if baseline_src.exists() else pd.DataFrame()
+    if len(baseline_df):
+        baseline_status = (
             "PARTIAL: fold0/seed0 only, not full 5-fold CV -- do not compare directly "
             "to the 5-fold macro table above without accounting for this"
         )
-        genbio_df.insert(1, "status", genbio_status)
-        genbio_df.to_csv(out_dir / "tables" / "genbio_embedding_mlp_baseline_B1.csv", index=False)
+        baseline_df.insert(1, "status", baseline_status)
+        baseline_df.to_csv(
+            out_dir / "tables" / "hoptimus0_embedding_mlp_baseline_B1.csv", index=False
+        )
 
     # -- H) efficiency (real measured items only; everything else explicitly NOT MEASURED) --
     student_params = None
@@ -178,7 +218,7 @@ def main():
     if sp.exists():
         student_params = json.loads(sp.read_text())["total_parameters"]
     teacher_params = None
-    tp = results / "genbio_teacher_param_count.json"
+    tp = results / "hoptimus0_teacher_param_count.json"
     if tp.exists():
         teacher_params = json.loads(tp.read_text())["total_parameters"]
     compression_ratio_value = (
@@ -186,32 +226,41 @@ def main():
     )
     eff_rows = [
         {
-            "metric": "student_encoder_total_parameters", "value": student_params,
+            "metric": "student_encoder_total_parameters",
+            "value": student_params,
             "status": "MEASURED",
             "source": "scripts (ConvNeXt V2-Atto student), student_encoder_param_count_seed0.json",
         },
         {
-            "metric": "genbio_pathfm_teacher_total_parameters", "value": teacher_params,
+            "metric": "h_optimus_0_teacher_total_parameters",
+            "value": teacher_params,
             "status": "MEASURED",
             "source": (
-                "AutoModel.from_pretrained('genbio-ai/genbio-pathfm'), sum(p.numel()), "
-                "2026-08-31"
+                "timm.create_model('hf-hub:bioptimus/H-optimus-0', pretrained=True), "
+                "sum(p.numel())"
             ),
         },
         {
-            "metric": "compression_ratio_teacher_over_student", "value": compression_ratio_value,
-            "status": "MEASURED", "source": "derived from the two rows above",
+            "metric": "compression_ratio_teacher_over_student",
+            "value": compression_ratio_value,
+            "status": "MEASURED",
+            "source": "derived from the two rows above",
         },
         {
-            "metric": "gpu_peak_vram_inference", "value": None, "status": "NOT MEASURED",
+            "metric": "gpu_peak_vram_inference",
+            "value": None,
+            "status": "NOT MEASURED",
             "source": "no inference-time VRAM profiling run this session",
         },
         {
-            "metric": "patches_per_second_throughput", "value": None, "status": "NOT MEASURED",
+            "metric": "patches_per_second_throughput",
+            "value": None,
+            "status": "NOT MEASURED",
             "source": "no throughput benchmark run this session",
         },
         {
-            "metric": "A8_gnn_inference_wallclock_per_patient", "value": None,
+            "metric": "A8_gnn_inference_wallclock_per_patient",
+            "value": None,
             "status": "NOT MEASURED",
             "source": "no dedicated timing harness run this session",
         },
@@ -224,13 +273,23 @@ def main():
     for cancer, info in cv_folds["per_cancer"].items():
         for f in info["folds"]:
             for pid in f["train_patients"]:
-                fold_rows.append({
-                    "cancer": cancer, "fold": f["fold"], "split": "train", "patient_id": pid,
-                })
+                fold_rows.append(
+                    {
+                        "cancer": cancer,
+                        "fold": f["fold"],
+                        "split": "train",
+                        "patient_id": pid,
+                    }
+                )
             for pid in f["test_patients"]:
-                fold_rows.append({
-                    "cancer": cancer, "fold": f["fold"], "split": "test", "patient_id": pid,
-                })
+                fold_rows.append(
+                    {
+                        "cancer": cancer,
+                        "fold": f["fold"],
+                        "split": "test",
+                        "patient_id": pid,
+                    }
+                )
     pd.DataFrame(fold_rows).to_csv(out_dir / "folds" / "cv_folds_used.csv", index=False)
 
     # -- J) FINAL_RESULTS.md --
@@ -238,9 +297,9 @@ def main():
         return "N/A" if v is None or (isinstance(v, float) and np.isnan(v)) else f"{v:.{d}f}"
 
     def gate_line(gate_key):
-        g = [
-            r for r in gate_rows if r["gate"] == gate_key and r["scope"] == "pooled (3 cancers)"
-        ][0]
+        g = [r for r in gate_rows if r["gate"] == gate_key and r["scope"] == "pooled (3 cancers)"][
+            0
+        ]
         per_c = [
             f"{r['scope']}: {r['verdict']} (delta={fmt(r['mean_delta_R'])})"
             for r in gate_rows
@@ -256,8 +315,13 @@ def main():
         )
 
     macro_cols = [
-        "model", "priority", "hvg1000_R_mean", "hvg1000_R_ci_low", "hvg1000_R_ci_high",
-        "hvg50_R_mean", "pathway_R_mean",
+        "model",
+        "priority",
+        "hvg1000_R_mean",
+        "hvg1000_R_ci_low",
+        "hvg1000_R_ci_high",
+        "hvg50_R_mean",
+        "pathway_R_mean",
     ]
     macro_table_md = macro_df[macro_cols].round(4).to_markdown(index=False)
     gate_cols = ["label", "mean_delta_R", "ci_low", "ci_high", "p_value_one_sided", "verdict"]
@@ -266,26 +330,27 @@ def main():
     official_table_md = (
         official_df.round(4).to_markdown(index=False) if len(official_df) else "(not available)"
     )
-    genbio_cols = ["cancer", "status", "HVG50_r", "HVG1000_r", "PROGENy14_r"]
-    genbio_table_md = (
-        genbio_df[genbio_cols].round(4).to_markdown(index=False)
-        if len(genbio_df) else "(not available)"
+    baseline_cols = ["cancer", "status", "HVG50_r", "HVG1000_r", "PROGENy14_r"]
+    baseline_table_md = (
+        baseline_df[baseline_cols].round(4).to_markdown(index=False)
+        if len(baseline_df)
+        else "(not available)"
     )
 
     md = f"""# FINAL_RESULTS.md
 
-Locked final scientific experiment: distilled ConvNeXt V2-Atto (from GenBio-PathFM) +
+Locked final scientific experiment: distilled ConvNeXt V2-Atto (from H-Optimus-0) +
 multiscale PNA graph correction, 5-fold patient-level CV x 3 HEST-1k cancers
 (IDC/COAD/CCRCC) x seed 0. Source run: SLURM job 84871, completed 2026-08-31
 (03:15:54 elapsed). All numbers below are read directly from
 `results/cv_ablation_metrics.csv`, `results/primary_hypothesis_test.json`,
 `results/secondary_hypothesis_tests.json`, `results/official_hest_benchmark/`,
-`results/genbio_baseline/`, and the two parameter-count JSONs -- nothing here is
+`results/hoptimus0_baseline/`, and the two parameter-count JSONs -- nothing here is
 estimated or extrapolated (FINAL STOP RULE).
 
 ## Research questions, answered
 
-**Q1/Q2 -- Does GenBio-PathFM distillation help the patch-only encoder?**
+**Q1/Q2 -- Does H-Optimus-0 distillation help the patch-only encoder?**
 {gate_line('gate1_distillation')}
 Distillation is **not supported** as a pooled effect at seed 0: A2 (distilled) is not reliably
 better than A1 (ImageNet) once patient-level bootstrap uncertainty is accounted for. See the
@@ -304,10 +369,10 @@ from A5 (degree-preserving shuffled graph) in every cancer. Per the FINAL STOP R
 reported as a genuine negative finding, not glossed over -- the GNN's Gate-2 benefit most likely
 comes from general neighbor-averaging/regularization, not from encoding real tissue adjacency.
 
-**Q5 -- Compression efficiency (student vs. GenBio-PathFM teacher).**
+**Q5 -- Compression efficiency (student vs. H-Optimus-0 teacher).**
 Student (distilled ConvNeXt V2-Atto): **{student_params:,} parameters** (measured).
-GenBio-PathFM teacher: **{teacher_params:,} parameters** (measured 2026-08-31 via
-`AutoModel.from_pretrained`, exact `sum(p.numel())`, not the model card's rounded "1.1B").
+H-Optimus-0 teacher: **{teacher_params:,} parameters** (exact `sum(p.numel())`, not the model card's
+rounded "1.1B").
 Compression ratio: **{teacher_params / student_params:.1f}x** fewer parameters, at the accuracy
 cost quantified by Gate 1 above and by the official-protocol comparison below. All other
 efficiency metrics (peak inference VRAM, patches/sec throughput, per-patient GNN wall-clock) were
@@ -333,13 +398,13 @@ which uses train-fold HVG selection, a trained patch head, and GNN correction)
 
 {official_table_md}
 
-## GenBio embedding -> trained MLP baseline (B1) -- **PARTIAL, fold0/seed0 only, not full 5-fold CV**
+## H-Optimus-0 embedding -> trained MLP baseline (B1) -- **PARTIAL, fold0/seed0 only, not full 5-fold CV**
 
-Frozen 4608-D GenBio-PathFM embedding fed directly into a small trained MLP head (no PCA, no
-Ridge -- `src/scripts/run_genbio_hest_baseline.py --head ridge` is an available but unused
+Frozen 1536-D H-Optimus-0 embedding fed directly into a small trained MLP head (no PCA, no
+Ridge -- `src/scripts/run_hoptimus_hest_baseline.py --head ridge` is an available but unused
 alternative), on the same HVG1000/HVG50/PROGENy14 targets and fold structure as the A0-A9 table.
 
-{genbio_table_md}
+{baseline_table_md}
 
 This is preliminary (single fold per cancer); do not treat it as equivalent evidence to the
 5-fold macro table above. A full 5-fold B1 rerun would be needed before drawing a firm B1
@@ -354,7 +419,7 @@ conclusion.
    since job 84871's design, not new to this aggregation step.
 2. **Seeds 1/2** for the major models (A2/A8/B1) were not run -- seed 0 only, per the spec's
    "seed 0 is primary; seeds 1/2 only if compute allows" allowance.
-3. **B1 (GenBio embedding -> MLP baseline)** is fold0/seed0 only for each cancer (see above),
+3. **B1 (H-Optimus-0 embedding -> MLP baseline)** is fold0/seed0 only for each cancer (see above),
    not the full 5-fold design the rest of this table uses.
 4. **Efficiency**: only parameter counts (student, teacher, compression ratio) were measured;
    VRAM/throughput/wall-clock were not.

@@ -1,5 +1,10 @@
-"""PROGENy14 pathway scoring via decoupler's MLM method.
-Uses the installed decoupler v2 API (`dc.op.progeny`, `dc.mt.mlm`), not the v1 API (`dc.get_progeny`, `dc.run_mlm`) this was adapted from."""
+"""PROGENy14 pathway activity scoring with decoupler's MLM method.
+
+The scores are the 14-pathway targets for the pathway head in models/patch_head.py. Uses the
+installed decoupler v2 API (`dc.op.progeny`, `dc.mt.mlm`), not the v1 API (`dc.get_progeny`,
+`dc.run_mlm`) this code was adapted from.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,9 +13,14 @@ import pandas as pd
 
 
 def fetch_and_cache_progeny_net(
-    cache_path: str | Path, top: int = 100, organism: str = "human",
+    cache_path: str | Path,
+    top: int = 100,
+    organism: str = "human",
 ) -> pd.DataFrame:
-    """Fetches the PROGENy model (14 pathways x weighted target genes) once and caches it so re-runs reuse the exact same gene-weight table."""
+    """Fetch the PROGENy model (14 pathways x weighted target genes) once and cache it as CSV.
+
+    Re-runs reuse the exact same gene-weight table.
+    """
     cache_path = Path(cache_path)
     if cache_path.exists():
         return pd.read_csv(cache_path)
@@ -23,33 +33,44 @@ def fetch_and_cache_progeny_net(
 
 
 def check_pathway_gene_coverage(
-    net: pd.DataFrame, genes_by_slide: dict[str, set[str]],
+    net: pd.DataFrame,
+    genes_by_slide: dict[str, set[str]],
 ) -> pd.DataFrame:
-    """Checks pathway target-gene coverage per ST platform/slide, so pathways with poor coverage on any retained slide can be excluded."""
+    """Per-pathway target-gene coverage across ST platforms/slides.
+
+    Lets pathways with poor coverage on any retained slide be excluded.
+    """
     rows = []
     for pathway, sub in net.groupby("source"):
         targets = set(sub["target"])
         n_present_per_slide = [len(targets & genes) for genes in genes_by_slide.values()]
         mean_present = (
-            sum(n_present_per_slide) / len(n_present_per_slide)
-            if n_present_per_slide else 0
+            sum(n_present_per_slide) / len(n_present_per_slide) if n_present_per_slide else 0
         )
-        rows.append({
-            "pathway": pathway,
-            "n_target_genes": len(targets),
-            "min_present_across_slides": min(n_present_per_slide) if n_present_per_slide else 0,
-            "mean_present_across_slides": mean_present,
-        })
+        rows.append(
+            {
+                "pathway": pathway,
+                "n_target_genes": len(targets),
+                "min_present_across_slides": min(n_present_per_slide) if n_present_per_slide else 0,
+                "mean_present_across_slides": mean_present,
+            }
+        )
     return pd.DataFrame(rows).sort_values("pathway").reset_index(drop=True)
 
 
 def compute_progeny_scores(
-    expr_df: pd.DataFrame, net: pd.DataFrame, min_n: int = 5,
+    expr_df: pd.DataFrame,
+    net: pd.DataFrame,
+    min_n: int = 5,
 ) -> pd.DataFrame:
-    """Runs decoupler's MLM on log-normalized full expression (not just HVG1000); returns (spots x pathways) reindexed to expr_df's row order, with decoupler-dropped degenerate spots filled NaN like any other missing target."""
+    """Run decoupler's MLM on log-normalized full expression (not just HVG1000).
+
+    Returns (spots x pathways) reindexed to expr_df's row order. Spots decoupler drops as
+    degenerate come back as NaN, like any other missing target.
+    """
     import decoupler as dc
 
-    # v2 API infers source/target/weight from net's columns (not kwargs); v1's min_n kwarg is now tmin.
+    # v2 infers source/target/weight from net's columns, not kwargs; v1's min_n is now tmin.
     acts, pvals = dc.mt.mlm(data=expr_df, net=net, tmin=min_n, verbose=False)
     acts.index = acts.index.astype(expr_df.index.dtype)
     n_dropped = expr_df.shape[0] - acts.shape[0]

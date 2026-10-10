@@ -1,5 +1,6 @@
 """Fast, torch-free tests for the deterministic numeric code -- runnable
 right now, before any real data lands."""
+
 import sys
 from pathlib import Path
 
@@ -21,7 +22,8 @@ def test_multiscale_edges_within_radius():
 
 
 def test_union_edge_features_shape():
-    # V2 Phase 9 correction: 1 distance + 16 RBF + 3-D scale one-hot = 20-D (V1 omitted the distance scalar -> 19-D, a bug).
+    # V2 Phase 9 correction: 1 distance + 16 RBF + 3-D scale one-hot = 20-D (V1 omitted the distance
+    # scalar -> 19-D, a bug).
     d = np.array([10.0, 200.0, 500.0], dtype=np.float32)
     scale = np.array(["local", "meso", "macro"], dtype=object)
     feats = graph_builder.union_edge_features(d, scale, 600.0, n_rbf=16)
@@ -31,7 +33,8 @@ def test_union_edge_features_shape():
 
 
 def test_per_scale_edge_features_shape():
-    # V2 Phase 9: scale-aware branches don't need the one-hot (branch identity IS the scale) -> 1 distance + 16 RBF = 17-D.
+    # V2 Phase 9: scale-aware branches don't need the one-hot (branch identity IS the scale) -> 1
+    # distance + 16 RBF = 17-D.
     d = np.array([10.0, 200.0, 500.0], dtype=np.float32)
     feats = graph_builder.per_scale_edge_features(d, 600.0, n_rbf=16)
     assert feats.shape == (3, 17)

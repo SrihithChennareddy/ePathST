@@ -1,5 +1,8 @@
-"""Shared utilities: config loading, seeding, JSON I/O, and run-environment
-capture (git commit, package versions, CUDA/GPU, wall-clock, peak VRAM)."""
+"""Shared utilities: config loading, seeding, JSON I/O and run-environment capture.
+
+RunEnvironment records git commit, package versions, CUDA/GPU, wall-clock time and peak VRAM.
+"""
+
 from __future__ import annotations
 
 import json
@@ -15,7 +18,10 @@ import numpy as np
 
 
 def load_config(path: str | Path) -> dict:
-    """Prefers a sibling .json over YAML (PyYAML isn't guaranteed on every cluster module); resolves ``${...}`` templates against the config's own top-level scalars."""
+    """Load a config, preferring a sibling .json over YAML (PyYAML is not on every cluster module).
+
+    ``${...}`` templates are resolved against the config's own top-level scalars.
+    """
     path = Path(path)
     json_sibling = path.with_suffix(".json")
     if json_sibling.exists():
@@ -23,6 +29,7 @@ def load_config(path: str | Path) -> dict:
             cfg = json.load(f)
     else:
         import yaml
+
         with open(path) as f:
             cfg = yaml.safe_load(f)
     return _resolve_templates(cfg, cfg)
@@ -40,13 +47,26 @@ def _resolve_templates(node, root: dict):
 
 
 def resolve_run_paths(cfg: dict) -> dict[str, Path]:
-    """Creates every run subdirectory under work_dir, except `teacher_embeddings`/`student_checkpoints`, which go under `persist_dir` when set, since those two are expensive artifacts meant to survive across runs."""
+    """Create every run subdirectory under work_dir.
+
+    `teacher_embeddings` and `student_checkpoints` go under `persist_dir` when it is set, since
+    they are expensive artifacts meant to survive across runs.
+    """
     work_dir = Path(cfg["paths"]["work_dir"])
     persist_dir = cfg["paths"].get("persist_dir")
     persist_dir = Path(persist_dir) if persist_dir else None
 
-    ephemeral_subdirs = ["configs", "logs", "manifests", "qc", "student_embeddings",
-                         "graphs", "predictions", "results", "figures"]
+    ephemeral_subdirs = [
+        "configs",
+        "logs",
+        "manifests",
+        "qc",
+        "student_embeddings",
+        "graphs",
+        "predictions",
+        "results",
+        "figures",
+    ]
     persistable_subdirs = ["teacher_embeddings", "student_checkpoints"]
 
     out = {"work_dir": work_dir}
@@ -66,6 +86,7 @@ def seed_everything(seed: int) -> None:
     np.random.seed(seed)
     try:
         import torch
+
         torch.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
     except ImportError:
@@ -101,7 +122,11 @@ def ensure_dir(path: str | Path) -> Path:
 
 
 class RunEnvironment:
-    """Context manager writing a reproducibility record (wall-clock, peak VRAM, package/CUDA versions, GPU model, git commit -- blank outside a git repo) after an expensive stage."""
+    """Context manager that writes a reproducibility record after an expensive stage.
+
+    Records wall-clock, peak VRAM, package/CUDA versions, GPU model and git commit (None outside a
+    git repo).
+    """
 
     def __init__(self, stage_name: str, out_path: str | Path):
         self.stage_name = stage_name
@@ -112,6 +137,7 @@ class RunEnvironment:
         self._t0 = time.time()
         try:
             import torch
+
             if torch.cuda.is_available():
                 torch.cuda.reset_peak_memory_stats()
         except ImportError:
@@ -132,13 +158,15 @@ class RunEnvironment:
         record.update(_gpu_record())
 
         save_json(record, self.out_path)
-        return False  # never swallow exceptions -- failures must surface
+        return False  # never swallow exceptions; failures must surface
 
 
 def _git_commit() -> str | None:
     try:
         return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, text=True,
+            ["git", "rev-parse", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
         ).strip()
     except Exception:
         return None
@@ -146,8 +174,21 @@ def _git_commit() -> str | None:
 
 def _package_versions() -> dict:
     versions = {}
-    for pkg in ["torch", "torchvision", "timm", "torch_geometric", "numpy", "pandas",
-                "scipy", "sklearn", "scanpy", "anndata", "h5py", "pyarrow", "safetensors"]:
+    for pkg in [
+        "torch",
+        "torchvision",
+        "timm",
+        "torch_geometric",
+        "numpy",
+        "pandas",
+        "scipy",
+        "sklearn",
+        "scanpy",
+        "anndata",
+        "h5py",
+        "pyarrow",
+        "safetensors",
+    ]:
         try:
             mod = __import__(pkg)
             versions[pkg] = getattr(mod, "__version__", "unknown")
@@ -160,6 +201,7 @@ def _gpu_record() -> dict:
     out = {"cuda_version": None, "gpu_model": None, "peak_vram_gb": None}
     try:
         import torch
+
         if torch.cuda.is_available():
             out["cuda_version"] = torch.version.cuda
             out["gpu_model"] = torch.cuda.get_device_name(0)
@@ -170,7 +212,7 @@ def _gpu_record() -> dict:
 
 
 def count_parameters(model) -> dict:
-    """Exact, programmatically-counted parameter counts -- never estimate manually."""
+    """Exact parameter counts taken from the model; never estimate by hand."""
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
     return {"trainable_parameters": int(trainable), "total_parameters": int(total)}

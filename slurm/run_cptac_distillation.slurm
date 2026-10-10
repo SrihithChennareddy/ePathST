@@ -57,7 +57,7 @@ log "=== Step 4: H-Optimus-0 teacher embedding, sharded across 4 GPUs ==="
 NUM_SHARDS=4
 PIDS=()
 for i in $(seq 0 $((NUM_SHARDS - 1))); do
-  CUDA_VISIBLE_DEVICES=$i python3 src/scripts/04_run_teacher_genbio.py --config "$CONFIG" --device cuda \
+  CUDA_VISIBLE_DEVICES=$i python3 src/scripts/04_run_teacher_hoptimus.py --config "$CONFIG" --device cuda \
     --shard-index "$i" --num-shards "$NUM_SHARDS" \
     > "logs/step4_shard${i}_${SLURM_JOB_ID}.out" 2>&1 &
   PIDS+=($!)
@@ -71,7 +71,7 @@ if [ "$FAIL" -ne 0 ]; then
   exit 1
 fi
 log "merging Step 4 shards into the canonical persistent cache"
-python3 src/scripts/04_run_teacher_genbio.py --config "$CONFIG" --merge-shards --num-shards "$NUM_SHARDS"
+python3 src/scripts/04_run_teacher_hoptimus.py --config "$CONFIG" --merge-shards --num-shards "$NUM_SHARDS"
 
 ELAPSED=$((SECONDS - JOB_START))
 REMAINING=$((WALL_CLOCK_SECONDS - ELAPSED - RESERVE_SECONDS))
@@ -90,7 +90,7 @@ log "=== Step 9: lock student, strip teacher-projection head, save to persist_di
 python3 src/scripts/07_lock_student.py --config "$CONFIG" --device cuda --mode A
 
 log "=== snapshotting results to experimental_runs/ for later comparison ==="
-python3 src/scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition h200x4 \
+python3 src/scripts/tools/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition h200x4 \
   --gpu "4x H200" --label cptac_distill_h200x4 --stage "end of 8h job"
 
 log "=== DONE (total elapsed: $((SECONDS - JOB_START))s) ==="

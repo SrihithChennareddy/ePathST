@@ -1,18 +1,27 @@
-"""Statistical inference: patient bootstrap CI, paired sign-flip test,
-Benjamini-Hochberg FDR correction."""
+"""Patient-level inference: bootstrap CI, paired sign-flip test and Benjamini-Hochberg FDR.
+
+Inputs are per-patient values, since patients rather than spots are the independent unit.
+"""
+
 from __future__ import annotations
 
 import numpy as np
 
 
-def patient_bootstrap_ci(deltas: np.ndarray, n_iterations: int = 10000, seed: int = 0,
-                          ci: tuple[float, float] = (2.5, 97.5)) -> dict:
-    """Bootstraps the mean of `deltas` (e.g. per-patient R_real - R_shuffle) by resampling with replacement `n_iterations` times."""
+def patient_bootstrap_ci(
+    deltas: np.ndarray,
+    n_iterations: int = 10000,
+    seed: int = 0,
+    ci: tuple[float, float] = (2.5, 97.5),
+) -> dict:
+    """Percentile bootstrap CI of the mean of `deltas` (e.g. per-patient R_real - R_shuffle).
+
+    Also reports Cohen's d (mean / sample SD), NaN for a single patient.
+    """
     rng = np.random.RandomState(seed)
     n = len(deltas)
     boot_means = np.empty(n_iterations)
     for i in range(n_iterations):
-        # resample with replacement
         idx = rng.randint(0, n, size=n)
         boot_means[i] = np.mean(deltas[idx])
     if n > 1:
@@ -29,13 +38,15 @@ def patient_bootstrap_ci(deltas: np.ndarray, n_iterations: int = 10000, seed: in
 
 
 def paired_sign_flip_test(deltas: np.ndarray, n_iterations: int = 10000, seed: int = 0) -> dict:
-    """One-sided test for H1: mean(delta) > 0 via sign-flip permutation."""
+    """One-sided sign-flip permutation test for H1: mean(delta) > 0.
+
+    p = (1 + #{null >= observed}) / (1 + n_iterations), so p is never exactly 0.
+    """
     rng = np.random.RandomState(seed)
     n = len(deltas)
     observed = float(np.mean(deltas))
     null = np.empty(n_iterations)
     for i in range(n_iterations):
-        # random sign flips under H0
         flips = rng.choice([-1.0, 1.0], size=n)
         null[i] = np.mean(deltas * flips)
     p = (1 + np.sum(null >= observed)) / (1 + n_iterations)
@@ -43,7 +54,10 @@ def paired_sign_flip_test(deltas: np.ndarray, n_iterations: int = 10000, seed: i
 
 
 def bh_fdr(pvalues: np.ndarray, q_threshold: float = 0.05) -> tuple[np.ndarray, np.ndarray]:
-    """Benjamini-Hochberg FDR correction. Returns (reject_mask, q_values)."""
+    """Benjamini-Hochberg FDR correction. Returns (reject_mask, q_values).
+
+    NaN p-values are skipped: they get q = NaN and are never rejected.
+    """
     p = np.asarray(pvalues, dtype=np.float64)
     valid = ~np.isnan(p)
     q = np.full_like(p, np.nan)
@@ -53,7 +67,7 @@ def bh_fdr(pvalues: np.ndarray, q_threshold: float = 0.05) -> tuple[np.ndarray, 
     idx = np.where(valid)[0]
     pv = p[idx]
 
-    # BH step-up: rank p-values, compute raw q, enforce monotonicity
+    # BH step-up: raw q = p * m / rank, then enforce monotonicity from the largest rank down
     order = np.argsort(pv)
     ranked = pv[order]
     m = len(ranked)
@@ -61,7 +75,6 @@ def bh_fdr(pvalues: np.ndarray, q_threshold: float = 0.05) -> tuple[np.ndarray, 
     raw_q = np.minimum.accumulate(raw_q[::-1])[::-1]
     raw_q = np.clip(raw_q, 0, 1)
 
-    # unsort back to original order
     q_full = np.empty(m)
     q_full[order] = raw_q
     q[idx] = q_full

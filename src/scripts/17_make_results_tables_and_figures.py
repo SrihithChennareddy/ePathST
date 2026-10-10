@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-"""Builds the MODEL x {HVG50, HVG1000, pathway} results table (mean +/-
-95% CI at the patient level), the per-cancer breakdown table, and figures
-1/4/5/7 -- the figures directly derivable from tabular results already on
-disk (2/3/6/8 are produced inline by scripts 02/06/13 since they need raw
-images/embeddings)."""
+"""Builds the model x {HVG50, HVG1000, pathway} results table (mean and 95% bootstrap CI over
+(cancer, fold, seed) cells), the per-cancer table, and figures 1/4/5/7.
+
+Works only from tabular outputs already on disk (cv_ablation_metrics.csv and the optional dose
+response and efficiency JSONs). Figures 2/3/6/8 need raw images or embeddings and are produced
+inline by scripts 02/06/13."""
 from __future__ import annotations
 
 import argparse
@@ -20,9 +21,16 @@ from epathst.statistics.stats_tests import patient_bootstrap_ci
 from epathst.utils import load_config, resolve_run_paths
 
 MODEL_ORDER = [
-    "A0_mean_expression", "A1_imagenet_patch", "A2_distilled_patch", "A5_shuffled_graph",
-    "A6_local_pna", "A7_multiscale_pna", "A8_scale_aware_pna", "A3_matched_mlp",
-    "A4_random_graph", "A9_gatv2_multiscale",
+    "A0_mean_expression",
+    "A1_imagenet_patch",
+    "A2_distilled_patch",
+    "A5_shuffled_graph",
+    "A6_local_pna",
+    "A7_multiscale_pna",
+    "A8_scale_aware_pna",
+    "A3_matched_mlp",
+    "A4_random_graph",
+    "A9_gatv2_multiscale",
 ]
 
 
@@ -54,18 +62,22 @@ def main():
         ]
         for target, col in targets:
             if sub.empty or col not in sub.columns:
-                row.update({
-                    f"{target}_r_mean": None,
-                    f"{target}_r_ci_low": None,
-                    f"{target}_r_ci_high": None,
-                })
+                row.update(
+                    {
+                        f"{target}_r_mean": None,
+                        f"{target}_r_ci_low": None,
+                        f"{target}_r_ci_high": None,
+                    }
+                )
                 continue
             mean, lo, hi, n = summarize(sub[col].values)
-            row.update({
-                f"{target}_r_mean": mean,
-                f"{target}_r_ci_low": lo,
-                f"{target}_r_ci_high": hi,
-            })
+            row.update(
+                {
+                    f"{target}_r_mean": mean,
+                    f"{target}_r_ci_low": lo,
+                    f"{target}_r_ci_high": hi,
+                }
+            )
         row["n_folds_seeds"] = len(sub)
         rows.append(row)
     table = pd.DataFrame(rows)
@@ -73,38 +85,51 @@ def main():
     print(f"[17_results_and_figures] final results table:\n{table.to_string(index=False)}")
 
     per_cancer_models = [
-        "A2_distilled_patch", "A7_multiscale_pna", "A8_scale_aware_pna", "A9_gatv2_multiscale",
+        "A2_distilled_patch",
+        "A7_multiscale_pna",
+        "A8_scale_aware_pna",
+        "A9_gatv2_multiscale",
     ]
     per_cancer_rows = []
     for cancer in cfg["cancers"]["hest"]:
         for model in per_cancer_models:
             sub = df[(df["ablation"] == model) & (df["cancer"] == cancer)]
-            per_cancer_rows.append({
-                "cancer": cancer,
-                "model": model,
-                "hvg50_mean_R": sub["hvg50_fisher_z_mean_patient_R"].mean() if len(sub) else None,
-                "hvg1000_mean_R": sub["hvg1000_fisher_z_mean_patient_R"].mean() if len(sub) else None,
-                "pathway_mean_R": sub["pathway_fisher_z_mean_patient_R"].mean() if len(sub) else None,
-            })
+            per_cancer_rows.append(
+                {
+                    "cancer": cancer,
+                    "model": model,
+                    "hvg50_mean_R": (
+                        sub["hvg50_fisher_z_mean_patient_R"].mean() if len(sub) else None
+                    ),
+                    "hvg1000_mean_R": (
+                        sub["hvg1000_fisher_z_mean_patient_R"].mean() if len(sub) else None
+                    ),
+                    "pathway_mean_R": (
+                        sub["pathway_fisher_z_mean_patient_R"].mean() if len(sub) else None
+                    ),
+                }
+            )
     per_cancer_path = paths["results"] / "per_cancer_results_table.csv"
     pd.DataFrame(per_cancer_rows).to_csv(per_cancer_path, index=False)
 
-    # Figures directly derivable from `table` -- HVG1000 is the primary reported target
+    # HVG1000 is the primary reported target, so figures are drawn from that column.
     valid = table.dropna(subset=["hvg1000_r_mean"])
     figures.fig1_pipeline_diagram(paths["figures"] / "fig1_pipeline.png")
     if len(valid):
         renamed = valid.rename(columns={"hvg1000_r_mean": "fisher_z_mean_patient_R"})
         figures.fig4_ablation_bars(renamed, paths["figures"] / "fig4_ablation_comparison.png")
 
-    # figure 5: dose-response (optional)
+    # Figure 5 is optional: skipped when the dose-response JSON has not been produced.
     dose = paths["results"] / "spatial_destruction_dose_response.json"
     if dose.exists():
         r_per_q = json.load(open(dose))
         qs = sorted(float(k) for k in r_per_q)
         rs = [r_per_q[str(q)] if str(q) in r_per_q else r_per_q[q] for q in qs]
-        figures.fig5_destruction_dose_response(qs, rs, rs, rs, paths["figures"] / "fig5_dose_response.png")
+        figures.fig5_destruction_dose_response(
+            qs, rs, rs, rs, paths["figures"] / "fig5_dose_response.png"
+        )
 
-    # figure 7: efficiency vs performance (optional)
+    # Figure 7 is optional: needs the output of 14_model_efficiency.py.
     eff = paths["results"] / "model_efficiency.json"
     if eff.exists():
         e = json.load(open(eff))
@@ -112,13 +137,16 @@ def main():
         a2_rows = valid[valid["model"] == "A2_distilled_patch"]
         perf = [a2_rows["hvg1000_r_mean"].values[0]] if len(a2_rows) else [0]
         labels = ["distilled student"]
-        # H-Optimus-0 teacher point intentionally not added here -- its performance lives in a
-        # separate PCA256-based comparison (src/epathst/evaluation/hoptimus_comparison.py), not in cv_ablation_metrics.csv.
+        # No teacher point: H-Optimus-0 performance comes from the separate PCA256 comparison
+        # (src/epathst/evaluation/hoptimus_comparison.py), not cv_ablation_metrics.csv.
         figures.fig7_efficiency_vs_performance(
             params, perf, labels, paths["figures"] / "fig7_efficiency.png"
         )
 
-    print(f"[17_results_and_figures] wrote tables and figures under {paths['results']} / {paths['figures']}")
+    print(
+        f"[17_results_and_figures] wrote tables and figures under {paths['results']} / "
+        f"{paths['figures']}"
+    )
 
 
 if __name__ == "__main__":

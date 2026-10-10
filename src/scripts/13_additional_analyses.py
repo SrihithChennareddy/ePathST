@@ -1,7 +1,10 @@
 #!/usr/bin/env python
-"""Secondary analyses: multiscale-vs-local contribution and per-cancer
-consistency, computed from the per-ablation/per-fold metrics scripts 10/12
-already wrote to disk."""
+"""Descriptive secondary analyses: per-cancer consistency of the A2/A5/A6/A7 ablations and the
+pooled multiscale-minus-local (A7 - A6) difference in Fisher-z patient-macro R.
+
+Reads cv_ablation_metrics.csv from src/scripts/10_run_patient_cv.py; no hypothesis tests here
+(see 12_primary_hypothesis_test.py). The Moran's I and per-pathway analyses are not wired in yet,
+since they need per-gene, per-patient r tables saved during the script 10 run."""
 from __future__ import annotations
 
 import argparse
@@ -24,7 +27,6 @@ def main():
 
     df = pd.read_csv(paths["results"] / "cv_ablation_metrics.csv")
 
-    # per-cancer consistency
     by_cancer = {}
     for cancer, sub in df.groupby("cancer"):
         by_cancer[cancer] = {
@@ -45,7 +47,7 @@ def main():
     consistency_df.to_csv(paths["results"] / "per_cancer_consistency.csv", index=False)
     print(f"[13_additional_analyses] per-cancer consistency:\n{consistency_df}")
 
-    # local vs. multiscale delta, pooled across cancers
+    # Pooled over all cancers/folds/seeds, so cancers with more runs weigh more.
     local_mean = df[df["ablation"] == "A6_local_pna"]["fisher_z_mean_patient_R"].mean()
     multi_mean = df[df["ablation"] == "A7_multiscale_pna"]["fisher_z_mean_patient_R"].mean()
     summary = {

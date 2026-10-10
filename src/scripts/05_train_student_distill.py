@@ -1,6 +1,14 @@
 #!/usr/bin/env python
-"""Trains the S1 (H-optimus-0-distilled) and S2 (random-init distilled) students per seed; S0 (ImageNet,
-no distillation) needs no training loop and is handled directly by script 06."""
+"""Distillation training of the S1 and S2 students for each seed.
+
+Stage 05 of the ePathST pipeline: S1 distills H-optimus-0 into an ImageNet-initialised ConvNeXt
+V2-Atto, S2 uses the same recipe from random init. S0 (ImageNet, no distillation) needs no
+training and is handled directly by 06_eval_distillation.py.
+
+Each run trains on the train patients of that seed's patient split and picks the best epoch on its
+val patients; test patients are never loaded. Runs go in priority order under an optional shared
+wall-clock budget.
+"""
 from __future__ import annotations
 
 import argparse
@@ -16,17 +24,28 @@ from epathst.utils import RunEnvironment, load_config, resolve_run_paths, save_j
 
 def main():
     import time
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/base.yaml")
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--seeds", type=int, nargs="+", default=None,
-                     help="override cfg.seeds (priority order)")
-    ap.add_argument("--baselines", nargs="+", default=None, choices=["S1", "S2"],
-                     help="override which baselines to train (priority order); default both, S1 first")
-    ap.add_argument("--time-budget-hours", type=float, default=None,
-                     help="total wall-clock budget across every (baseline, seed) run below; runs "
-                          "later in priority order get whatever remains, so put the most important "
-                          "baseline/seed first -- S1 seed0 is the primary comparison target")
+    ap.add_argument(
+        "--seeds", type=int, nargs="+", default=None, help="override cfg.seeds (priority order)"
+    )
+    ap.add_argument(
+        "--baselines",
+        nargs="+",
+        default=None,
+        choices=["S1", "S2"],
+        help="override which baselines to train (priority order); default both, S1 first",
+    )
+    ap.add_argument(
+        "--time-budget-hours",
+        type=float,
+        default=None,
+        help="total wall-clock budget across every (baseline, seed) run below; runs "
+        "later in priority order get whatever remains, so put the most important "
+        "baseline/seed first -- S1 seed0 is the primary comparison target",
+    )
     args = ap.parse_args()
     cfg = load_config(args.config)
     paths = resolve_run_paths(cfg)
@@ -38,7 +57,7 @@ def main():
     seeds = args.seeds if args.seeds is not None else cfg["seeds"]
     baseline_order = args.baselines if args.baselines is not None else ["S1", "S2"]
     enabled_map = {
-        "S1": cfg["baselines"]["S1_genbio_distilled"],
+        "S1": cfg["baselines"]["S1_hoptimus_distilled"],
         "S2": cfg["baselines"]["S2_random_init_distilled"],
     }
     runs = [(b, s) for s in seeds for b in baseline_order if enabled_map.get(b)]
@@ -46,31 +65,42 @@ def main():
 
     results = {}
     for baseline, seed in runs:
-        # respect time budget
         if deadline is not None and time.time() >= deadline:
-            print(f"[05_train_student_distill] time budget exhausted before starting "
-                  f"{baseline} seed{seed} -- skipping")
+            print(
+                f"[05_train_student_distill] time budget exhausted before starting "
+                f"{baseline} seed{seed} -- skipping"
+            )
             continue
         remaining = (deadline - time.time()) if deadline is not None else None
 
-        # build train/val datasets for this seed's split
+        # Only train and val patients of this seed's split are loaded; test stays held out.
         split_df = pd.read_csv(paths["manifests"] / f"cptac_split_seed{seed}.csv")
-        merged = patch_manifest.merge(split_df[["patient_id", "split"]], on="patient_id", how="inner")
+        merged = patch_manifest.merge(
+            split_df[["patient_id", "split"]], on="patient_id", how="inner"
+        )
         train_pm = merged[merged["split"] == "train"]
         val_pm = merged[merged["split"] == "val"]
         train_ds = CPTACDistillDataset(train_pm, teacher_h5, shard_dir, train=True, cfg=cfg)
         val_ds = CPTACDistillDataset(val_pm, teacher_h5, shard_dir, train=False, cfg=cfg)
 
-        # train student
         stage = f"05_train_student_{baseline}_seed{seed}"
         with RunEnvironment(stage, paths["logs"] / f"{stage}_env.json"):
             res = train_student(
-                baseline, train_ds, val_ds, cfg, paths["student_checkpoints"], seed, args.device,
+                baseline,
+                train_ds,
+                val_ds,
+                cfg,
+                paths["student_checkpoints"],
+                seed,
+                args.device,
                 time_budget_seconds=remaining,
             )
         results[f"{baseline}_seed{seed}"] = res
-        print(f"[05_train_student_distill] {baseline} seed{seed}: best_epoch={res['best_epoch']} "
-              f"val_cos={res['best_val_cosine_sim']:.4f} stopped_early_for_time={res['stopped_early_for_time']}")
+        print(
+            f"[05_train_student_distill] {baseline} seed{seed}: best_epoch={res['best_epoch']} "
+            f"val_cos={res['best_val_cosine_sim']:.4f} "
+            f"stopped_early_for_time={res['stopped_early_for_time']}"
+        )
 
     save_json(results, paths["results"] / "distillation_training_summary.json")
 

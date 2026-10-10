@@ -12,7 +12,7 @@
 #SBATCH --error=/lustre/nvwulf/home/schennareddy/cellvit_project/STS_src/logs/slurm_official_bench_%j.err
 
 # Official HEST-Benchmark reproduction (final-experiment diagnostic, 2026-08-30):
-# GenBio-PathFM + distilled ConvNeXt V2-Atto on the official IDC/COAD/CCRCC
+# H-Optimus-0 + distilled ConvNeXt V2-Atto on the official IDC/COAD/CCRCC
 # hest-bench splits/genes/PCA256/Ridge protocol. Answers a DIFFERENT question
 # from the custom 3-cancer patient-held-out experiment (src/scripts/10) -- see
 # src/scripts/19_official_hest_benchmark.py's module docstring.

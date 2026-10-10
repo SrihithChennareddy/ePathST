@@ -40,3 +40,7 @@ efficiency = ["fvcore>=0.1.5"]  # FLOPs/MACs accounting; epathst.efficiency degr
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["epathst*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]

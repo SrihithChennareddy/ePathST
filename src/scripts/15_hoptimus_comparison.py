@@ -1,10 +1,11 @@
 #!/usr/bin/env python
-"""Extracts H-Optimus-0 (teacher) features on the same HEST patches used
-for the student, cached in the same format so they can be dropped into
-src/scripts/10_run_patient_cv.py's ablation loop for a like-for-like
-teacher-vs-student comparison (same patients/genes/folds/normalization/
-graph/metric). Superseded by the train-fold-only PCA256 comparison in
-src/epathst/evaluation/hoptimus_comparison.py for the locked final experiment; kept for reference."""
+"""Caches H-Optimus-0 teacher features (1536-D) for the HEST patches the student was run on.
+Same cache format as the student embeddings, so src/scripts/10_run_patient_cv.py can swap them in.
+
+That gives a like-for-like teacher-vs-student comparison (same patients, genes, folds,
+normalization, graph and metric). Superseded for the locked final experiment by the
+train-fold-only PCA256 comparison in src/epathst/evaluation/hoptimus_comparison.py; kept for
+reference."""
 from __future__ import annotations
 
 import argparse
@@ -35,11 +36,13 @@ def main():
     out_dir = paths["student_embeddings"] / "hoptimus0_teacher"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    env_log = paths["logs"] / "15_genbio_fair_comparison_env.json"
-    with RunEnvironment("15_genbio_fair_comparison_extract", env_log):
+    env_log = paths["logs"] / "15_hoptimus_comparison_env.json"
+    with RunEnvironment("15_hoptimus_comparison_extract", env_log):
         teacher = HOptimusTeacher(cfg, device=args.device)
         bs = cfg["teacher"]["batch_size"]
-        for sample_id, group in tqdm(spot_manifest.groupby("sample_id"), desc="H-Optimus-0 features on HEST"):
+        for sample_id, group in tqdm(
+            spot_manifest.groupby("sample_id"), desc="H-Optimus-0 features on HEST"
+        ):
             with h5py.File(patch_shard_dir / f"{sample_id}.h5", "r") as f:
                 shard_pids = f["patch_id"][:].astype(str)
                 shard_patches = f["patches"][:]
@@ -47,15 +50,20 @@ def main():
 
             feats = []
             for start in range(0, len(shard_pids), bs):
-                feats.append(teacher.embed_batch(shard_patches[start:start + bs]))
+                feats.append(teacher.embed_batch(shard_patches[start : start + bs]))
             feats = np.concatenate(feats, axis=0)
             coords = group[["x_um", "y_um"]].values
             cache_features(out_dir / f"{sample_id}.h5", shard_pids.tolist(), feats, coords)
 
-    print(f"[15_genbio_fair_comparison] cached H-Optimus-0-teacher (1536-D) HEST features under {out_dir}")
-    print("[15_genbio_fair_comparison] to compare against the student, rerun the patch-only/graph "
-          "ablations with feature_source='hoptimus0_teacher' in place of the distilled-student "
-          "features, keeping every fold/target/graph identical.")
+    print(
+        f"[15_hoptimus_comparison] cached H-Optimus-0-teacher (1536-D) HEST features under "
+        f"{out_dir}"
+    )
+    print(
+        "[15_hoptimus_comparison] to compare against the student, rerun the patch-only/graph "
+        "ablations with feature_source='hoptimus0_teacher' in place of the distilled-student "
+        "features, keeping every fold/target/graph identical."
+    )
 
 
 if __name__ == "__main__":

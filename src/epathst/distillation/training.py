@@ -1,5 +1,9 @@
-"""Distillation objective (cosine + normalized feature-regression) and the training loop
-implementing the S0/S1/S2 baseline definitions: ImageNet-only, ImageNet-init distilled, random-init distilled."""
+"""Distillation loss (cosine + normalized feature regression) and the student training loop.
+
+Implements the baseline definitions: S0 ImageNet-only (no training), S1 ImageNet-init distilled,
+S2 random-init distilled. Targets are cached teacher embeddings; selection uses validation only.
+"""
+
 from __future__ import annotations
 
 import math
@@ -28,8 +32,9 @@ def cosine_distillation_loss(
     return (1.0 - cos_sim).mean()
 
 
-def feature_regression_loss(student_projected: torch.Tensor, teacher_embedding: torch.Tensor,
-                             kind: str = "smooth_l1") -> torch.Tensor:
+def feature_regression_loss(
+    student_projected: torch.Tensor, teacher_embedding: torch.Tensor, kind: str = "smooth_l1"
+) -> torch.Tensor:
     """Normalized feature-regression term (never raw unnormalized MSE)."""
     s = F.normalize(student_projected, dim=-1)
     t = F.normalize(teacher_embedding, dim=-1)
@@ -40,8 +45,12 @@ def feature_regression_loss(student_projected: torch.Tensor, teacher_embedding: 
     raise ValueError(f"unknown feature loss kind: {kind}")
 
 
-def distillation_loss(student_projected: torch.Tensor, teacher_embedding: torch.Tensor, lam: float,
-                       feature_kind: str = "smooth_l1") -> dict:
+def distillation_loss(
+    student_projected: torch.Tensor,
+    teacher_embedding: torch.Tensor,
+    lam: float,
+    feature_kind: str = "smooth_l1",
+) -> dict:
     l_cos = cosine_distillation_loss(student_projected, teacher_embedding)
     l_feat = feature_regression_loss(student_projected, teacher_embedding, feature_kind)
     total = l_cos + lam * l_feat
@@ -49,7 +58,10 @@ def distillation_loss(student_projected: torch.Tensor, teacher_embedding: torch.
 
 
 def augment_train(patch_uint8: np.ndarray, rng: np.random.RandomState, cfg: dict) -> np.ndarray:
-    """Flips, 90-deg rotations, moderate color/stain augmentation, mild brightness/contrast -- never destructive to tissue morphology."""
+    """Flips, 90-degree rotations, moderate color/stain jitter and mild brightness/contrast.
+
+    Never destructive to tissue morphology. Takes (H, W, 3) uint8, returns float32 in [0, 1].
+    """
     aug = cfg["distillation"]["augmentation"]
     img = patch_uint8.copy()
     if aug["hflip"] and rng.rand() < 0.5:
@@ -74,12 +86,17 @@ def augment_train(patch_uint8: np.ndarray, rng: np.random.RandomState, cfg: dict
 
 
 def to_tensor_normalized(img_float01: np.ndarray) -> np.ndarray:
+    """ImageNet-normalize an (H, W, 3) float image in [0, 1]; returns (3, H, W) float32."""
     normed = (img_float01 - IMAGENET_MEAN) / IMAGENET_STD
     return np.transpose(normed, (2, 0, 1)).astype(np.float32)
 
 
 class CPTACDistillDataset(Dataset):
-    """Reads patches on-demand from per-WSI HDF5 shards (epathst.data.wsi_patches format) and pairs each with its cached teacher embedding by patch_id; asserts every manifest patch has a cached embedding before training starts."""
+    """Reads patches on demand from per-WSI HDF5 shards (epathst.data.wsi_patches format) and pairs
+    each with its cached teacher embedding by patch_id.
+
+    Asserts at construction that every manifest patch has a cached embedding.
+    """
 
     def __init__(
         self, patch_manifest, teacher_h5_path: str, shard_dir: str, train: bool, cfg: dict
@@ -104,11 +121,9 @@ class CPTACDistillDataset(Dataset):
             pids = f["patch_id"][:].astype(str)
             pos = int(np.where(pids == row["patch_id"])[0][0])
             patch = f["patches"][pos]
-        rng = np.random.RandomState(abs(hash((row["patch_id"], idx))) % (2 ** 31))
+        rng = np.random.RandomState(abs(hash((row["patch_id"], idx))) % (2**31))
         img = (
-            augment_train(patch, rng, self.cfg)
-            if self.train
-            else patch.astype(np.float32) / 255.0
+            augment_train(patch, rng, self.cfg) if self.train else patch.astype(np.float32) / 255.0
         )
         x = to_tensor_normalized(img)
         teacher_emb = self._teacher_by_id[row["patch_id"]]
@@ -117,10 +132,13 @@ class CPTACDistillDataset(Dataset):
 
 def build_optimizer(model: DistillationStudent, cfg: dict):
     d = cfg["distillation"]
-    return torch.optim.AdamW([
-        {"params": model.encoder.parameters(), "lr": d["backbone_lr"]},
-        {"params": model.projection_head.parameters(), "lr": d["projection_lr"]},
-    ], weight_decay=d["weight_decay"])
+    return torch.optim.AdamW(
+        [
+            {"params": model.encoder.parameters(), "lr": d["backbone_lr"]},
+            {"params": model.projection_head.parameters(), "lr": d["projection_lr"]},
+        ],
+        weight_decay=d["weight_decay"],
+    )
 
 
 def cosine_warmup_lr(step: int, total_steps: int, warmup_steps: int) -> float:
@@ -154,20 +172,37 @@ def train_student(
     device: str = "cuda",
     time_budget_seconds: float | None = None,
 ) -> dict:
-    """`baseline` in {"S1", "S2"} (S0 needs no training loop); saves the best checkpoint (by validation teacher-cosine similarity, never test) to out_dir/{baseline}_seed{seed}_best.pt, and is resumable/wall-clock-budgeted for SLURM: a full training-state snapshot (model+optimizer+scaler+step counters) is saved every epoch to out_dir/{baseline}_seed{seed}_resume.pt and reloaded automatically if present, so a job killed by the wall clock resumes on the next `sbatch`; if `time_budget_seconds` is set, training stops (after saving both checkpoints) once elapsed time exceeds it, returning `stopped_early_for_time=True` rather than raising."""
+    """Train a student; `baseline` is "S1" or "S2" (S0 needs no training loop).
+
+    Saves the best checkpoint, chosen by validation teacher-cosine similarity (never test), to
+    out_dir/{baseline}_seed{seed}_best.pt.
+
+    Resumable and wall-clock-budgeted for SLURM: a full training-state snapshot (model, optimizer,
+    scaler, step counters) is saved every epoch to out_dir/{baseline}_seed{seed}_resume.pt and
+    reloaded automatically if present, so a job killed by the wall clock resumes on the next
+    `sbatch`. If `time_budget_seconds` is set, training stops once elapsed time exceeds it (after
+    saving both checkpoints) and returns `stopped_early_for_time=True` rather than raising.
+    """
     import time
+
     from epathst.utils import seed_everything
+
     seed_everything(seed)
 
-    # build model, optimizer, dataloaders
     pretrained = "imagenet" if baseline == "S1" else None
     model = DistillationStudent(cfg, pretrained=pretrained).to(device)
     d = cfg["distillation"]
     opt = build_optimizer(model, cfg)
     scaler = torch.cuda.amp.GradScaler(enabled=d["amp"])
 
-    train_loader = torch.utils.data.DataLoader(train_ds, batch_size=d["batch_size"], shuffle=True,
-                                                num_workers=8, drop_last=True, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(
+        train_ds,
+        batch_size=d["batch_size"],
+        shuffle=True,
+        num_workers=8,
+        drop_last=True,
+        pin_memory=True,
+    )
     val_loader = torch.utils.data.DataLoader(
         val_ds, batch_size=d["batch_size"], shuffle=False, num_workers=4
     )
@@ -181,7 +216,7 @@ def train_student(
     resume_path = out_dir / f"{baseline}_seed{seed}_resume.pt"
     history_path = out_dir / f"{baseline}_seed{seed}_history.json"
 
-    # resume from a prior wall-clock-budgeted run, if present
+    # resume a prior wall-clock-budgeted run
     start_epoch, best_val_cos, best_epoch, patience_ctr, global_step = 0, -1.0, -1, 0, 0
     history = []
     if resume_path.exists():
@@ -204,12 +239,10 @@ def train_student(
         for x, teacher_emb, _ in train_loader:
             x, teacher_emb = x.to(device), teacher_emb.to(device)
 
-            # lr warmup/cosine-decay schedule
             lr_scale = cosine_warmup_lr(global_step, total_steps, warmup_steps)
             for g, base_lr in zip(opt.param_groups, [d["backbone_lr"], d["projection_lr"]]):
                 g["lr"] = base_lr * lr_scale
 
-            # forward + distillation loss
             opt.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast(enabled=d["amp"]):
                 out = model(x)
@@ -217,7 +250,6 @@ def train_student(
                     out["projected"], teacher_emb, d["lambda_feature"], d["feature_loss"]
                 )
 
-            # backward + optimizer step
             scaler.scale(losses["loss"]).backward()
             scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), d["grad_clip_norm"])
@@ -226,6 +258,7 @@ def train_student(
             epoch_losses.append(float(losses["loss"].item()))
             global_step += 1
 
+            # budget is checked every 200 steps; resume treats a mid-epoch stop as a finished epoch
             if (
                 time_budget_seconds is not None
                 and global_step % 200 == 0
@@ -234,67 +267,79 @@ def train_student(
                 stopped_early_for_time = True
                 break
 
-        # validation + logging
         val_cos = evaluate_val_cosine(model, val_loader, device)
-        history.append({
-            "epoch": epoch,
-            "train_loss": float(np.mean(epoch_losses)),
-            "val_cosine_sim": val_cos,
-        })
+        history.append(
+            {
+                "epoch": epoch,
+                "train_loss": float(np.mean(epoch_losses)),
+                "val_cosine_sim": val_cos,
+            }
+        )
         print(
             f"[{baseline} seed{seed}] epoch {epoch}: "
             f"train_loss={np.mean(epoch_losses):.4f} val_cos={val_cos:.4f}"
             + (" [time-budget hit mid-epoch]" if stopped_early_for_time else "")
         )
 
-        # save best-so-far checkpoint
         if val_cos > best_val_cos:
             best_val_cos, best_epoch, patience_ctr = val_cos, epoch, 0
-            torch.save({
-                "model_state_dict": model.state_dict(),
-                "epoch": epoch,
-                "val_cosine_sim": val_cos,
-                "baseline": baseline,
-                "seed": seed,
-            }, ckpt_path)
+            torch.save(
+                {
+                    "model_state_dict": model.state_dict(),
+                    "epoch": epoch,
+                    "val_cosine_sim": val_cos,
+                    "baseline": baseline,
+                    "seed": seed,
+                },
+                ckpt_path,
+            )
         else:
             patience_ctr += 1
 
-        # save resumable full training state
-        torch.save({
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": opt.state_dict(),
-            "scaler_state_dict": scaler.state_dict(),
-            "epoch": epoch,
-            "best_val_cos": best_val_cos,
-            "best_epoch": best_epoch,
-            "patience_ctr": patience_ctr,
-            "global_step": global_step,
-            "history": history,
-        }, resume_path)
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": opt.state_dict(),
+                "scaler_state_dict": scaler.state_dict(),
+                "epoch": epoch,
+                "best_val_cos": best_val_cos,
+                "best_epoch": best_epoch,
+                "patience_ctr": patience_ctr,
+                "global_step": global_step,
+                "history": history,
+            },
+            resume_path,
+        )
 
-        # Milestone snapshots every 10 completed epochs (epoch 0-indexed, so epoch+1=completed count): permanent, never-overwritten, unlike `ckpt_path` (best-so-far) or `resume_path` (overwritten each epoch).
+        # Milestone snapshot every 10 completed epochs (epoch is 0-indexed: completed = epoch + 1).
+        # Permanent, unlike `ckpt_path` (best so far) and `resume_path` (overwritten each epoch).
         completed = epoch + 1
         if completed % 10 == 0:
             milestone_path = out_dir / f"{baseline}_seed{seed}_epoch{completed}.pt"
-            torch.save({
-                "model_state_dict": model.state_dict(),
-                "epoch": epoch,
-                "val_cosine_sim": val_cos,
-                "train_loss": float(np.mean(epoch_losses)),
-                "baseline": baseline,
-                "seed": seed,
-            }, milestone_path)
+            torch.save(
+                {
+                    "model_state_dict": model.state_dict(),
+                    "epoch": epoch,
+                    "val_cosine_sim": val_cos,
+                    "train_loss": float(np.mean(epoch_losses)),
+                    "baseline": baseline,
+                    "seed": seed,
+                },
+                milestone_path,
+            )
             print(
                 f"[{baseline} seed{seed}] saved milestone checkpoint at epoch {completed} "
                 f"-> {milestone_path}"
             )
-        save_json({
-            "history": history,
-            "best_epoch": best_epoch,
-            "best_val_cosine_sim": best_val_cos,
-            "stopped_early_for_time": stopped_early_for_time,
-        }, history_path)
+        save_json(
+            {
+                "history": history,
+                "best_epoch": best_epoch,
+                "best_val_cosine_sim": best_val_cos,
+                "stopped_early_for_time": stopped_early_for_time,
+            },
+            history_path,
+        )
 
         if stopped_early_for_time:
             print(

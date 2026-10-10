@@ -57,7 +57,7 @@ python3 src/scripts/12_primary_hypothesis_test.py --config "$CONFIG" --max-folds
   log "Step 12 failed or incomplete -- non-fatal, results/cv_ablation_metrics.csv is still valid, rerun once fixed"
 
 log "=== snapshotting results to experimental_runs/ for later comparison ==="
-python3 src/scripts/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition h200x4 \
+python3 src/scripts/tools/snapshot_experiment.py --config "$CONFIG" --job-id "${SLURM_JOB_ID}" --partition h200x4 \
   --gpu "1x H200" --label hest_downstream_full_3cancer --stage "end of 8h job" || \
   log "snapshot failed -- non-fatal"
 
