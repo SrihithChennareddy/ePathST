@@ -1,181 +1,67 @@
-# Ablation Results Under the Official HEST-1k Benchmark Protocol
+# HEST-1K: ablation results and protocol notes
 
-**Created**: 2026-09-04 (SLURM job 87551) · **Last updated**: 2026-09-14 (superseded numbers — see [Revision history](#revision-history))
+The paper's Table III (comparison with pathology foundation models) and Table V (spatial-context ablation) are reproduced in
+[`docs/METHODS.md`](../METHODS.md) section 6, which is their single source in this repository. This document holds what surrounds them:
+the evaluation protocol, how the paper reads the ablation, the controls that were run in addition, and the validation checks.
 
-## Overview
+## 1. Evaluation protocol (as in the paper)
 
-This document reports ePathST's ablation results under the **official HEST-1k
-Benchmark protocol** — official k-fold splits, the official curated 50-gene
-marker panel per cancer, and the official pooled-spot Pearson correlation
-coefficient (PCC), matching the public HEST-1k leaderboard's own metric
-(`mahmoodlab/HEST`, `src/hest/bench/trainer.py`) exactly. This is the
-evaluation reported in the paper, *Efficient Histopathology Representation
-Learning for Spatial Gene Expression Prediction* (Chennareddy & Yurovsky,
-2026) — see `docs/reports/DESIGN.md` §8-§9 for the full methods writeup this
-document's numbers are drawn from.
+- **Genes and metric:** the official HEST-1K 50-gene highly variable panel (HVG50) of each cancer; Pearson correlation (PCC) per gene on held-out
+  samples, averaged over genes within each cancer, then over the three cancers for the average.
+- **Partitions:** patient-disjoint. The held-out test partition is the official HEST-Benchmark test folds (IDC 4, COAD 2, ccRCC 6 folds);
+  model selection uses validation data only and the test partition is used once, for the final evaluation.
+- **Baselines (Table III, foundation models):** official frozen-encoder protocol, PCA to 256 dimensions followed by Ridge regression.
+- **ePathST-E, ePathST and the ablation variants:** identical patient-level partitions and gene targets, trained on the HEST-1K cohort slides
+  outside the held-out test partition (about 200 slides across the three cancers) and evaluated on the held-out test partition.
+- **Implementation:** `src/scripts/19_official_hest_benchmark.py` (baselines), `22_official_hest_ablation_grid.py` (ablation grid), `23_morans_i_diagnostic.py`.
+  The panel gene lists are in [`HEST_OFFICIAL_HVG50_GENES.md`](HEST_OFFICIAL_HVG50_GENES.md).
 
-A companion evaluation under this project's own **custom protocol** (own
-patient-level splits, per-fold-selected HVG1000/HVG50, patient-level Fisher-z
-aggregation) is reported separately in
-[`HEST_FINAL_5FOLD_RESULTS.md`](HEST_FINAL_5FOLD_RESULTS.md) — the two use
-different gene panels (1-2 genes overlap out of 50 per cancer) and different
-metrics, so their absolute numbers are not directly comparable. What
-replicates across both is the qualitative finding on real vs. shuffled
-spatial topology (§Gate readout below).
+## 2. How the paper reads the ablation
 
-## Models evaluated
+- Every spatial-context variant improves on the patch-only ePathST-E (average PCC 0.3438).
+- Mesoscopic context is the strongest single scale on average (0.3609). The best single scale varies by cancer: macroscopic is strongest among
+  the single-scale variants for ccRCC (0.2341).
+- Multiscale PNA raises the average to 0.3622 but does not consistently beat the best single scale within a cohort.
+- Scale-aware ePathST is best in IDC, COAD and ccRCC (average 0.3687): +0.0249 over ePathST-E, +0.0065 over multiscale PNA.
+- At gene level the best scale is target dependent. ERBB2 (HER2) is already well predicted from local morphology and gains from broader context;
+  the immune gene CD3E gains much more from context, consistent with dependence on the surrounding T-cell microenvironment.
+- Against pathology foundation models ePathST keeps about 94% of H-Optimus-0's average PCC with 215x fewer parameters and is the best model on COAD.
 
-Only the models reported in the paper are included below. The full A0-A9
-ablation grid (including A1 ImageNet-only, A3 capacity-matched MLP, A4
-random-graph, A5 shuffled-graph, and A9 GATv2) exists in this project's
-codebase and has been run under this protocol (job 87551), but the paper
-does not report updated numbers for those rows — see
-[Revision history](#revision-history) for why they are omitted here rather
-than shown with stale numbers.
+## 3. Additional controls: full A0-A9 grid (earlier controlled run)
 
-| Model | Architecture |
-|---|---|
-| ePathST-E | Frozen distilled CNN encoder, patch-only, no graph correction |
-| Local-only PNA | + graph correction, local scale only (≤150µm, ≤8 neighbors) |
-| Meso-only PNA | + graph correction, mesoscopic scale only (≤300µm, ≤12 neighbors) |
-| Macro-only PNA | + graph correction, macroscopic scale only (≤600µm, ≤16 neighbors) |
-| Multiscale PNA | + graph correction, all three scales, one PNA layer sees all edges (no gating) |
-| **ePathST** | + graph correction, all three scales, per-scale PNA branches + learned softmax gate (flagship model) |
+The full A0-A9 grid (`src/epathst/ablations.py`) was also run in a separate controlled experiment, with the models trained on the benchmark's own
+training slides in each of the 12 official folds (benchmark-fold training; IDC 3, COAD 1 to 3, ccRCC 20 slides per fold) and scored on the official
+test slides, genes and metric. Seed 1; mean and SD over the 12 fold cells (patient-level Fisher-z R and pooled-spot PCC).
 
-## Results
+| Model | Fisher-z R (mean, SD) | Pooled-spot PCC (mean, SD) |
+|---|---|---|
+| A1 ImageNet encoder, patch-only | 0.2214, 0.1557 | 0.2051, 0.1478 |
+| A2 distilled encoder, patch-only (ePathST-E) | 0.3100, 0.1584 | 0.3076, 0.1267 |
+| A3 parameter-matched MLP | 0.3157, 0.1795 | 0.3100, 0.1528 |
+| A4 random graph | 0.3200, 0.1672 | 0.3227, 0.1362 |
+| A5 degree-preserving shuffled graph | 0.3211, 0.1693 | 0.3242, 0.1365 |
+| A6 local PNA | 0.3213, 0.1704 | 0.3238, 0.1367 |
+| A7 multiscale PNA | 0.3207, 0.1669 | 0.3209, 0.1327 |
+| A8 scale-aware PNA (ePathST) | 0.3199, 0.1686 | 0.3215, 0.1331 |
+| A9 GATv2 multiscale | 0.3203, 0.1661 | 0.3261, 0.1284 |
 
-Official pooled-spot Pearson correlation coefficient, per cancer and
-averaged (equal-weighted mean across the three cancers):
+Reading: the distilled encoder beats the ImageNet encoder (A2 vs A1), and every graph variant beats patch-only by about 0.01 to 0.02. In this
+controlled run the shuffled-graph control (A5) scores as high as the real scale-aware graph (A8), so it does not show that the real physical
+topology, as opposed to generic neighbourhood aggregation, carries the gain. Fold-to-fold SD (0.13 to 0.18) is large relative to differences
+between graph variants. Files: `experimental_runs/2026-09-05_job88050_official_hest_ablation_grid/`.
 
-| Model | IDC | COAD | CCRCC | Average |
-|---|---|---|---|---|
-| ePathST-E (patch-only) | 0.4890 | 0.3151 | 0.2275 | 0.3438 |
-| Local-only PNA | 0.5161 | 0.3238 | 0.2316 | 0.3572 |
-| Meso-only PNA | 0.5237 | 0.3261 | 0.2328 | 0.3609 |
-| Macro-only PNA | 0.5194 | 0.3249 | 0.2341 | 0.3595 |
-| Multiscale PNA (no gate) | 0.5272 | 0.3256 | 0.2337 | 0.3622 |
-| **ePathST (scale-aware PNA)** | **0.5384** | **0.3302** | **0.2375** | **0.3687** |
+**Moran's I diagnostic** (`23_morans_i_diagnostic.py`; per gene, spatial autocorrelation against the A8 minus A2 gain): IDC r = 0.043 (p = 0.77),
+COAD -0.051 (p = 0.72), ccRCC -0.134 (p = 0.36), pooled over 150 genes 0.136 (p = 0.097). None is significant.
 
-ePathST's gain over the patch-only anchor is **+0.0249** average PCC
-(0.3687 vs. 0.3438); its gain over conventional ungated multiscale fusion is
-a further **+0.0065** (0.3687 vs. 0.3622). Among single fixed scales,
-meso-only is strongest (0.3609), narrowly ahead of macro-only (0.3595) and
-local-only (0.3572) — but no single fixed scale matches multiscale or
-scale-aware fusion; combining scales helps, and learned gating over the
-combination helps a little further.
+## 4. Validation checks (implementation level)
 
-## Comparison against published pathology foundation models
+- Official train and test samples are disjoint in every one of the 12 official folds (0 overlapping sample ids).
+- `TrainOnlyStandardizer.assert_no_leakage` runs in every fold; encoders are frozen and in evaluation mode; graphs are built per sample, so
+  train, validation and test graphs only contain nodes from their own sample pool.
+- Where an official fold has fewer than 2 training slides (COAD fold 0) the single training pool also serves as validation; this affects model
+  selection only and never touches test data.
 
-Parameter counts and relative size are normalized to ePathST's full
-5.25M-parameter system (frozen CNN encoder + GNN together, not the 3.39M
-encoder-only variant).
+## 5. Output files of the controlled run
 
-| Method | Params (M) | Relative size | IDC | COAD | CCRCC | Average |
-|---|---|---|---|---|---|---|
-| GigaPath | 1135 | 216.19× | 0.5515 | 0.2992 | 0.2430 | 0.3646 |
-| H-Optimus-0 (this project's teacher) | 1134 | 216.00× | **0.5976** | 0.3086 | 0.2676 | 0.3913 |
-| GenBio-PathFM | 1133 | 215.94× | 0.5872 | 0.3284 | 0.2615 | **0.3924** |
-| UNI2-h | 681 | 129.71× | 0.5898 | 0.3015 | 0.2640 | 0.3851 |
-| Virchow2 | 632 | 120.38× | 0.5971 | 0.2581 | **0.2719** | 0.3757 |
-| CONCH v1.5 | 307 | 58.48× | 0.5440 | 0.2802 | 0.2176 | 0.3473 |
-| Kaiko ViT-B/16 | 86 | 16.38× | 0.5352 | 0.2812 | 0.2291 | 0.3485 |
-| CTransPath | 27.5 | 5.24× | 0.4993 | 0.2382 | 0.2362 | 0.3246 |
-| ResNet50 | 25.5 | 4.86× | 0.4739 | 0.2500 | 0.2252 | 0.3164 |
-| ePathST-E (this project, encoder only) | 3.39 | 0.65× | 0.4890 | 0.3151 | 0.2275 | 0.3438 |
-| **ePathST** (this project, full system) | 5.25 | 1.00× | 0.5384 | **0.3302** | 0.2375 | 0.3687 |
-
-ePathST is the single best model on COAD among every model listed, including
-every pathology foundation model at 129-1231× its parameter count, and
-retains ~94% of H-Optimus-0's average PCC (0.3687 / 0.3913) at 216× fewer
-parameters. See `docs/reports/DESIGN.md` §9.5 for the accompanying
-compute-normalized (TFLOPs/WSI) efficiency analysis.
-
-## Gate readout
-
-- **Gate 2 (spatial context: does graph correction beat patch-only?)**
-  **holds**, and more clearly than earlier runs of this evaluation
-  suggested: +0.0249 average PCC (ePathST vs. ePathST-E).
-- **Gate 3 (true topology: does *real* spatial structure matter, vs. any
-  local averaging?)** — **not verifiable from the paper's own tables**,
-  since the paper does not report a shuffled-graph negative control. Under
-  this project's own custom protocol, the equivalent test (job 84871,
-  [`HEST_FINAL_5FOLD_RESULTS.md`](HEST_FINAL_5FOLD_RESULTS.md) §4) and the
-  earlier version of this official-protocol evaluation (job 87551, see
-  Revision history) **both found Gate 3 fails** — a real, degree-preserving
-  shuffled graph performs statistically indistinguishably from the real
-  spatial graph. Whether that finding still holds against the improved
-  ePathST numbers above is an open question until the shuffled-graph
-  control is rerun under the same setup that produced these numbers.
-- **Gate 1 (distillation: does the distilled encoder beat ImageNet-only
-  features?)** — similarly not verifiable from the paper alone (no A1
-  row reported). Held clearly under job 87551 (pooled +0.089); unconfirmed
-  against the run that produced the numbers above.
-
-## Leakage check
-
-Verified for the underlying evaluation infrastructure (`src/scripts/22_official_hest_ablation_grid.py`,
-`src/scripts/10_run_patient_cv.py::run_ablation`), and unchanged by the
-numeric revision below:
-
-- Official train/test splits are sample-disjoint: 0 overlapping `sample_id`s
-  across all 12 official train/test fold pairs.
-- `TrainOnlyStandardizer.assert_no_leakage(ids_test)` is called
-  unconditionally every fold.
-- Feature encoders (distilled + ImageNet) are frozen/eval-mode.
-- Graphs are built strictly per `sample_id`; train/val/test graphs only ever
-  contain nodes from their own disjoint sample pool.
-- Official folds with fewer than 2 training samples (COAD fold 0) use the
-  full training pool as both train and validation, so early stopping there
-  monitors training loss rather than a held-out signal — an optimistic
-  *model-selection* bias only, logged explicitly as `val==train fallback`;
-  it never touches test data and does not leak into reported test metrics.
-
-## Revision history
-
-- **2026-09-14**: replaced this document's numbers with the paper's final
-  Table III/V figures for the models the paper reports (ePathST-E, ePathST,
-  local/meso/macro/multiscale PNA), and added meso-only and macro-only rows
-  that did not previously exist in this project's ablation grid at all.
-  Two things changed at once and are worth stating plainly:
-  1. **Metric correction.** The original version of this document (below)
-     reported *Fisher-z-aggregated patient-level Pearson R*, not the
-     official HEST-1k Benchmark's actual pooled-spot Pearson metric —
-     despite the document's title. The numbers above use the correct
-     official metric, matching the paper.
-  2. **Model improvement.** Independently of the metric fix, the paper's
-     own numbers for ePathST-E/ePathST are higher than job 87551's
-     equivalent (mismatched-metric) rows by a margin too large to be
-     metric-related alone (e.g. patch-only 0.3438 vs. job 87551's
-     0.3100 Fisher-z R). An external reference point, GenBio-PathFM, moved
-     by less than 0.001 between the two evaluations, which rules out a
-     scoring/pipeline change as the explanation and points to a later,
-     improved training run feeding the paper. **What exactly changed is
-     not documented anywhere found so far** — flagged here rather than
-     guessed at (see `docs/reports/DESIGN.md` §14 for the corresponding
-     follow-up item).
-  - A0/A1/A3/A4/A5/A9 are omitted from the tables above (rather than shown
-    with unconfirmed numbers) because the paper does not report updated
-    values for them. The original job-87551 numbers for those rows,
-    computed under the (mismatched) Fisher-z metric, are preserved here for
-    the historical record:
-
-    | Ablation | Fisher-z R (mean, n=12 folds) | R (std) |
-    |---|---|---|
-    | A0_mean_expression | n/a (no model) | — |
-    | A1_imagenet_patch | 0.2214 | 0.1557 |
-    | A3_matched_mlp | 0.3157 | 0.1794 |
-    | A4_random_graph | 0.3197 | 0.1669 |
-    | A5_shuffled_graph (negative control) | 0.3204 | 0.1685 |
-    | A9_gatv2_multiscale | 0.3203 | 0.1661 |
-
-    Job 87551 metadata: all 3 cancers, all 12 official k-folds, seed=1
-    (official `BenchmarkConfig` default), feature-seed=0 (locked distilled
-    encoder). Runtime 26 minutes (2026-09-04, 11:34-12:01). Driver:
-    `src/scripts/22_official_hest_ablation_grid.py`.
-
-## Output files
-
-`/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_genbio_distill_hest_pna_work/results/official_hest_ablation_grid/`
-- `official_ablation_metrics.csv` — one row per cancer × fold × ablation (120 rows, job 87551)
-- `official_ablation_summary_macro.csv` — mean/std per ablation, pooled across folds/cancers (job 87551)
-- `run_args.json` — exact CLI args used
+Snapshots are in `experimental_runs/2026-09-05_job88050_official_hest_ablation_grid/` (`official_ablation_metrics.csv`, one row per cancer x fold x
+ablation, and `official_ablation_summary_macro.csv`); run arguments in `run_args.json`.

@@ -1,89 +1,54 @@
-# Leiden Clustering Comparison: Predicted vs. Ground-Truth Spatial Domains
+# Leiden clustering: predicted vs ground-truth spatial domains
 
-**Created**: 2026-09-14 (transcribed from the paper's qualitative evaluation) · **Last updated**: 2026-09-14
+PCC measures how well each gene is predicted. This check asks whether predicted expression recovers the same spatial domains as measured
+expression: Leiden clustering is applied independently to the measured and to each model's predicted 50-gene expression, and the two partitions
+are compared with the adjusted Rand index (ARI; AMI is also computed in section 2). Source for section 1: the paper, Fig. 3 and 4.
 
-## Overview
+## 1. Representative sample (paper figure)
 
-Predictive accuracy per gene/spot (the pooled-spot Pearson tables in
-[`HEST_OFFICIAL_ABLATION_RESULTS.md`](HEST_OFFICIAL_ABLATION_RESULTS.md))
-answers "how close is each predicted value to ground truth," but not
-"does the predicted expression recover the same *spatial domain
-structure* a pathologist or downstream analysis would find." This
-document reports the paper's complementary qualitative check: unsupervised
-**Leiden clustering** applied independently to ground-truth expression and
-to each model's predicted expression, then compared.
+HEST sample TENX149 (COAD, 3,620 spots). Procedure: z-score, PCA (up to 30 components), kNN graph with k = 15, Leiden (igraph). The clustering
+resolution was searched on the ground truth to give 5 to 9 clusters (resolution 0.3, 6 clusters) and reused for every prediction.
 
-Source: *Efficient Histopathology Representation Learning for Spatial Gene
-Expression Prediction* (Chennareddy & Yurovsky, 2026), §IV qualitative
-evaluation, Fig. 3-4. See `docs/reports/DESIGN.md` §9.4 for how this fits
-into the project's full results narrative.
+| Model | ARI |
+|---|---|
+| ePathST-E (patch-only) | 0.58 |
+| ePathST (scale-aware PNA) | 0.66 |
+| H-Optimus-0 (frozen, PCA-256 + Ridge) | 0.69 |
 
-## Method
+In the paper, ePathST improves ARI from 0.58 to 0.66, approaching the 0.69 of H-Optimus-0.
 
-For a representative HEST-1K sample, Leiden clustering (standard
-`scanpy`/Louvain-family community detection over the expression-derived
-neighbor graph, default resolution) is run twice:
+Per-gene prediction maps (paper Fig. 4, one gene and one sample per cancer; per-sample PCC for ePathST / H-Optimus-0): IDC GATA3 0.88 / 0.89,
+COAD CEACAM6 0.79 / 0.39, ccRCC STK39 0.48 / 0.50. These are illustrations of what a prediction map looks like, not aggregate statistics.
 
-1. On **ground-truth** measured expression → the reference spatial domain
-   partition.
-2. On each model's **predicted** expression, independently, using the same
-   clustering procedure and parameters.
+## 2. All 32 HEST test samples (benchmark-fold training)
 
-The two partitions are compared with a cluster-agreement score (higher =
-predicted domains better match the true spatial domain structure). This is
-a single-sample qualitative diagnostic, not a cross-fold statistic — it
-answers "does this look right," complementing the quantitative tables
-elsewhere in `docs/`, not replacing them.
+The same comparison on every sample of the official HEST test folds (IDC 4, COAD 4, ccRCC 24), with ePathST-E, ePathST and H-Optimus-0 trained on the
+benchmark's own training slides in each official fold (benchmark-fold training), seeds 0 and 1. Leiden recipe: z-score, PCA (20), kNN k = 15,
+igraph Leiden with random_state 0 at resolution 0.5 (0.3 and 1.0 as sensitivity); measured expression is clustered once per sample and the predictions
+are reindexed to it by spot id. H-Optimus-0 here is the frozen teacher with PCA reduction and the same MLP patch head as ePathST-E.
 
-## Results
+| Mean ARI at resolution 0.5 | ePathST-E | ePathST | H-Optimus-0 |
+|---|---|---|---|
+| All 32 samples, seed 0 | 0.128 | 0.128 | 0.140 |
+| All 32 samples, seed 1 | 0.127 | 0.132 | 0.139 |
+| Three cancers weighted equally, seed 0 | 0.196 | 0.192 | 0.239 |
+| Three cancers weighted equally, seed 1 | 0.199 | 0.198 | 0.227 |
+| IDC (4), seeds 0 / 1 | 0.208 / 0.221 | 0.212 / 0.219 | 0.299 / 0.293 |
+| COAD (4), seeds 0 / 1 | 0.376 / 0.371 | 0.345 / 0.362 | 0.380 / 0.356 |
+| ccRCC (24), seeds 0 / 1 | 0.074 / 0.071 | 0.078 / 0.079 | 0.074 / 0.077 |
 
-| Model | Cluster-agreement score | Role |
-|---|---|---|
-| ePathST-E (patch-only, no graph correction) | 0.58 | This project's patch-only anchor |
-| **ePathST (scale-aware PNA)** | **0.66** | This project's proposed final model |
-| H-Optimus-0 (frozen 1.13B-parameter teacher, PCA256+Ridge) | 0.69 | Full-scale reference — not a fair capacity comparison (216× more parameters), context only |
+Paired Wilcoxon tests across samples between the three systems give p between 0.06 and 0.73 (none below 0.05). ccRCC contributes 24 of the 32 samples
+and has low ARI for all systems. On this larger evaluation the ePathST-E to ePathST difference seen on TENX149 is not present, and repeated training
+runs on TENX149 itself give ePathST-E 0.58 to 0.67 and ePathST 0.61 to 0.66, so a single-sample ordering is not stable.
 
-**Reading**: the ordering (patch-only < scale-aware ePathST < H-Optimus-0)
-matches the quantitative pooled-spot Pearson ordering reported in
-[`HEST_OFFICIAL_ABLATION_RESULTS.md`](HEST_OFFICIAL_ABLATION_RESULTS.md)
-(ePathST-E 0.3438 avg PCC < ePathST 0.3687 < H-Optimus-0 0.3913). Spatial
-graph correction (ePathST vs. ePathST-E) recovers +0.08 cluster-agreement
-— a larger relative jump than the +0.0249 average-PCC gain over the same
-comparison — suggesting the graph correction's benefit shows up more
-clearly at the level of coherent spatial domains than at the level of
-individual spot/gene accuracy. ePathST closes most (but not all) of the
-gap to the 216×-larger H-Optimus-0 teacher on this diagnostic (0.66 vs.
-0.69, a 0.03 gap, vs. patch-only's 0.11 gap).
+**Reproducibility of the clustering (seed 0 run):** re-running the identical clustering on the saved matrices reproduces 94.5% of the saved label sets exactly; the
+rest move the mean ARI by at most 0.005 (per sample at most 0.063), and the system ordering is unchanged.
 
-## Per-gene spatial prediction maps (companion diagnostic, paper Fig. 4)
+Files: `results/leiden_official_hvg50{,_seed1}/` (per-sample table, summary, paired tests, ground-truth and predicted labels, models); see
+`docs/reports/RESULTS_INDEX.md`.
 
-A second, gene-level qualitative check: for one representative gene per
-cancer, predicted-vs-ground-truth spatial expression maps are compared
-visually, with a per-sample Pearson PCC reported alongside:
+## 3. Caveats
 
-| Cancer | Gene | ePathST PCC | H-Optimus-0 PCC | Note |
-|---|---|---|---|---|
-| IDC | GATA3 | 0.88 | 0.89 | Near parity |
-| COAD | CEACAM6 | **0.79** | 0.39 | ePathST substantially ahead on this specific gene/sample |
-| CCRCC | STK39 | 0.48 | 0.50 | Near parity |
-
-These are **illustrative single-sample/single-gene** comparisons, not
-aggregate statistics. COAD's large gap here is consistent with COAD being
-ePathST's strongest cancer in the aggregate comparison
-([`HEST_OFFICIAL_ABLATION_RESULTS.md`](HEST_OFFICIAL_ABLATION_RESULTS.md)),
-but should not be read as evidence that ePathST generally beats
-H-Optimus-0 on COAD — the aggregate pooled-spot table is the
-statistically meaningful comparison; this table exists to show what a
-prediction map actually looks like for one gene, not to establish a trend.
-
-## Caveats
-
-- Single representative sample per cluster-agreement score, single
-  gene/sample per per-gene map — not aggregated across folds or cancers,
-  so no confidence interval is reported or should be inferred.
-- H-Optimus-0 is shown as a full-scale reference for context (it is this
-  project's own distillation teacher), not as a same-capacity baseline —
-  it has ~216× ePathST's parameter count.
-- This diagnostic has not been run under this project's own custom
-  protocol (only the official-protocol paper run); no HVG1000/HVG50
-  custom-protocol equivalent currently exists.
+- Section 1 is one sample per score and one gene per map; no confidence interval applies.
+- H-Optimus-0 is the full-scale reference (it is the distillation teacher) and has about 215 times the parameters of ePathST.
+- Section 2 uses benchmark-fold training (1 to 3 slides per fold for IDC and COAD), so absolute values differ from the cohort-trained models of the paper tables.

@@ -5,7 +5,7 @@
 Source specs: `/lustre/nvwulf/home/schennareddy/cellvit_project/
 Final_Project_V1.txt` (original, the codebase's foundation) and
 `Final_Project_V2.txt` ("ePathST — Revised Implementation Plan",
-written after seeing PoC_5's real results -- see `docs/POC5_RESULTS.md`).
+written after seeing PoC_5's real results -- see `docs/reports/POC5_RESULTS.md`).
 
 **Explicit constraint honored throughout this migration**: nothing related
 to CPTAC WSI selection/QC, patch extraction, H-Optimus-0 teacher
@@ -15,7 +15,7 @@ inference, or ConvNeXt V2-Atto distillation training was touched --
 `teacher:`/`student:`/`distillation:` sections are byte-for-byte unchanged
 except where an earlier, unrelated fix (the HDF5 truncation bug) already
 touched `src/pathology_st/teacher_genbio.py` before this migration started -- see
-`docs/RUN_STATUS.md`. Verified by diffing those sections' resolved config
+`docs/reports/RUN_STATUS.md`. Verified by diffing those sections' resolved config
 values before/after (`distillation.max_epochs=100`,
 `teacher.hf_repo=bioptimus/H-optimus-0`, `student.backbone=
 convnextv2_atto` all confirmed unchanged) and by confirming the live
@@ -71,7 +71,7 @@ non-deterministic across forward calls in train mode, since nothing had
 put it in `eval()`. `ResidualGraphPredictor.__init__` now calls
 `self.patch_head.eval()` and overrides `.train()` to keep it there
 permanently -- caught by the new S1 sanity check failing on first run,
-fixed, then reconfirmed passing (see `docs/RUN_STATUS.md`-style
+fixed, then reconfirmed passing (see `docs/reports/RUN_STATUS.md`-style
 incident record, kept here since it's part of this migration's own work).
 
 ### 3. Ablation grid restructured (V2 Phase 14)
@@ -97,7 +97,7 @@ yet wired into a driver script, see Known follow-ups).
 The most consequential change. PoC_5's own cross-fold aggregate silently
 pooled only 3 of 4 completed folds (fold 3 finished but was never
 included; fold 4 failed both/all 3 seeds on a broken script path -- see
-`docs/POC5_RESULTS.md` for the full forensic writeup). V2 Phase 3 requires
+`docs/reports/POC5_RESULTS.md` for the full forensic writeup). V2 Phase 3 requires
 a hard assertion against exactly this. Added:
 - `src/pathology_st/cv_folds.expected_run_keys` -- enumerates every (cancer, fold,
   seed, ablation) the CV design calls for.

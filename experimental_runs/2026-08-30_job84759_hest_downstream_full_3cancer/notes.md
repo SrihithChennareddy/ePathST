@@ -2,4 +2,4 @@
 
 Stage: end of 24h job
 
-(add free-text observations about this snapshot here)
+Completed in 2271 s on b40x4-long: a second complete run of the same stage as job 84733.

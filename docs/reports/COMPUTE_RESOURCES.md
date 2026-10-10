@@ -8,7 +8,33 @@ stays accurate through publication. Queued/cancelled jobs that never
 acquired a GPU are listed separately and excluded from the GPU-hour
 total (zero compute consumed).
 
-## Summary (last updated 2026-08-29, job 84150 still in progress)
+## Update 2026-10-09: full ledger from SLURM accounting
+
+Compiled with `sacct` for every GPU job from 2026-08-21 to 2026-10-07 (380 jobs; GPU-hours = elapsed hours x GPUs allocated; interactive sessions
+excluded). Grouping by job family is by job name and approximate.
+
+| | GPU-hours |
+|---|---|
+| **Total** | **505.0** |
+| NVIDIA H200 | 171.4 |
+| NVIDIA RTX PRO 6000 Blackwell (98 GB) | 333.6 |
+| 2026-08 / 2026-09 / 2026-10 | 79.7 / 385.3 / 40.0 |
+
+| Job family | GPU-hours |
+|---|---|
+| A10 cell-level extension experiments (not part of the paper) | 371.6 |
+| TCGA external validation (inference) | 37.9 |
+| Phase 1 distillation | 35.0 |
+| HEST downstream, official-protocol and ablation runs | 31.4 |
+| Official-cohort Leiden | 5.2 |
+| Other (smoke tests, diagnostics) | 23.8 |
+
+The paper states that the full ePathST system and the ablation models were evaluated on NVIDIA H200 GPUs, and that distillation ran on a single
+RTX PRO 6000 Blackwell per job. Suggested Methods sentence: "Pathology representation distillation was run on a single NVIDIA RTX PRO 6000 Blackwell
+GPU (98 GB) per job; the downstream spatial gene-expression prediction system and all ablation models were evaluated on NVIDIA H200 GPUs, on a
+SLURM-managed institutional cluster." The Phase 1 ledger below is as of 2026-08-29.
+
+## Phase 1 distillation ledger (last updated 2026-08-29, job 84150 still in progress at that date)
 
 - **GPU used**: 1x NVIDIA RTX PRO 6000 Blackwell (98GB) per job,
   throughout — no other GPU model contributed compute (H200 was
@@ -24,7 +50,7 @@ total (zero compute consumed).
   distillation training (S1/seed0), with validation cosine similarity to
   the teacher climbing 0.7646 -> 0.9019 over that span.
 - **Two of the five jobs (83723, 83737) failed** partway through (a real
-  bug, since fixed — see `docs/RUN_STATUS.md`) after ~1.3-1.6 GPU-hours
+  bug, since fixed — see `docs/reports/RUN_STATUS.md`) after ~1.3-1.6 GPU-hours
   each; their successful Steps 1-4 work was reused by later jobs rather
   than wasted.
 - **Job 84150** (in progress) continues training from epoch 39 toward
@@ -45,7 +71,7 @@ An 8x/4x NVIDIA H200 (141GB) partition (`h200x4`/`h200x8` and their
 started** — the cluster's H200 GPUs were fully allocated cluster-wide at
 submission time, and separately the `-long` partition variants proved
 structurally lower scheduling priority than their short-partition
-siblings on this cluster (see `docs/RUN_STATUS.md` for the full
+siblings on this cluster (see `docs/reports/RUN_STATUS.md` for the full
 scheduling investigation). All were cancelled with zero elapsed runtime
 and zero GPU-hours consumed. **No H200 compute was used in this
 project** — if reporting hardware in a paper, report RTX PRO 6000

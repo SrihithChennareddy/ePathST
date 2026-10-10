@@ -4,21 +4,12 @@
 
 Detailed, skimmable version of `FINAL_RESULTS.md` for the LOCKED final 5-fold x 3-cancer x seed-0 experiment (SLURM job 84871, completed 2026-08-31, 03:15:54 elapsed). Metric: patient-level Fisher-z mean Pearson R (`pathology_st.metrics.patient_macro_fisher_z`). All CIs are bootstrap 95% intervals, n_bootstrap=10000, resampled over (cancer, fold, seed) cells -- see Limitations for what that does and doesn't mean. Every number below is read directly from `results/final/tables/`, not re-derived or estimated.
 
-> **Protocol note**: this document reports the project's own **custom
-> protocol** (own patient-level GroupKFold splits, per-fold-selected
-> HVG1000/HVG50, patient-level Fisher-z-aggregated Pearson R). The
-> published paper (*Efficient Histopathology Representation Learning for
-> Spatial Gene Expression Prediction*, Chennareddy & Yurovsky, 2026)
-> reports results exclusively under the **official HEST-1k Benchmark
-> protocol** instead (official splits, official 50-gene marker panel,
-> pooled-spot Pearson) — see
-> [`HEST_OFFICIAL_ABLATION_RESULTS.md`](HEST_OFFICIAL_ABLATION_RESULTS.md)
-> for the paper-comparable numbers. The two protocols score different gene
-> panels (1-2 genes overlap out of 50 per cancer) under different metrics,
-> so the numbers in this document are **not directly comparable** to the
-> paper's tables and are not restated to match them. What does replicate
-> across both protocols is the qualitative Gate 3 finding (real vs.
-> shuffled spatial graph) — see §4 and §9 below.
+> **Protocol note**: this document reports the project's own **custom 5-fold cross-validation**: patient-level GroupKFold per cancer over the HEST
+> cohort (for each fold, the cohort slides outside the fold are used for training and the fold's slides for testing), per-fold-selected HVG1000/HVG50
+> genes, and patient-level Fisher-z Pearson R. The paper reports its results on the official HEST-1K gene panel (HVG50) and pooled-spot PCC, evaluated on
+> the held-out HEST test partition (see `docs/METHODS.md` section 5). The two protocols score different genes (1 to 2 of 50 overlap per cancer) with
+> different metrics, so the numbers here are not directly comparable to the paper's tables and are not restated to match them. What replicates across
+> them is the qualitative finding on the real versus shuffled spatial graph (sections 4 and 9).
 
 ## Contents
 

@@ -20,27 +20,33 @@ instead, so the module's pinned CUDA build isn't overwritten.
 
 ```
 src/
-├── epathst/           reusable library, organized by responsibility
-│   ├── data/           CPTAC/HEST selection, patch extraction, splits, expression, pathways
-│   ├── models/         teacher, student, patch head, graph correction models
-│   ├── graph/          spatial graph construction, perturbation, training
-│   ├── distillation/   teacher-to-student distillation training and evaluation
-│   ├── evaluation/     metrics, downstream analyses, pathway scoring
-│   ├── statistics/     bootstrap CIs, hypothesis tests, FDR correction
-│   ├── efficiency/     parameter/FLOP/latency/memory benchmarking
-│   ├── reporting/      figures and final results reporting
-│   ├── ablations.py    the A0-A9 ablation grid (cross-cutting)
-│   └── utils.py        config loading, path resolution, shared helpers (cross-cutting)
-└── scripts/            numbered pipeline stages (01-23, run in order) + tools/ (utilities)
+├── epathst/            reusable library, organized by responsibility
+│   ├── data/            CPTAC/HEST selection, patch extraction, splits, expression, pathways
+│   ├── models/          teacher (H-Optimus-0), student, patch head, graph correction models
+│   ├── graph/           spatial graph construction, perturbation, training
+│   ├── distillation/    teacher-to-student distillation training and evaluation
+│   ├── evaluation/      metrics, ablation runner, official HEST protocol, Leiden analysis
+│   ├── statistics/      bootstrap CIs, hypothesis tests, FDR correction
+│   ├── efficiency/      parameter/FLOP/latency/memory benchmarking
+│   ├── tcga/            TCGA external validation: GDC access, hex-grid prediction, worker queue
+│   ├── audits/          consistency checks of panels, saved models and training samples
+│   ├── reporting/       figures and final results reporting
+│   ├── ablations.py     the A0-A9 ablation grid (cross-cutting)
+│   ├── cli.py           stage dispatch for the multi-stage driver scripts
+│   └── utils.py         config loading, path resolution, shared helpers
+└── scripts/             numbered pipeline stages (run in order), tools/, legacy/
+figures/                 code and small data behind every paper figure (see figures/README.md)
 configs/                 base.yaml: every hyperparameter, nothing hard-coded in scripts
-tests/                   unit tests for deterministic numeric code
-docs/reports/          topic-specific writeups (results, data provenance, migration history)
-design/DESIGN.md         full methods supplement
-experimental_runs/       dated, git-committed snapshots of completed jobs' results
+slurm/                   SLURM job files for the stages above
+tests/                   unit tests, determinism digests, GPU end-to-end checks
+docs/METHODS.md          methods, data, evaluation protocol and results, aligned with the paper
+docs/reports/            topic-specific writeups (results, data provenance, compute, research history)
+experimental_runs/       dated, git-committed snapshots of completed jobs' results (see INDEX.csv)
+design/                  earlier submitted version of the paper (PDF); docs/METHODS.md follows the Oct 9 version
 ```
 
-See [`docs/reports/style_references/`](docs/reports/style_references/README.md) for the style
-references this repository's organization follows.
+Documentation starts at [`docs/README.md`](docs/README.md); the methods, evaluation protocol and headline results of the paper are in
+[`docs/METHODS.md`](docs/METHODS.md).
 
 ## Pipeline overview
 
@@ -51,7 +57,7 @@ The `src/scripts/` are numbered end-to-end and split into two phases: distilling
 1. `01_select_cptac_wsi.py` — select one WSI per patient from the CPTAC root/metadata (breast, colon, kidney)
 2. `02_extract_cptac_patches.py` — tissue-masked, spatially sampled 224×224 patch extraction
 3. `03_cptac_patient_split.py` — patient-level 80/10/10 split, per seed
-4. `04_run_teacher_genbio.py` — run the frozen H-Optimus-0 teacher once over every selected patch (filename kept from an earlier teacher choice; see `docs/reports/V1_TO_V2_MIGRATION.md`)
+4. `04_run_teacher_hoptimus.py` — run the frozen H-Optimus-0 teacher once over every selected patch
 5. `05_train_student_distill.py` — train the ConvNeXt V2-Atto student(s) distilled from the teacher
 6. `06_eval_distillation.py` — evaluate the student(s) on held-out CPTAC test patients
 7. `07_lock_student.py` — lock the final student checkpoint at the chosen hyperparameters
@@ -60,20 +66,45 @@ The `src/scripts/` are numbered end-to-end and split into two phases: distilling
 
 8. `08_prepare_hest_metadata.py` — audit HEST metadata across the IDC/COAD/CCRCC cohorts
 9. `09_extract_student_features_hest.py` — run the locked student encoder over HEST patches
-10. `10_run_patient_cv.py` — main patient-level cross-validation: patch-only vs. spatial PNA-GNN models
+10. `10_run_patient_cv.py` — patient-level cross-validation: patch-only vs. spatial PNA-GNN models
 11. `11_spatial_destruction_doseresponse.py` — progressive spatial-edge destruction dose-response
 12. `12_primary_hypothesis_test.py` — aggregate per-patient Fisher-z Pearson correlations for the primary hypothesis test
 13. `13_additional_analyses.py` — multiscale-vs-local contribution and per-cancer consistency
 14. `14_model_efficiency.py` — parameter counts, compression ratio, FLOPs/MACs
-15. `15_genbio_fair_comparison.py` — fair comparison against H-Optimus-0 (the teacher) itself on the same HEST cohort (filename kept from an earlier teacher choice; superseded by `epathst.evaluation.hoptimus_comparison`'s train-fold-only PCA256 comparison for the locked final experiment)
+15. `15_hoptimus_comparison.py` — H-Optimus-0 (the teacher) features on the same HEST cohort, for comparison with the student
 16. `16_sanity_checks.py` — sanity checks that must pass before launching full runs
 17. `17_make_results_tables_and_figures.py` — final results tables and figures across HVG settings
 18. `18_final_interpretation.py` — final scientific interpretation of the results
 
-**Official HEST-1k Benchmark reproduction** (separate from the custom protocol above — see `docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md`)
+Steps 10 to 18 use the project's own 5-fold patient-level cross-validation over the HEST cohort (per-fold HVG1000/HVG50 genes, patient-level
+Fisher-z correlation); its results are in `docs/reports/HEST_FINAL_5FOLD_RESULTS.md`.
 
-19. `19_official_hest_benchmark.py` — official splits/genes/PCA256+Ridge protocol, raw teacher/student encoders only
+**Official HEST-1k Benchmark protocol** (official 50-gene panels and pooled-spot PCC; see `docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md`)
+
+19. `19_official_hest_benchmark.py` — official splits/genes/PCA256+Ridge protocol for the frozen foundation-model encoders
 20. `20_build_final_results.py` — assembles the final results tables from all upstream result files
 21. `21_results_summary_doc.py` — regenerates the git-tracked results summary doc
-22. `22_official_hest_ablation_grid.py` — the full A0-A9 grid re-evaluated under the official protocol
+22. `22_official_hest_ablation_grid.py` — the A0-A9 ablation grid trained and scored under the official protocol
 23. `23_morans_i_diagnostic.py` — tests whether A8's per-gene gain over A2 tracks real spatial autocorrelation (ground-truth Moran's I)
+
+**Supplementary analyses** (see `docs/reports/RESULTS_INDEX.md`). Each driver runs one stage at a time and keeps the options the
+stage had as a standalone script (`python src/scripts/<driver> <stage> --help`).
+
+24. `24_tcga_validation.py` — TCGA external validation: `cases`, `download`, `patches`, `predict-sparse`, `predict` (100 µm hex
+    pseudo-spots), `worker` (self-scheduling GPU queue), `audit`, `companion` (RNA-seq, clinical, purity)
+25. `25_leiden_official_panel.py` — Leiden spatial domains on the official 50-gene panels: `official`, `cohort`, `verify`,
+    `reproducibility`
+26. `26_hest_audits.py` — `panel-coverage`, `frozen-weights`, `training-samples`
+
+`run_hoptimus_hest_baseline.py` is the standalone frozen H-Optimus-0 patch-only baseline for the custom protocol.
+`tools/` holds the snapshot, debugging and profiling utilities; `legacy/` keeps earlier variants of the Leiden analysis and
+the TCGA slide-geometry survey for provenance. Figure code is in `figures/`.
+
+## Tests
+
+```shell
+python -m pytest -q tests/test_graph_and_stats.py tests/test_tcga_queue_claims.py
+python tests/regression_baseline.py --out digests.json   # determinism digests; diff two runs
+sbatch slurm/run_smoke_tests.slurm                        # adds the one-slide TCGA end-to-end check (GPU)
+sbatch slurm/run_figures_check.slurm                      # regenerates the figures, compares pixels
+```

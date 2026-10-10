@@ -2,7 +2,7 @@
 
 Two different "HVG50" gene sets exist across this codebase's runs, and they are **not the same
 genes**. This doc lists both, per cancer, and explains why they diverge (see also
-`docs/HEST_OFFICIAL_ABLATION_RESULTS.md` for the results that use the official panel).
+`docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md` for the results that use the official panel).
 
 ## How each is computed
 

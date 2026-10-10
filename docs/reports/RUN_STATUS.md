@@ -400,7 +400,7 @@ either reach epoch 50 or land very close to it.
 
 All 3 real HEST cancers (breast/IDC, colon/COAD, kidney/CCRCC -- 202
 samples total) became available together for the first time this session
-(`docs/RUN_STATUS.md`'s earlier entries only had colon). This section
+(`docs/reports/RUN_STATUS.md`'s earlier entries only had colon). This section
 covers: (1) parallelizing Step 8 (the previous bottleneck), (2) building
 a second, independent frozen-GenBio-PathFM patch-only baseline for
 comparison, and (3) four real, previously-hidden bugs Step 10 hit the

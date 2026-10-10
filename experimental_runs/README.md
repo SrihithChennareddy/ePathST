@@ -4,7 +4,7 @@ Captured, point-in-time snapshots of this project's actual experiment
 results (never fabricated numbers -- everything here was copied out of a
 real completed or in-progress run's `results/`, per the project's CRITICAL
 RULE). This is the place to look for cross-run/cross-seed/cross-ablation
-comparison later; `docs/RUN_STATUS.md` is the operational recovery log
+comparison later; `docs/reports/RUN_STATUS.md` is the operational recovery log
 (job IDs, what to do after a crash) -- this folder is the scientific
 record.
 

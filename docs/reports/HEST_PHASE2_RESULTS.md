@@ -23,7 +23,7 @@ job **84733**, 2026-08-30). Compiled directly from
 (mirrored into `experimental_runs/2026-08-30_job84733_hest_downstream_full_3cancer/`);
 nothing here is estimated or reconstructed from memory. The separate,
 standalone frozen-GenBio-PathFM comparison (job 84744) is documented in
-`docs/RUN_STATUS.md`'s "MILESTONE 2" entry, which also has the full
+`docs/reports/RUN_STATUS.md`'s "MILESTONE 2" entry, which also has the full
 operational narrative for this run (every bug found/fixed getting here).
 
 ## Scientific question
@@ -41,7 +41,7 @@ controls (shuffled/random graphs, mean-expression floor)?
 | | |
 |---|---|
 | Cancers | IDC (breast), COAD (colon), CCRCC (kidney) -- 202 total HEST samples audited |
-| Samples actually used | **191** (11 excluded: 6 IDC + 5 COAD samples run on a targeted ~541-gene panel (Xenium-style) rather than whole-transcriptome ST -- see `docs/RUN_STATUS.md`'s "Step 10 bug 3" for why; COAD/CCRCC data source is a different HEST-1k download than IDC's, unaffected otherwise) |
+| Samples actually used | **191** (11 excluded: 6 IDC + 5 COAD samples run on a targeted ~541-gene panel (Xenium-style) rather than whole-transcriptome ST -- see `docs/reports/RUN_STATUS.md`'s "Step 10 bug 3" for why; COAD/CCRCC data source is a different HEST-1k download than IDC's, unaffected otherwise) |
 | Split | **Single 80/20 patient-level GroupKFold split per cancer** (`--max-folds-per-cancer 1 --seeds 0`) -- NOT the full V2 Phase 3 design (5-fold x 3-seed); a deliberate time-budget tradeoff for this run, not the project's final design |
 | Test-set size | IDC 23 patients, COAD 11 patients, CCRCC 5 patients |
 | HVG1000 gene count | Full 1000 for every cancer (the targeted-panel exclusion above keeps this apples-to-apples across cancers -- before that fix, IDC's shared gene pool had silently collapsed to 171) |
@@ -161,7 +161,7 @@ drawing a real scientific conclusion.
   cache regardless of ablation spec). Every other ablation (A0, A2-A9)
   already specs the encoder that's actually loaded, so only A1's row
   and Gate 1 were invalid -- everything else here is unaffected. See
-  `docs/RUN_STATUS.md` for the full writeup, including a
+  `docs/reports/RUN_STATUS.md` for the full writeup, including a
   `base.json`-vs-`base.yaml` sync gotcha this surfaced.
 - **Single fold/seed per cancer** -- not the project's final 5-fold x
   3-seed design. Rerun with `--max-folds-per-cancer 5 --seeds 0 1 2`

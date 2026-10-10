@@ -165,7 +165,7 @@ re-running `debug_idc_pipeline.py` and confirming identical output.
   reformat them.
 - **Dual config sources** (`configs/base.yaml` hand-mirrored to `base.json`,
   `load_config` silently preferring `.json`) — flagged by the Pass 1 audit as a
-  real footgun (already caught once per `docs/RUN_STATUS.md`), but fixing the
+  real footgun (already caught once per `docs/reports/RUN_STATUS.md`), but fixing the
   loading mechanism itself was judged out of presentation-only scope; not touched.
 - **A3-vs-`train_patch_head` code duplication** in `10_run_patient_cv.py` — Agent 2
   suggested extracting the shared training loop, but doing so changes structure,
@@ -240,3 +240,139 @@ untracked, unreviewed code — not an oversight.
    state.
 6. **Were deterministic baseline checks preserved?** Yes, byte-identical after
    every pass, including the final state.
+
+---
+
+# Round 2 (2026-10-09): whole repository, script consolidation, H-Optimus-0 naming, figure code
+
+Same governing spec (`fix_code.txt`), applied to everything written after round 1: scripts 24-53, the TCGA and Leiden
+pipelines, tests, SLURM files and the paper-figure code. Nothing is committed yet.
+
+## 1. Structure after round 2
+
+```
+src/epathst/
+├── data/ models/ graph/ distillation/ statistics/ efficiency/ reporting/   (unchanged from round 1)
+├── evaluation/   + ablation_runner.py (from script 10), official_hest.py (from script 22),
+│                   leiden.py (script 35), leiden_cohort.py (script 37)
+├── tcga/         gdc.py (was data/tcga.py), cases.py (24), download.py (25), patches.py (28),
+│                 prediction.py (38), hexgrid.py (40), worker.py (43), audit.py (44), companion.py (50)
+├── audits/       panel_coverage.py (41), frozen_weights.py (42), training_samples.py (53),
+│                 leiden_ari.py (45), leiden_reproducibility.py (46)
+└── cli.py        stage dispatch for the three drivers below
+src/scripts/      01-23 unchanged in place (04, 15 renamed), 24_tcga_validation.py, 25_leiden_official_panel.py,
+                  26_hest_audits.py, run_hoptimus_hest_baseline.py, tools/, legacy/
+figures/          one script per paper figure, inference/ for their GPU inputs, data/ (small inputs)
+tests/            unit tests, regression_baseline.py (determinism digests), e2e_one_slide.py, e2e_figures.py,
+                  e2e_embed_equivalence.py
+```
+
+Numbered top-level scripts went from 47 (01-53 with gaps, plus 51/52) to 26. The 01-23 pipeline keeps its numbering, as
+the spec requires.
+
+## 2. How the merge was done
+
+Scripts 22, 23, 35, 37, 40, 43, 44, 45, 46 and the baseline loaded each other by file path with `importlib`
+(10 -> 22 -> 23/35 -> 37/45/46; 38 -> 40 -> 43 -> 44). The reusable definitions were moved verbatim into the package and
+every caller now imports them normally. Each former script's `main()` became a library entry point, and three drivers call
+them with the original options unchanged (`24_tcga_validation.py worker --limit 1` takes exactly what
+`43_tcga_worker.py --limit 1` took). Scripts 32, 33, 34, 36 and 39 are earlier variants kept in `legacy/` with only their
+imports fixed. Old name -> new command: `docs/reports/RESULTS_INDEX.md` section 5.
+
+Script 35 patches `predict_graph_model` inside the module that defines `run_ablation`, so it can save the fitted ePathST
+model. That patch now targets `epathst.evaluation.ablation_runner` and is applied when `epathst.evaluation.leiden` is imported,
+exactly as importing script 35 applied it before.
+
+## 3. Renames
+
+| Old | New | Why |
+|---|---|---|
+| `04_run_teacher_genbio.py`, `15_genbio_fair_comparison.py`, `run_genbio_hest_baseline.py` (+ SLURM) | `04_run_teacher_hoptimus.py`, `15_hoptimus_comparison.py`, `run_hoptimus_hest_baseline.py` | teacher is H-Optimus-0 |
+| config keys `baselines.S1_genbio_distilled`, `genbio_fair_comparison` | `S1_hoptimus_distilled`, `hoptimus_comparison` | same; values unchanged, only 05 reads the first |
+| inputs read by 20/21: `genbio_baseline/genbio_summary.csv`, `genbio_teacher_param_count.json`, encoder `genbio_pathfm` | `hoptimus0_baseline/hoptimus0_summary.csv` (what the baseline script writes), `hoptimus0_teacher_param_count.json`, `h_optimus_0` (what script 19 writes) | readers now match the current writers |
+| `_row_for`, `_decode_barcodes` (script 22) | `row_for_sample`, `decode_barcodes` | now imported across modules |
+| module aliases `s38`, `s40`, `s43` | `prediction`, `hexgrid`, `worker` | readability |
+| log prefixes `[35_...]`, `[37]`, `[38]`, `[40]`, `[43 ...]`, `[50 ...]` | module names | the scripts no longer exist under those names |
+| `tests/test_tcga_embed_equivalence.py` | `tests/e2e_embed_equivalence.py` | GPU script with argv; pytest collected it and failed |
+
+GenBio-PathFM no longer appears in any code, config or SLURM file. It remains in the docs and in `figures/data/*.csv`
+as one of the compared foundation models, and in the file names of the `experimental_runs/` snapshots, which are records.
+
+## 4. Formatting and comments
+
+black (line length 100) over every in-scope file, long docstring paragraphs and comments rewrapped, long string literals
+split into adjacent literals, section banners removed, and a comment/docstring pass in the spec's style (four parallel
+reviewers, comments and docstrings only). After each pass every file was checked:
+whole-module AST identical to the previous state (ignoring docstrings for the comment passes, not ignoring them for the
+string splits), and for the rewrap pass the exact word sequence of every docstring and comment preserved.
+
+## 5. Behaviour checks (before = frozen copy of the tree taken before any round-2 edit)
+
+| Check | Before | After |
+|---|---|---|
+| Unit tests (`test_graph_and_stats.py`, `test_tcga_queue_claims.py`) | 9/9 | 9/9 |
+| Determinism digests, 21 sections (graph edges and features per scale, random/rewired/partial graphs, ablation graphs, bootstrap CI, sign-flip, BH-FDR, patient Pearson/Fisher-z, Moran's I, CPTAC split, CV grid, parameter counts and forward outputs of patch head, union PNA, GATv2, scale-aware PNA, residual predictor, student encoder) | recorded | byte-identical |
+| One TCGA slide per cancer, end to end on GPU (embeddings from the WSI vs cache; predictions vs the stored production files) | PASS, max diffs 2.4e-3 to 3.9e-3 | PASS, the same numbers to every printed digit |
+| Every moved function, class and constant | | AST-identical to its original (aliases and the two renames normalised) |
+| Paper figures regenerated (15 images) | | pixel-identical to the files in `paper_figures/` |
+| Leiden, official panel, COAD fold 0, old script 35 vs `25_leiden_official_panel.py official` (same GPU, same seed, scratch output) | ePathST-E 0.3729, ePathST 0.3574, H-Optimus-0 0.3234 | ePathST-E and H-Optimus-0 predictions bit-identical (0.3729, 0.3234); ePathST 0.3566. The graph model's GPU training is not bit-reproducible: two earlier identical seed-0 runs of the original script gave 0.3633 and 0.3528 |
+
+Parameter count of the student encoder: 3,387,400 (paper: 3.39 M).
+
+## 6. Deliberate changes to how things are invoked (not to what they compute)
+
+- The merged scripts run as stages of the three drivers; every SLURM file was updated.
+- `epathst.tcga.worker.run_final_audit` called `44_tcga_audit.py` next to itself; after the move that path would not
+  exist, so it now calls `24_tcga_validation.py audit` with the same arguments.
+- Six SLURM files called `src/scripts/snapshot_experiment.py`, which round 1 moved to `src/scripts/tools/`; the path is fixed.
+- Scripts 20 and 21 read the H-Optimus-0 file names above. The files currently in the results folder are the older
+  GenBio-labelled ones, so 20 and 21 will not find their B1 and teacher-parameter inputs until the H-Optimus-0 baseline is rerun
+  (and 20 still has round-1 bug 1: it fails on a missing teacher-parameter file).
+- Exploratory SLURM files that run `.tmp_*` scratch scripts moved to `slurm/scratch/` (git-ignored, like `.tmp_*`); the A10
+  job files moved to `slurm/a10/`.
+
+## 7. Incident during testing
+
+A `--help` sweep over the scripts executed 20 and 21, which take no arguments. Script 20 rewrote
+`cptac_hoptimus0_distill_hest_pna_work/results/final/tables/` and `final/folds/` before stopping. Seven of the eight files are
+byte-identical to their committed snapshot copies; `efficiency.csv` lost its teacher-parameter and compression values. A copy of
+the folder as it is now is in the session scratch area. To restore the committed version:
+`cp experimental_runs/2026-08-31_job84871_final_5fold_3cancer_seed0_with_results_final/results/final/tables/efficiency.csv <work_dir>/results/final/tables/`.
+The same sweep re-ran `26_hest_audits.py panel-coverage`, which rewrote `results/hest_panel_coverage/` with recomputed values.
+
+## 8. Left unchanged on purpose
+
+- 01-23 stay numbered and in place; their code was only reformatted in round 1 and here.
+- Script 19 keeps its own copies of `official_target` and `_decode_barcodes`, which duplicate `official_hest`: the spec forbids
+  deduplicating scientific code.
+- The A10 subsystem (`src/pathology_st/`, `a10_*` scripts, configs, tests) is untracked and not part of the paper; its imports of
+  the old `pathology_st.*` modules are still broken (round-1 note 10).
+- `.tmp_*` scratch scripts are git-ignored, not deleted. The figure code that came from them now lives in `figures/`.
+- `experimental_runs/` snapshot files keep their original names and contents.
+
+## 9. Found, not fixed (needs a decision)
+
+1. **Distillation teacher of the stored student.** `cptac_teacher_embeddings.h5` is (564,312 x 4608) and the distillation
+   checkpoint `S1_seed0_best.pt` has a projection head 320 -> 1024 -> 4608, with validation cosine 0.9060 at epoch 56. H-Optimus-0
+   embeddings are 1536-d; 4608-d is the GenBio-PathFM CLS size, and `genbio_teacher_param_count.json` records 1,133,686,784
+   parameters loaded from `genbio-ai/genbio-pathfm`. The paper reports an H-Optimus-0 teacher, a 320 -> 1024 -> 1536 head and
+   cosine 0.9060 at epoch 55. `locked_encoder_seed0.pt`, derived from this checkpoint, is the encoder behind every saved model,
+   the TCGA predictions, the Leiden runs and the stored ePathST predictions used in two figures. Commit 421d30f (2026-09-13)
+   says those earlier results "genuinely were produced using GenBio-PathFM"; later commits (3bd426b, 0439715) relabelled
+   them as H-Optimus-0. The code and configs now describe an H-Optimus-0 teacher, which is what a new distillation run would
+   use; the stored checkpoints were not distilled from it.
+2. `docs/reports/HEST_FINAL_5FOLD_RESULTS.md` section 7 and the `experimental_runs` snapshots show official-protocol teacher
+   numbers (IDC 0.5898, COAD 0.3264, ccRCC 0.2638) and B1 numbers under an H-Optimus-0 label; they equal the GenBio-labelled
+   files on disk (`official_hest_benchmark_summary.csv`, `genbio_summary.csv`).
+3. The file named `gene_context.png` in `paper_figures/` is a third-party GigaTIME figure, not the gene-context dot plot the
+   caption describes; check what was uploaded to the paper.
+4. Round-1 items 1-4, 6 and 7 are still open (item 5, the missing `INDEX.csv` rows, is fixed).
+
+## 10. Final statement
+
+1. Scientific functionality changed? No. Moved code is AST-identical, digests and end-to-end outputs are identical.
+2. Model architecture changed? No.
+3. Evaluation or statistical methodology changed? No.
+4. Efficiency methodology changed? No.
+5. All available tests pass? Yes: unit tests 9/9, determinism digests, one-slide end to end, figure regeneration.
+6. Deterministic baseline checks preserved? Yes, byte-identical.
