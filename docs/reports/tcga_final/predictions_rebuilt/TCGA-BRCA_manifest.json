@@ -1,0 +1,16 @@
+{
+ "project": "TCGA-BRCA",
+ "head": "IDC",
+ "kept_folds": [
+  "IDC_fold0",
+  "IDC_fold1",
+  "IDC_fold3"
+ ],
+ "excluded": [
+  "IDC_fold2"
+ ],
+ "slides": 1030,
+ "seed": 0,
+ "source_embeddings": "/lustre/nvwulf/scratch/schennareddy/TCGA/embeddings_hex100",
+ "models": "/lustre/nvwulf/projects/YurovskyGroup-nvwulf/srihith/cptac_hoptimus0_distill_hest_pna_work/results/leiden_official_hvg50/models"
+}

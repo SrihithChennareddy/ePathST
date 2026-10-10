@@ -134,6 +134,9 @@ def predict_from_embeddings(bundles, x_s, x_t, coords_um, case, cfg, device, see
             acc[s] += z_ * b["scale"] + b["mu"]
     preds = {s: (acc[s] / len(bundles)).astype(np.float32) for s in SYSTEMS}
     assert all(np.isfinite(p).all() for p in preds.values()), f"{case}: non-finite predictions"
+    # A8 (FINAL_GUIDE.md Step 1): E, P and T all predict the same `n` rows of `coords_um` built
+    # above, so their spot sets cannot diverge; assert it so a future refactor can't break it silently.
+    assert all(p.shape[0] == n for p in preds.values()), f"{case}: systems produced different spot counts"
     return preds
 
 

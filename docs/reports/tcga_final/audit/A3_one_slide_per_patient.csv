@@ -1,0 +1,4 @@
+project,slides,patients,dx1,dx_other,duplicate_patients
+TCGA-BRCA,1045,1045,1010,35,0
+TCGA-COAD,429,429,426,3,0
+TCGA-KIRC,488,488,486,2,0

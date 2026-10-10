@@ -1,0 +1,19 @@
+project,system,kind,files,format,key,example_shape,dtype,bytes
+TCGA-BRCA,E,prediction,1030,npz,pred__ePathST-E,"(13058, 50)",float16,3976678470
+TCGA-BRCA,P,prediction,1030,npz,pred__ePathST,"(13058, 50)",float16,3976678470
+TCGA-BRCA,T,prediction,1030,npz,pred__H-Optimus-0,"(13058, 50)",float16,3976678470
+TCGA-BRCA,E/P encoder,embedding,1030,npz,student,"(13058, 320)",float16,58251505460
+TCGA-BRCA,T encoder,embedding,1030,npz,teacher,"(13058, 1536)",float16,58251505460
+TCGA-BRCA,all,prediction keys,1030,npz,x_um;y_um;genes;n_folds;native_mpp;pitch_um;pred__ePathST-E;pred__ePathST;pred__H-Optimus-0,,,0
+TCGA-COAD,E,prediction,413,npz,pred__ePathST-E,"(17851, 50)",float16,1378083822
+TCGA-COAD,P,prediction,413,npz,pred__ePathST,"(17851, 50)",float16,1378083822
+TCGA-COAD,T,prediction,413,npz,pred__H-Optimus-0,"(17851, 50)",float16,1378083822
+TCGA-COAD,E/P encoder,embedding,413,npz,student,"(17851, 320)",float16,20135736758
+TCGA-COAD,T encoder,embedding,413,npz,teacher,"(17851, 1536)",float16,20135736758
+TCGA-COAD,all,prediction keys,413,npz,x_um;y_um;genes;n_folds;native_mpp;pitch_um;pred__ePathST-E;pred__ePathST;pred__H-Optimus-0,,,0
+TCGA-KIRC,E,prediction,488,npz,pred__ePathST-E,"(6675, 50)",float16,2524616507
+TCGA-KIRC,P,prediction,488,npz,pred__ePathST,"(6675, 50)",float16,2524616507
+TCGA-KIRC,T,prediction,488,npz,pred__H-Optimus-0,"(6675, 50)",float16,2524616507
+TCGA-KIRC,E/P encoder,embedding,488,npz,student,"(6675, 320)",float16,37387555792
+TCGA-KIRC,T encoder,embedding,488,npz,teacher,"(6675, 1536)",float16,37387555792
+TCGA-KIRC,all,prediction keys,488,npz,x_um;y_um;genes;n_folds;native_mpp;pitch_um;pred__ePathST-E;pred__ePathST;pred__H-Optimus-0,,,0

@@ -5,8 +5,21 @@
               "COAD": {"head": "COAD", "endpoint": "PFI", "horizon_years": 3},
               "KIRC": {"head": "CCRCC", "endpoint": "OS", "horizon_years": 5}},
   "brca_population": {"primary": "all_histologies", "sensitivity": "Infiltrating Ductal Carcinoma", "decided": "by the user on 2026-10-09, before any outcome analysis"},
-  "panels": "TO_FILL_STEP1: ordered 50-gene list per head, read from checkpoint/config",
-  "tcga_ensemble": "TO_FILL_STEP1: seed(s) used and fold models excluded by the collapse rule",
+  "panels": {
+    "IDC": ["ABCC11","ADH1B","ADIPOQ","ANKRD30A","AQP1","AQP3","CCR7","CD3E","CEACAM6","CEACAM8","CLIC6","CYTIP","DST","ERBB2","ESR1","FASN","GATA3","IL2RG","IL7R","KIT","KLF5","KRT14","KRT5","KRT6B","MMP1","MMP12","MS4A1","MUC6","MYBPC1","MYH11","MYLK","OPRPN","OXTR","PIGR","PTGDS","PTN","PTPRC","SCD","SCGB2A1","SERHL2","SERPINA3","SFRP1","SLAMF7","TACSTD2","TCL1A","TENT5C","TOP2A","TPSAB1","TRAC","VWF"],
+    "COAD": ["AQP8","AREG","BANK1","CA1","CA4","CALB2","CCL20","CCR7","CD177","CEACAM6","CEACAM7","CHGA","CHGB","CHI3L2","CLCA1","CLCA4","COL11A1","CTSE","CXCL10","CXCL13","DMBT1","DUOX2","FCRL1","GATA2","GCG","GUCA2A","GUCA2B","HEPACAM2","IL1B","INSL5","ITLN1","LCN2","MMP1","MMP3","MS4A1","MS4A12","NXPE4","OLFM4","OTOP2","PI3","PRPH","RETNLB","SCG2","SCGN","SLC26A3","SPIB","TCL1A","TMIGD1","TYMS","UGT2B17"],
+    "CCRCC": ["AKAP8","BLVRB","BTF3","CD109","CD14","CHST15","CIB1","CKB","CPD","CPE","DERL1","DNAJB12","EGFL7","FLNB","GADD45B","GPNMB","H3F3A","HMOX1","HNRNPK","HSPA1A","HTRA1","IFI27","IFI6","IRF7","ISG15","KRTCAP2","LAPTM4B","LRRC41","LY6E","NAMPT","NOL3","NOTCH3","NT5DC2","PARP10","PTGS1","PXN","RXRA","S100A9","SCARB1","SEMA4B","SLC15A4","SLC39A14","STK39","TFRC","TM2D3","TMEM91","TP53INP1","TRBC1","VMP1","YWHAE"],
+    "source": "Step 1 A4: ordered gene axis read from each head's stored predictions; identical across E, P, T within each cancer (results/tcga_final/audit/A4_panels.csv)"
+  },
+  "tcga_ensemble": {
+    "seed": 0,
+    "TCGA-BRCA": {"head": "IDC", "folds_used": ["IDC_fold0", "IDC_fold1", "IDC_fold3"], "excluded": ["IDC_fold2"], "excluded_why": "Step 1 A7: ePathST-E head collapsed, test PCC 0.011; rebuilt for E, P and T from results/tcga_final/predictions_rebuilt/TCGA-BRCA/", "slides": 1030},
+    "TCGA-COAD": {"head": "COAD", "folds_used": ["COAD_fold0", "COAD_fold1"], "excluded": [], "slides": 413},
+    "TCGA-KIRC": {"head": "CCRCC", "folds_used": ["CCRCC_fold0", "CCRCC_fold1", "CCRCC_fold2", "CCRCC_fold3", "CCRCC_fold4", "CCRCC_fold5"], "excluded": [], "slides": 488},
+    "averaging": "un-standardised per fold (z * (sigma + eps) + mu), then arithmetic mean over the kept folds",
+    "note": "seed 1 is not used for any TCGA ensemble; the seed-1 H-Optimus-0 collapse at ccRCC fold 4 (A7) therefore does not affect these predictions (see DEVIATIONS.md)",
+    "source": "results/tcga_final/audit/A6_ensemble.csv, A7_collapse.csv"
+  },
   "collapse_rule": "fold model collapsed if validation PCC (mean over genes) < 0.05 OR median per-gene prediction SD across validation spots < 0.01 x target SD; excluded from the TCGA ensemble for every system sharing that fold head",
   "slides": {"type": "DX only", "per_patient": "DX1, else lowest DX number", "min_spots": 200},
   "rna": {"source": "GDC STAR-Counts tpm_unstranded", "transform": "log2(TPM+1)", "sample_type": "01", "aliquot_rule": "01A first, then lowest vial/portion code"},

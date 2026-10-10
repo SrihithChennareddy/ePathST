@@ -1,0 +1,4 @@
+project,slide_type,slides
+TCGA-BRCA,DX,1045
+TCGA-COAD,DX,429
+TCGA-KIRC,DX,488
