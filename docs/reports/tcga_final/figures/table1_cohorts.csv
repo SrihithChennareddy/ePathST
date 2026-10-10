@@ -1,0 +1,4 @@
+cancer,candidate,step1_eligible,survival_eligible,events,median_followup_years
+BRCA,1045,1030,994,130,2.61
+COAD,429,413,384,101,2.17
+KIRC,488,488,483,162,4.61
