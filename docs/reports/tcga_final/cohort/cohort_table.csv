@@ -1,0 +1,4 @@
+cancer,endpoint,candidate_patients,excl_slide_qc,excl_slide_qc_reasons,slide_eligible,excl_survival,excl_missing_stage,excl_missing_age,excl_missing_or_nonpositive_time,survival_eligible,events,event_rate,with_rna,median_followup_years,at_risk_3y,at_risk_5y,idc_only
+BRCA,PFI,1045,15,skipped_no_mpp=7; skipped_<200_spots=6; skipped_<200_spots_prefilter=2,1030,36,23,1,13,994,130,0.131,994,2.61,387,209,711.0
+COAD,PFI,429,16,skipped_no_mpp=14; skipped_no_tissue_patches=1; skipped_<200_spots=1,413,29,12,1,18,384,101,0.263,384,2.17,73,26,
+KIRC,OS,488,0,,488,5,3,0,2,483,162,0.335,483,4.61,265,137,

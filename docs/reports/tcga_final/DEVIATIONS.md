@@ -26,3 +26,15 @@
 - **What changed:** the KIRC Stage III subgroup analysis (8.6) ran at tau=4.00 years (1461.0 days) instead of the nominal 5-year horizon.
 - **Why:** this subgroup has only 117 patients / 47 events; Step 5.4's rule (>=10% TE at risk, tau<=TR max follow-up, >=1 TE patient with time<tau in every outer split) failed at 5 years and was satisfied at 4. This is `56_survival_exploratory.py`'s reuse of `54_tcga_survival.py`'s `pick_tau`/`run_cohort`, which lowers tau automatically; this entry was added after the run completed because the subgroup path didn't wire its deviation list back to this file (a gap in `56_survival_exploratory.py`, noted for completeness, not re-run for it alone since the result itself is already correct).
 - **Outcomes seen:** logged after the run. Tau was lowered automatically by the pre-registered Step 5.4 rule, based on follow-up only; no choice was made after seeing outcomes.
+
+## 2026-10-14 — ΔC corrected t-test: J=25, not 50, for C vs C+P comparisons
+
+- **What changed:** `delta_table` (54) and the sensitivity deltas (54c) paired splits on (cohort, repeat, fold) across both the full and RNA cohorts. Every survival-eligible patient has RNA, so the two cohorts are identical, and C+P vs C was tested on 50 "splits" (each counted twice). Comparisons are now paired within one cohort (full when both sets are fit there, else RNA), J=25, df=24, as pre-registered. Rebuilt from the saved per-split C-indices (`--deltas-only`), no refitting.
+- **Effect:** point estimates unchanged; CIs wider, p higher for C+P vs C. BRCA primary 0.0163 [-0.031, 0.063], p=0.484 (was p=0.460); KIRC 0.0197 [0.003, 0.036], p=0.022 (was 0.014). Other comparisons and U3 unchanged. Old tables in `survival/_superseded_J50_20261014/` and `survival_sensitivity/_superseded_J50_20261014/`.
+- **Outcomes seen:** yes — a coding error against the pre-registered test, fixed regardless of direction; the primary test is null either way.
+
+## 2026-10-15 — Post-hoc null controls (not pre-registered)
+
+- **What:** `60_null_controls.py`, added after external review flagged the lack of a negative control. (a) Transfer: 1,000 shuffled-patient permutations of the predicted matrix (one permutation across all genes), same Spearman + BH over 150 pairs as Step 4; null of #genes q<0.05. (b) KIRC: 200 permutations of the predicted-gene rows across patients with age, stage and outcome fixed, rerunning the full Step 5 C/C+P nested CV and the Step 5.6 independence fit; null of the P-score HR, LR statistic and ΔC.
+- **Why:** the Step 5.6 score is the out-of-fold C+P risk, which contains age and stage, so HR 2.54 could partly reflect the clinical terms; (b) tests that directly.
+- **Outcomes seen:** yes — added after all primary and secondary results were known. Reported as a supplementary control; it does not change any pre-registered result.

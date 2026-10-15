@@ -112,13 +112,55 @@ def run_variant(surv_mod, variant: str, cancer: str, project: str, panel: list, 
         surv_mod.CLIN = orig_clin
 
 
+COMPARISONS = [
+    ("C+P", "C"), ("C+P", "C+E"), ("C+E", "C+T"), ("C+P", "C+T"),
+    ("C+B", "C"), ("C+B+P", "C+B"),
+]
+
+
+def sensitivity_deltas(surv_mod, cindex_all: pd.DataFrame) -> pd.DataFrame:
+    """Corrected-t delta C per variant x cancer; splits paired within one cohort (J=25)."""
+    from epathst.analysis.stats_utils import bh
+
+    delta_rows = []
+    for variant in cindex_all["variant"].unique():
+        for cancer in cindex_all[cindex_all.variant == variant]["cancer"].unique():
+            for a, b in COMPARISONS:
+                coh = surv_mod.comparison_cohort(a, b)
+                sub = cindex_all[(cindex_all.variant == variant) & (cindex_all.cancer == cancer)
+                                 & (cindex_all.cohort == coh)]
+                da = sub[sub.feature_set == a].set_index(["repeat", "outer_fold"])["uno_c"]
+                db = sub[sub.feature_set == b].set_index(["repeat", "outer_fold"])["uno_c"]
+                common = da.index.intersection(db.index)
+                if len(common) == 0:
+                    continue
+                d = (da.loc[common] - db.loc[common]).to_numpy()
+                n_tr = sub[sub.feature_set == a]["n_tr"].mean()
+                n_te = sub[sub.feature_set == a]["n_te"].mean()
+                mean, lo, hi, t, p = surv_mod.nb_ttest(d, n_tr, n_te)
+                delta_rows.append(
+                    {"variant": variant, "cancer": cancer, "cohort": coh, "comparison": f"{a} vs {b}",
+                     "mean_delta_c": mean, "ci_low": lo, "ci_high": hi, "p": p, "n_splits": len(common)}
+                )
+    delta_df = pd.DataFrame(delta_rows)
+    delta_df["q"] = bh(delta_df["p"].to_numpy())
+    return delta_df
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--plan", default="configs/analysis_plan.json")
     ap.add_argument("--out", default="results/tcga_final")
+    ap.add_argument("--deltas-only", action="store_true",
+                    help="rebuild delta_c_sensitivity.csv from the saved per-split C-indices, no refitting")
     args = ap.parse_args()
     out_root = Path(args.out)
     out = out_root / "survival_sensitivity"
+    if args.deltas_only:
+        cindex_all = pd.read_csv(out / "cindex_by_split_sensitivity.csv")
+        sensitivity_deltas(load_survival_module(), cindex_all).to_csv(out / "delta_c_sensitivity.csv", index=False)
+        print("rebuilt", out / "delta_c_sensitivity.csv")
+        return
     out.mkdir(parents=True, exist_ok=True)
     (out_root / "logs").mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
@@ -151,33 +193,7 @@ def main():
 
     cindex_all = pd.concat(all_results, ignore_index=True)
     cindex_all.to_csv(out / "cindex_by_split_sensitivity.csv", index=False)
-
-    delta_rows = []
-    comparisons = [
-        ("C+P", "C"), ("C+P", "C+E"), ("C+E", "C+T"), ("C+P", "C+T"),
-        ("C+B", "C"), ("C+B+P", "C+B"),
-    ]
-    for variant in cindex_all["variant"].unique():
-        for cancer in cindex_all[cindex_all.variant == variant]["cancer"].unique():
-            sub = cindex_all[(cindex_all.variant == variant) & (cindex_all.cancer == cancer)]
-            for a, b in comparisons:
-                da = sub[sub.feature_set == a].set_index(["cohort", "repeat", "outer_fold"])["uno_c"]
-                db = sub[sub.feature_set == b].set_index(["cohort", "repeat", "outer_fold"])["uno_c"]
-                common = da.index.intersection(db.index)
-                if len(common) == 0:
-                    continue
-                d = (da.loc[common] - db.loc[common]).to_numpy()
-                n_tr = sub[sub.feature_set == a]["n_tr"].mean()
-                n_te = sub[sub.feature_set == a]["n_te"].mean()
-                mean, lo, hi, t, p = surv_mod.nb_ttest(d, n_tr, n_te)
-                delta_rows.append(
-                    {"variant": variant, "cancer": cancer, "comparison": f"{a} vs {b}",
-                     "mean_delta_c": mean, "ci_low": lo, "ci_high": hi, "p": p, "n_splits": len(common)}
-                )
-    delta_df = pd.DataFrame(delta_rows)
-    from epathst.analysis.stats_utils import bh
-
-    delta_df["q"] = bh(delta_df["p"].to_numpy())
+    delta_df = sensitivity_deltas(surv_mod, cindex_all)
     delta_df.to_csv(out / "delta_c_sensitivity.csv", index=False)
 
     if deviations:

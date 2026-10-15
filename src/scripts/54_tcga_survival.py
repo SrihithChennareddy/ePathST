@@ -219,22 +219,31 @@ def run_cohort(cancer: str, df: pd.DataFrame, panel: list[str], sets: list[str],
     )
 
 
-def delta_table(cindex: pd.DataFrame, comparisons, cancers_per_comp=None) -> pd.DataFrame:
+def comparison_cohort(a: str, b: str) -> str:
+    """Full cohort when both sets are fit there, else the RNA subset."""
+    return "full" if a in FULL_SETS and b in FULL_SETS else "rna"
+
+
+def delta_table(cindex: pd.DataFrame, comparisons, cancers_per_comp=None, cohort: str | None = None) -> pd.DataFrame:
+    # pair splits within one cohort only: C and C+P are fit in both the full and RNA cohorts,
+    # so matching on (cohort, repeat, fold) across both gave J=50 for C+P vs C
     rows = []
     for a, b, *rest in comparisons:
         cancers = rest[0] if rest else cancers_per_comp
+        coh = cohort or comparison_cohort(a, b)
         for cancer in cancers:
-            da = cindex[(cindex.cancer == cancer) & (cindex.feature_set == a)].set_index(["cohort", "repeat", "outer_fold"])["uno_c"]
-            db = cindex[(cindex.cancer == cancer) & (cindex.feature_set == b)].set_index(["cohort", "repeat", "outer_fold"])["uno_c"]
+            sub = cindex[(cindex.cancer == cancer) & (cindex.cohort == coh)]
+            da = sub[sub.feature_set == a].set_index(["repeat", "outer_fold"])["uno_c"]
+            db = sub[sub.feature_set == b].set_index(["repeat", "outer_fold"])["uno_c"]
             common = da.index.intersection(db.index)
             if len(common) == 0:
                 continue
             deltas = (da.loc[common] - db.loc[common]).to_numpy()
-            n_tr = cindex[(cindex.cancer == cancer) & (cindex.feature_set == a)]["n_tr"].mean()
-            n_te = cindex[(cindex.cancer == cancer) & (cindex.feature_set == a)]["n_te"].mean()
+            n_tr = sub[sub.feature_set == a]["n_tr"].mean()
+            n_te = sub[sub.feature_set == a]["n_te"].mean()
             mean, lo, hi, t, p = nb_ttest(deltas, n_train=n_tr, n_test=n_te)
             rows.append(
-                {"cancer": cancer, "comparison": f"{a} vs {b}", "mean_delta_c": mean,
+                {"cancer": cancer, "cohort": coh, "comparison": f"{a} vs {b}", "mean_delta_c": mean,
                  "ci_low": lo, "ci_high": hi, "t": t, "p": p, "n_splits": len(common)}
             )
     df = pd.DataFrame(rows)
@@ -278,9 +287,15 @@ def main():
     ap.add_argument("--plan", default="configs/analysis_plan.json")
     ap.add_argument("--out", default="results/tcga_final")
     ap.add_argument("--smoke", action="store_true", help="20 patients/cancer, 2 repeats")
+    ap.add_argument("--deltas-only", action="store_true",
+                    help="rebuild the delta-C tables from the saved cindex_by_split.csv, no refitting")
     args = ap.parse_args()
     out_root = Path(args.out)
     out = out_root / "survival"
+    if args.deltas_only:
+        write_delta_tables(pd.read_csv(out / "cindex_by_split.csv"), out)
+        print("rebuilt delta-C tables in", out)
+        return
     out.mkdir(parents=True, exist_ok=True)
     (out_root / "logs").mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
@@ -357,6 +372,11 @@ def main():
     pd.DataFrame(independence_rows).to_csv(out / "independence.csv", index=False)
     pd.concat(ph_rows, ignore_index=True).to_csv(out / "ph_tests.csv", index=False)
 
+    write_delta_tables(cindex_all, out)
+    log.info("wrote %s", out)
+
+
+def write_delta_tables(cindex_all: pd.DataFrame, out: Path):
     primary = delta_table(cindex_all, [("C+P", "C", ["BRCA"])])
     primary.to_csv(out / "delta_c_primary.csv", index=False)
     secondary = delta_table(cindex_all, SECONDARY_COMPARISONS)
@@ -364,11 +384,8 @@ def main():
     pd.concat([primary.assign(family="primary"), secondary.assign(family="secondary")], ignore_index=True).to_csv(
         out / "delta_c.csv", index=False
     )
-
     u3 = delta_table(cindex_all, U3_COMPARISONS, cancers_per_comp=["BRCA", "COAD", "KIRC"])
     u3.to_csv(out / "bottleneck_summary.csv", index=False)
-
-    log.info("wrote %s", out)
 
 
 if __name__ == "__main__":

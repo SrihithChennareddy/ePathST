@@ -346,8 +346,7 @@ def main():
     fig4(out, root)
     fig5(out, root)
     main_tables(out, root)
-    Path("docs/reports/NUMBERS_SHEET.md").write_text(numbers_sheet(root, args.commit))
-    print("wrote", out, "and docs/reports/NUMBERS_SHEET.md")
+    print("wrote", out, "(numbers sheet: 59_numbers_sheet.py)")
 
 
 if __name__ == "__main__":

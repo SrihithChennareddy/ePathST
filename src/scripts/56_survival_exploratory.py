@@ -232,7 +232,7 @@ def subgroup_analysis(surv_mod, cancer: str, df_full: pd.DataFrame, subgroup_mas
     cindex, alpha, coef, pcavar, oof, tau, folds = surv_mod.run_cohort(
         cancer, d, panel, ["C", "C+P"], f"subgroup_{name}", seeds, 32, Path("/dev/null"), deviations
     )
-    dtab = surv_mod.delta_table(cindex, [("C+P", "C", [cancer])])
+    dtab = surv_mod.delta_table(cindex, [("C+P", "C", [cancer])], cohort=f"subgroup_{name}")
     if len(dtab):
         result.update(
             {"delta_c": dtab["mean_delta_c"].iloc[0], "ci_low": dtab["ci_low"].iloc[0],
