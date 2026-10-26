@@ -35,9 +35,7 @@ conservative choice to avoid gene-selection leakage in the project's own from-sc
 evaluation. But statistic, normalization, and data scope (train-only-per-fold vs.
 pooled-whole-cohort) all differ, so the two procedures land on almost entirely different genes.
 
-The project's list below is job 84871's fold-0 selection (`experimental_runs/
-2026-08-31_job84871_final_5fold_3cancer_seed0_with_results_final/results/genbio_baseline/
-hvg_lists/<cancer>_hvg50.json`) -- shown as one representative fold; the actual selection is
+The project's list below is job 84871's fold-0 selection -- shown as one representative fold; the actual selection is
 re-run fresh every fold.
 
 ## IDC

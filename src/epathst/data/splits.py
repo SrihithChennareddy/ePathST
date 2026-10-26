@@ -215,7 +215,7 @@ def assert_run_completeness(expected: set[tuple], completed: set[tuple], context
     """Hard completeness gate: print the included runs, then assert completed == expected.
 
     Raises instead of warning: aggregation must fail loudly rather than silently proceed on a
-    partial run, as it once did (see docs/reports/POC5_RESULTS.md).
+    partial run, as it once did.
     """
     print(
         f"[assert_run_completeness{f' ({context})' if context else ''}] "

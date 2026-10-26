@@ -77,7 +77,7 @@ The `src/scripts/` are numbered end-to-end and split into two phases: distilling
 18. `18_final_interpretation.py` — final scientific interpretation of the results
 
 Steps 10 to 18 use the project's own 5-fold patient-level cross-validation over the HEST cohort (per-fold HVG1000/HVG50 genes, patient-level
-Fisher-z correlation); its results are in `docs/reports/HEST_FINAL_5FOLD_RESULTS.md`.
+Fisher-z correlation).
 
 **Official HEST-1k Benchmark protocol** (official 50-gene panels and pooled-spot PCC; see `docs/reports/HEST_OFFICIAL_ABLATION_RESULTS.md`)
 

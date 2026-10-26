@@ -264,7 +264,7 @@ def main():
     print(f"[10_run_patient_cv] wrote {paths['results'] / 'cv_ablation_metrics.csv'}")
 
     # Hard completeness gate before aggregation: prevents silently pooling only 3 of 4 completed
-    # folds (see docs/reports/POC5_RESULTS.md).
+    # folds.
     expected_keys = expected_run_keys(cv_grid, [a.name for a in ABLATION_GRID], unit="per_cancer")
     assert_run_completeness(expected_keys, completed_keys, context="10_run_patient_cv final gate")
     print(

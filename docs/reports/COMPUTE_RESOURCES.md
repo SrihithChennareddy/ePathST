@@ -50,7 +50,7 @@ SLURM-managed institutional cluster." The Phase 1 ledger below is as of 2026-08-
   distillation training (S1/seed0), with validation cosine similarity to
   the teacher climbing 0.7646 -> 0.9019 over that span.
 - **Two of the five jobs (83723, 83737) failed** partway through (a real
-  bug, since fixed — see `docs/reports/RUN_STATUS.md`) after ~1.3-1.6 GPU-hours
+  bug, since fixed) after ~1.3-1.6 GPU-hours
   each; their successful Steps 1-4 work was reused by later jobs rather
   than wasted.
 - **Job 84150** (in progress) continues training from epoch 39 toward
@@ -71,8 +71,7 @@ An 8x/4x NVIDIA H200 (141GB) partition (`h200x4`/`h200x8` and their
 started** — the cluster's H200 GPUs were fully allocated cluster-wide at
 submission time, and separately the `-long` partition variants proved
 structurally lower scheduling priority than their short-partition
-siblings on this cluster (see `docs/reports/RUN_STATUS.md` for the full
-scheduling investigation). All were cancelled with zero elapsed runtime
+siblings on this cluster. All were cancelled with zero elapsed runtime
 and zero GPU-hours consumed. **No H200 compute was used in this
 project** — if reporting hardware in a paper, report RTX PRO 6000
 Blackwell only.

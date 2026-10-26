@@ -617,7 +617,7 @@ def main():
         t_train0 = time.time()
         if args.head == "ridge":
             # Closed-form linear probe, the standard head for frozen foundation-model embeddings
-            # and less prone to MLP over/underfitting (docs/reports/RUN_STATUS.md). RidgeCV picks
+            # and less prone to MLP over/underfitting. RidgeCV picks
             # alpha by leave-one-out CV on TRAIN+VAL (never test), so val need not be held out
             # for early stopping as in the MLP path below.
             from sklearn.linear_model import RidgeCV

@@ -14,7 +14,7 @@
 # Standalone frozen-H-Optimus-0 patch-only baseline for the HEST
 # IDC/COAD/CCRCC cohorts (src/scripts/run_hoptimus_hest_baseline.py). Runs fully
 # independently of, and in parallel with, the CNN/GNN experiment job
-# (run_hest_downstream_full.slurm, job 84327/84331 as of submission) --
+# (jobs 84327/84331 as of submission) --
 # its own separate GPU allocation, no job dependency, and it only READS
 # that job's manifests/hest_samples.csv, manifests/hest_spot_manifest.csv,
 # and hest_patches/*.h5 (never writes to them). Its own outputs live under

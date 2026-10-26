@@ -17,7 +17,6 @@ paper. Everything else documents specific analyses, inputs and compute.
 |---|---|
 | `reports/HEST_OFFICIAL_ABLATION_RESULTS.md` | evaluation protocol, how the paper reads Table V, additional A0-A9 controls (benchmark-fold training), Moran's I, validation checks |
 | `reports/HEST_LEIDEN_CLUSTERING_RESULTS.md` | Leiden spatial-domain check: TENX149 (paper) and all 32 HEST test samples (benchmark-fold training) |
-| `reports/HEST_FINAL_5FOLD_RESULTS.md` | custom 5-fold patient-level cross-validation (HVG1000/HVG50, Fisher-z R); not comparable to the paper's tables |
 | `reports/HEST_OFFICIAL_HVG50_GENES.md` | official 50-gene panels versus the project's own HVG50, per cancer |
 
 ## Inputs and compute
@@ -27,10 +26,8 @@ paper. Everything else documents specific analyses, inputs and compute.
 | `reports/COMPUTE_RESOURCES.md` | compute used, with the accounting ledger |
 | `../input_data/README.md` | input data folder note |
 
-## Research history (`reports/`)
-Records that preserve the project history. They are accurate for their date and are kept unchanged: `reports/HEST_PHASE2_RESULTS.md` (early downstream
-CNN/GNN results), `reports/POC5_RESULTS.md` (colorectal proof of concept), `reports/RUN_STATUS.md` (run and recovery log),
-`reports/V1_TO_V2_MIGRATION.md`, and `../FINAL_REFACTOR_REPORT.md` (presentation-only refactor). `METHODS.md` is the current description of the work.
+## Research history
+`../FINAL_REFACTOR_REPORT.md` records the presentation-only refactor. `METHODS.md` is the current description of the work.
 
 ## Training and test splits
 Two protocols are described in the documents; each result states which one produced it.
@@ -39,7 +36,6 @@ Two protocols are described in the documents; each result states which one produ
 |---|---|---|---|
 | Cohort training (paper Table III/V) | per cancer, HEST-1K cohort slides outside the held-out test partition (about 200 across the three cancers) | held-out HEST test partition (official benchmark test folds) | `METHODS.md` |
 | Benchmark-fold training | the official benchmark's own training slides of each fold (IDC 3, COAD 1 to 3, ccRCC 20 slides per fold) | the fold's test slides | `reports/RESULTS_INDEX.md`, Leiden, TCGA, A0-A9 controls |
-| Custom 5-fold patient-level CV | cohort slides outside the fold, per-fold HVG genes | the fold's patients | `reports/HEST_FINAL_5FOLD_RESULTS.md` |
 
 ## Run snapshots (`../experimental_runs/`)
 `INDEX.csv` lists every snapshot; each folder has `manifest.json`, `results/`, `figures/` and `notes.md`:

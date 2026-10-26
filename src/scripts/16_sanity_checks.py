@@ -3,7 +3,7 @@
 All must pass before the full 5-fold x 3-seed run is launched; the script exits 1 otherwise.
 
 S3 (zero residual at init) and S9 (fold-completeness guard) target the two failures that broke an
-earlier run (PoC_5, docs/reports/POC5_RESULTS.md): the graph correction scored below the
+earlier run (PoC_5): the graph correction scored below the
 patch-only CNN because it was not a true residual at init, and a cross-fold aggregate silently
 pooled only 3 of 4 completed folds."""
 from __future__ import annotations

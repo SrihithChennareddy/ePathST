@@ -51,7 +51,7 @@
 #      workers each holding a multi-hundred-MB DICOM WSI pyramid +
 #      decompressed tile buffers spike well past a default few-GB limit).
 #   2. job 83815 (resubmitted after the truncation-bug fix, see
-#      docs/reports/RUN_STATUS.md) requested --mem=220G (sized for a node that
+#      run log) requested --mem=220G (sized for a node that
 #      had ~468GB truly free at 83721/83723's fix time) but got pinned via
 #      --nodelist to b40x4-11, which only had ~47GB actually allocatable
 #      at THAT submission time -- sat PENDING(Resources) indefinitely

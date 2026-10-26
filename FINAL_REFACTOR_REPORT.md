@@ -165,7 +165,7 @@ re-running `debug_idc_pipeline.py` and confirming identical output.
   reformat them.
 - **Dual config sources** (`configs/base.yaml` hand-mirrored to `base.json`,
   `load_config` silently preferring `.json`) — flagged by the Pass 1 audit as a
-  real footgun (already caught once per `docs/reports/RUN_STATUS.md`), but fixing the
+  real footgun (already caught once), but fixing the
   loading mechanism itself was judged out of presentation-only scope; not touched.
 - **A3-vs-`train_patch_head` code duplication** in `10_run_patient_cv.py` — Agent 2
   suggested extracting the shared training loop, but doing so changes structure,
@@ -336,8 +336,7 @@ Parameter count of the student encoder: 3,387,400 (paper: 3.39 M).
 A `--help` sweep over the scripts executed 20 and 21, which take no arguments. Script 20 rewrote
 `cptac_hoptimus0_distill_hest_pna_work/results/final/tables/` and `final/folds/` before stopping. Seven of the eight files are
 byte-identical to their committed snapshot copies; `efficiency.csv` lost its teacher-parameter and compression values. A copy of
-the folder as it is now is in the session scratch area. To restore the committed version:
-`cp experimental_runs/2026-08-31_job84871_final_5fold_3cancer_seed0_with_results_final/results/final/tables/efficiency.csv <work_dir>/results/final/tables/`.
+the folder as it is now is in the session scratch area. The committed snapshot copy was removed from the repository in the cleanup; the removed run files are kept outside the repository.
 The same sweep re-ran `26_hest_audits.py panel-coverage`, which rewrote `results/hest_panel_coverage/` with recomputed values.
 
 ## 8. Left unchanged on purpose
@@ -361,7 +360,7 @@ The same sweep re-ran `26_hest_audits.py panel-coverage`, which rewrote `results
    says those earlier results "genuinely were produced using GenBio-PathFM"; later commits (3bd426b, 0439715) relabelled
    them as H-Optimus-0. The code and configs now describe an H-Optimus-0 teacher, which is what a new distillation run would
    use; the stored checkpoints were not distilled from it.
-2. `docs/reports/HEST_FINAL_5FOLD_RESULTS.md` section 7 and the `experimental_runs` snapshots show official-protocol teacher
+2. The removed `HEST_FINAL_5FOLD_RESULTS.md` section 7 and `experimental_runs` snapshots showed official-protocol teacher
    numbers (IDC 0.5898, COAD 0.3264, ccRCC 0.2638) and B1 numbers under an H-Optimus-0 label; they equal the GenBio-labelled
    files on disk (`official_hest_benchmark_summary.csv`, `genbio_summary.csv`).
 3. The file named `gene_context.png` in `paper_figures/` is a third-party GigaTIME figure, not the gene-context dot plot the

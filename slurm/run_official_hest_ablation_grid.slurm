@@ -17,7 +17,7 @@
 # COAD 2, CCRCC 6 -- 12 fold x 9 ablations = 108 trained-model runs total).
 # See src/scripts/22_official_hest_ablation_grid.py's module docstring for the
 # exact protocol/adaptations. Smoke-tested on CPU (COAD fold 0, 2-epoch
-# config) before this real run -- see docs/reports/RUN_STATUS.md.
+# config) before this real run.
 
 set -euo pipefail
 cd /lustre/nvwulf/home/schennareddy/cellvit_project/STS_src
